@@ -1,0 +1,205 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import {
+  Box,
+  Typography,
+  Button,
+  Card,
+  TextField,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  Grid,
+  CircularProgress,
+} from '@mui/material';
+import { ArrowBack, Save } from '@mui/icons-material';
+import { colors, constants } from '../config/theme';
+import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection } from 'firebase/firestore';
+import { db } from '../config/firebase';
+
+const RewardFormPage = () => {
+  const navigate = useNavigate();
+  const { id } = useParams();
+  const isEditMode = !!id;
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
+    type: 'points',
+    pointsRequired: 1000,
+    cashValue: 0,
+    quantityAvailable: 100,
+    minRankRequired: 0,
+    tier: 'bronze',
+    status: 'inactive',
+    isLimited: true,
+    expiryDate: null,
+  });
+
+  useEffect(() => {
+    if (isEditMode) {
+      loadRewardData();
+    } else {
+      setLoading(false);
+    }
+  }, [id]);
+
+  const loadRewardData = async () => {
+    try {
+      setLoading(true);
+      const rewardRef = doc(db, 'rewards', id);
+      const rewardDoc = await getDoc(rewardRef);
+      if (rewardDoc.exists()) {
+        const data = rewardDoc.data();
+        setFormData({
+          name: data.name || '',
+          description: data.description || '',
+          type: data.type || 'points',
+          pointsRequired: data.pointsRequired || 1000,
+          cashValue: data.cashValue || 0,
+          quantityAvailable: data.quantityAvailable || 100,
+          minRankRequired: data.minRankRequired || 0,
+          tier: data.tier || 'bronze',
+          status: data.status || 'inactive',
+          isLimited: data.isLimited !== undefined ? data.isLimited : true,
+          expiryDate: data.expiryDate?.toDate || null,
+        });
+      }
+    } catch (error) {
+      console.error('Error loading reward:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleChange = (field, value) => {
+    setFormData({ ...formData, [field]: value });
+  };
+
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+      const rewardData = {
+        ...formData,
+        updatedAt: serverTimestamp(),
+      };
+
+      if (isEditMode) {
+        const rewardRef = doc(db, 'rewards', id);
+        await updateDoc(rewardRef, rewardData);
+      } else {
+        const rewardRef = doc(collection(db, 'rewards'));
+        await setDoc(rewardRef, {
+          ...rewardData,
+          createdAt: serverTimestamp(),
+        });
+      }
+      navigate(constants.routes.rewards);
+    } catch (error) {
+      console.error('Error saving reward:', error);
+      alert('Failed to save reward');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+        <CircularProgress sx={{ color: colors.brandRed }} />
+      </Box>
+    );
+  }
+
+  return (
+    <Box sx={{ width: '100%', maxWidth: '100%' }}>
+      <Button
+        startIcon={<ArrowBack />}
+        onClick={() => navigate(constants.routes.rewards)}
+        sx={{ mb: 3, color: colors.brandRed, textTransform: 'none', fontWeight: 600 }}
+      >
+        Back to Rewards
+      </Button>
+
+      <Typography variant="h4" sx={{ fontWeight: 700, mb: 3 }}>
+        {isEditMode ? 'Edit Reward' : 'Add New Reward'}
+      </Typography>
+
+      <Card sx={{ padding: 3, borderRadius: '16px' }}>
+        <Grid container spacing={3}>
+          <Grid item xs={12}>
+            <TextField
+              fullWidth
+              label="Reward Name"
+              value={formData.name}
+              onChange={(e) => handleChange('name', e.target.value)}
+              required
+            />
+          </Grid>
+          <Grid item xs={12}>
+            <TextField
+              fullWidth
+              multiline
+              rows={3}
+              label="Description"
+              value={formData.description}
+              onChange={(e) => handleChange('description', e.target.value)}
+            />
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <FormControl fullWidth>
+              <InputLabel>Type</InputLabel>
+              <Select
+                value={formData.type}
+                onChange={(e) => handleChange('type', e.target.value)}
+                label="Type"
+              >
+                <MenuItem value="points">Points</MenuItem>
+                <MenuItem value="cash">Cash</MenuItem>
+                <MenuItem value="prize">Prize</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <TextField
+              fullWidth
+              type="number"
+              label="Points Required"
+              value={formData.pointsRequired}
+              onChange={(e) => handleChange('pointsRequired', parseInt(e.target.value) || 0)}
+            />
+          </Grid>
+          <Grid item xs={12}>
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+              <Button
+                variant="outlined"
+                onClick={() => navigate(constants.routes.rewards)}
+                sx={{ textTransform: 'none', fontWeight: 600 }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="contained"
+                startIcon={<Save />}
+                onClick={handleSave}
+                disabled={saving}
+                sx={{
+                  background: `linear-gradient(135deg, ${colors.success} 0%, ${colors.success}DD 100%)`,
+                  textTransform: 'none',
+                  fontWeight: 600,
+                }}
+              >
+                {saving ? 'Saving...' : 'Save Reward'}
+              </Button>
+            </Box>
+          </Grid>
+        </Grid>
+      </Card>
+    </Box>
+  );
+};
+
+export default RewardFormPage;

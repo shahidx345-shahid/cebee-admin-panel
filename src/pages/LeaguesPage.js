@@ -1,0 +1,640 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  Box,
+  Typography,
+  Button,
+  Card,
+  Grid,
+  Chip,
+  Switch,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+  IconButton,
+  Menu,
+  ListItemText,
+} from '@mui/material';
+import {
+  Add,
+  SportsSoccer,
+  CheckCircle,
+  Cancel,
+  Stadium,
+  AccessTime,
+  List as ListIcon,
+  Lock,
+  MoreVert,
+  ArrowDropDown,
+  ArrowUpward,
+  ArrowDownward,
+} from '@mui/icons-material';
+import { colors, constants } from '../config/theme';
+import SearchBar from '../components/common/SearchBar';
+import DataTable from '../components/common/DataTable';
+import { collection, getDocs, query, orderBy, doc, updateDoc } from 'firebase/firestore';
+import { db } from '../config/firebase';
+import { format } from 'date-fns';
+
+const LeaguesPage = () => {
+  const navigate = useNavigate();
+  const [leagues, setLeagues] = useState([]);
+  const [filteredLeagues, setFilteredLeagues] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [selectedSort, setSelectedSort] = useState('dateNewest');
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [anchorEl, setAnchorEl] = useState(null);
+  const [selectedLeague, setSelectedLeague] = useState(null);
+  const [dateFilterAnchor, setDateFilterAnchor] = useState(null);
+  const [typeFilterAnchor, setTypeFilterAnchor] = useState(null);
+
+  useEffect(() => {
+    loadLeagues();
+  }, []);
+
+  useEffect(() => {
+    filterAndSortLeagues();
+  }, [leagues, searchQuery, typeFilter, selectedSort]);
+
+  const loadLeagues = async () => {
+    try {
+      setLoading(true);
+      const leaguesRef = collection(db, 'leagues');
+      const q = query(leaguesRef, orderBy('createdAt', 'desc'));
+      const snapshot = await getDocs(q);
+      const leaguesData = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setLeagues(leaguesData);
+      setFilteredLeagues(leaguesData);
+    } catch (error) {
+      console.error('Error loading leagues:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filterAndSortLeagues = () => {
+    let filtered = [...leagues];
+
+    // Search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (league) =>
+          league.name?.toLowerCase().includes(query) ||
+          league.id?.toLowerCase().includes(query)
+      );
+    }
+
+    // Type filter
+    if (typeFilter !== 'all') {
+      filtered = filtered.filter((league) => league.type === typeFilter);
+    }
+
+    // Sort
+    switch (selectedSort) {
+      case 'nameAZ':
+        filtered.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+        break;
+      case 'nameZA':
+        filtered.sort((a, b) => (b.name || '').localeCompare(a.name || ''));
+        break;
+      case 'typeAZ':
+        filtered.sort((a, b) => (a.type || '').localeCompare(b.type || ''));
+        break;
+      case 'typeZA':
+        filtered.sort((a, b) => (b.type || '').localeCompare(a.type || ''));
+        break;
+      case 'dateNewest':
+        filtered.sort((a, b) => {
+          const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
+          const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+          return dateB - dateA;
+        });
+        break;
+      case 'dateOldest':
+        filtered.sort((a, b) => {
+          const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
+          const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+          return dateA - dateB;
+        });
+        break;
+      default:
+        break;
+    }
+
+    setFilteredLeagues(filtered);
+  };
+
+  const toggleLeagueStatus = async (league) => {
+    try {
+      // Check if we're trying to activate and already have 5 active leagues
+      const activeCount = leagues.filter((l) => l.isActive).length;
+      if (!league.isActive && activeCount >= 5) {
+        alert('Maximum 5 active leagues allowed');
+        return;
+      }
+
+      const leagueRef = doc(db, 'leagues', league.id);
+      await updateDoc(leagueRef, {
+        isActive: !league.isActive,
+      });
+      await loadLeagues();
+    } catch (error) {
+      console.error('Error toggling league status:', error);
+    }
+  };
+
+  const handleMenuOpen = (event, league) => {
+    setAnchorEl(event.currentTarget);
+    setSelectedLeague(league);
+  };
+
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+    setSelectedLeague(null);
+  };
+
+  const activeCount = leagues.filter((l) => l.isActive).length;
+
+  const columns = [
+    {
+      id: 'logo',
+      label: 'Logo',
+      render: () => (
+        <Box
+          sx={{
+            width: 48,
+            height: 48,
+            borderRadius: '8px',
+            backgroundColor: colors.backgroundLight,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <SportsSoccer sx={{ fontSize: 24, color: colors.textSecondary }} />
+        </Box>
+      ),
+    },
+    {
+      id: 'name',
+      label: 'Name',
+      render: (value, row) => (
+        <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack }}>
+          {row.name || 'N/A'}
+        </Typography>
+      ),
+    },
+    {
+      id: 'type',
+      label: 'Type',
+      render: (value, row) => (
+        <Chip
+          label={row.type || 'N/A'}
+          size="small"
+          sx={{
+            backgroundColor: '#ed6c02',
+            color: colors.brandWhite,
+            fontWeight: 600,
+            fontSize: 11,
+            height: 24,
+          }}
+        />
+      ),
+    },
+    {
+      id: 'status',
+      label: 'Status',
+      render: (_, row) => (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Switch
+            checked={row.isActive || false}
+            onChange={() => toggleLeagueStatus(row)}
+            size="small"
+            disabled={activeCount >= 5 && !row.isActive}
+            sx={{
+              '& .MuiSwitch-switchBase.Mui-checked': {
+                color: colors.success,
+              },
+              '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                backgroundColor: colors.success,
+              },
+            }}
+          />
+          <Lock sx={{ fontSize: 16, color: colors.textSecondary }} />
+        </Box>
+      ),
+    },
+    {
+      id: 'createdAt',
+      label: 'Created Date',
+      render: (value) => {
+        if (!value) return 'N/A';
+        const date = value?.toDate ? value.toDate() : new Date(value);
+        return format(date, 'MMM dd, yyyy');
+      },
+    },
+    {
+      id: 'actions',
+      label: 'Actions',
+      render: (_, row) => (
+        <IconButton
+          size="small"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleMenuOpen(e, row);
+          }}
+          sx={{
+            backgroundColor: colors.brandRed,
+            color: colors.brandWhite,
+            width: 32,
+            height: 32,
+            '&:hover': {
+              backgroundColor: colors.brandDarkRed,
+            },
+          }}
+        >
+          <MoreVert sx={{ fontSize: 18 }} />
+        </IconButton>
+      ),
+    },
+  ];
+
+  const paginatedLeagues = filteredLeagues.slice(
+    page * rowsPerPage,
+    page * rowsPerPage + rowsPerPage
+  );
+
+  return (
+    <Box sx={{ width: '100%', maxWidth: '100%' }}>
+      {/* Header */}
+      <Box sx={{ mb: 3 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+          <Box
+            sx={{
+              padding: 1.5,
+              background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
+              borderRadius: '14px',
+              border: `2px solid ${colors.brandWhite}`,
+            }}
+          >
+            <Stadium sx={{ fontSize: 28, color: colors.brandWhite }} />
+          </Box>
+          <Typography
+            variant="h4"
+            sx={{
+              fontWeight: 700,
+              color: colors.brandBlack,
+              fontSize: { xs: 24, md: 28 },
+            }}
+          >
+            League Management
+          </Typography>
+        </Box>
+        <Typography
+          variant="body2"
+          sx={{
+            color: colors.textSecondary,
+            fontSize: 14,
+            ml: 8.5,
+          }}
+        >
+          Manage football leagues and competitions (Max 5 active)
+        </Typography>
+      </Box>
+
+      {/* Search and Add Button */}
+      <Grid container spacing={2} sx={{ mb: 2 }}>
+        <Grid item xs={12} md={8}>
+          <SearchBar
+            value={searchQuery}
+            onChange={setSearchQuery}
+            placeholder="Search leagues..."
+          />
+        </Grid>
+        <Grid item xs={12} md={4}>
+          <Button
+            variant="contained"
+            startIcon={<Add />}
+            onClick={() => navigate('/leagues/add')}
+            fullWidth
+            sx={{
+              background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
+              borderRadius: '12px',
+              textTransform: 'none',
+              fontWeight: 600,
+              py: 1.5,
+            }}
+          >
+            Add League
+          </Button>
+        </Grid>
+      </Grid>
+
+      {/* Filter Chips */}
+      <Box sx={{ display: 'flex', gap: 1.5, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
+        <Button
+          variant="outlined"
+          startIcon={<AccessTime sx={{ fontSize: 18 }} />}
+          endIcon={<ArrowDropDown sx={{ color: colors.brandRed }} />}
+          onClick={(e) => setDateFilterAnchor(e.currentTarget)}
+          sx={{
+            borderColor: colors.backgroundLight,
+            color: colors.brandBlack,
+            backgroundColor: colors.brandWhite,
+            borderRadius: '8px',
+            textTransform: 'none',
+            fontWeight: 500,
+            px: 2,
+            py: 1,
+          }}
+        >
+          {selectedSort === 'nameAZ' ? 'Name: A-Z' :
+           selectedSort === 'nameZA' ? 'Name: Z-A' :
+           selectedSort === 'typeAZ' ? 'Type: A-Z' :
+           selectedSort === 'typeZA' ? 'Type: Z-A' :
+           selectedSort === 'dateNewest' ? 'Date: Newest' :
+           selectedSort === 'dateOldest' ? 'Date: Oldest' : 'Date: Newest'}
+        </Button>
+        <Menu
+          anchorEl={dateFilterAnchor}
+          open={Boolean(dateFilterAnchor)}
+          onClose={() => setDateFilterAnchor(null)}
+          PaperProps={{
+            sx: {
+              borderRadius: '12px',
+              minWidth: 200,
+              boxShadow: `0 4px 12px ${colors.shadow}33`,
+              mt: 1,
+            },
+          }}
+        >
+          <MenuItem
+            onClick={() => { setSelectedSort('nameAZ'); setDateFilterAnchor(null); }}
+            sx={{
+              backgroundColor: selectedSort === 'nameAZ' ? `${colors.brandRed}14` : 'transparent',
+              '&:hover': { backgroundColor: `${colors.brandRed}08` },
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, width: '100%' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <ArrowDownward sx={{ fontSize: 16, color: colors.textSecondary }} />
+                <ListIcon sx={{ fontSize: 16, color: colors.textSecondary }} />
+              </Box>
+              <Typography sx={{ flex: 1, fontWeight: selectedSort === 'nameAZ' ? 600 : 500 }}>
+                Name: A-Z
+              </Typography>
+              {selectedSort === 'nameAZ' && (
+                <CheckCircle sx={{ fontSize: 18, color: colors.brandRed }} />
+              )}
+            </Box>
+          </MenuItem>
+          <MenuItem
+            onClick={() => { setSelectedSort('nameZA'); setDateFilterAnchor(null); }}
+            sx={{
+              backgroundColor: selectedSort === 'nameZA' ? `${colors.brandRed}14` : 'transparent',
+              '&:hover': { backgroundColor: `${colors.brandRed}08` },
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, width: '100%' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <ArrowUpward sx={{ fontSize: 16, color: colors.textSecondary }} />
+                <ListIcon sx={{ fontSize: 16, color: colors.textSecondary }} />
+              </Box>
+              <Typography sx={{ flex: 1, fontWeight: selectedSort === 'nameZA' ? 600 : 500 }}>
+                Name: Z-A
+              </Typography>
+              {selectedSort === 'nameZA' && (
+                <CheckCircle sx={{ fontSize: 18, color: colors.brandRed }} />
+              )}
+            </Box>
+          </MenuItem>
+          <MenuItem
+            onClick={() => { setSelectedSort('typeAZ'); setDateFilterAnchor(null); }}
+            sx={{
+              backgroundColor: selectedSort === 'typeAZ' ? `${colors.brandRed}14` : 'transparent',
+              '&:hover': { backgroundColor: `${colors.brandRed}08` },
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, width: '100%' }}>
+              <ArrowDownward sx={{ fontSize: 16, color: colors.textSecondary }} />
+              <Typography sx={{ flex: 1, fontWeight: selectedSort === 'typeAZ' ? 600 : 500 }}>
+                Type: A-Z
+              </Typography>
+              {selectedSort === 'typeAZ' && (
+                <CheckCircle sx={{ fontSize: 18, color: colors.brandRed }} />
+              )}
+            </Box>
+          </MenuItem>
+          <MenuItem
+            onClick={() => { setSelectedSort('typeZA'); setDateFilterAnchor(null); }}
+            sx={{
+              backgroundColor: selectedSort === 'typeZA' ? `${colors.brandRed}14` : 'transparent',
+              '&:hover': { backgroundColor: `${colors.brandRed}08` },
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, width: '100%' }}>
+              <ArrowUpward sx={{ fontSize: 16, color: colors.textSecondary }} />
+              <Typography sx={{ flex: 1, fontWeight: selectedSort === 'typeZA' ? 600 : 500 }}>
+                Type: Z-A
+              </Typography>
+              {selectedSort === 'typeZA' && (
+                <CheckCircle sx={{ fontSize: 18, color: colors.brandRed }} />
+              )}
+            </Box>
+          </MenuItem>
+          <MenuItem
+            onClick={() => { setSelectedSort('dateNewest'); setDateFilterAnchor(null); }}
+            sx={{
+              backgroundColor: selectedSort === 'dateNewest' ? `${colors.brandRed}14` : 'transparent',
+              '&:hover': { backgroundColor: `${colors.brandRed}08` },
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, width: '100%' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <AccessTime sx={{ fontSize: 16, color: colors.textSecondary }} />
+                <ArrowDownward sx={{ fontSize: 16, color: colors.textSecondary }} />
+              </Box>
+              <Typography sx={{ flex: 1, fontWeight: selectedSort === 'dateNewest' ? 600 : 500 }}>
+                Date: Newest
+              </Typography>
+              {selectedSort === 'dateNewest' && (
+                <CheckCircle sx={{ fontSize: 18, color: colors.brandRed }} />
+              )}
+            </Box>
+          </MenuItem>
+          <MenuItem
+            onClick={() => { setSelectedSort('dateOldest'); setDateFilterAnchor(null); }}
+            sx={{
+              backgroundColor: selectedSort === 'dateOldest' ? `${colors.brandRed}14` : 'transparent',
+              '&:hover': { backgroundColor: `${colors.brandRed}08` },
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, width: '100%' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <AccessTime sx={{ fontSize: 16, color: colors.textSecondary }} />
+                <ArrowUpward sx={{ fontSize: 16, color: colors.textSecondary }} />
+              </Box>
+              <Typography sx={{ flex: 1, fontWeight: selectedSort === 'dateOldest' ? 600 : 500 }}>
+                Date: Oldest
+              </Typography>
+              {selectedSort === 'dateOldest' && (
+                <CheckCircle sx={{ fontSize: 18, color: colors.brandRed }} />
+              )}
+            </Box>
+          </MenuItem>
+        </Menu>
+        <Button
+          variant="outlined"
+          startIcon={<ListIcon sx={{ fontSize: 18 }} />}
+          endIcon={<ArrowDropDown sx={{ color: colors.brandRed }} />}
+          onClick={(e) => setTypeFilterAnchor(e.currentTarget)}
+          sx={{
+            borderColor: colors.backgroundLight,
+            color: colors.brandBlack,
+            backgroundColor: colors.brandWhite,
+            borderRadius: '8px',
+            textTransform: 'none',
+            fontWeight: 500,
+            px: 2,
+            py: 1,
+          }}
+        >
+          {typeFilter === 'all' ? 'All Types' : typeFilter.charAt(0).toUpperCase() + typeFilter.slice(1)}
+        </Button>
+        <Menu
+          anchorEl={typeFilterAnchor}
+          open={Boolean(typeFilterAnchor)}
+          onClose={() => setTypeFilterAnchor(null)}
+        >
+          <MenuItem onClick={() => { setTypeFilter('all'); setTypeFilterAnchor(null); }}>
+            All Types
+          </MenuItem>
+          <MenuItem onClick={() => { setTypeFilter('domestic'); setTypeFilterAnchor(null); }}>
+            Domestic
+          </MenuItem>
+          <MenuItem onClick={() => { setTypeFilter('international'); setTypeFilterAnchor(null); }}>
+            International
+          </MenuItem>
+          <MenuItem onClick={() => { setTypeFilter('cup'); setTypeFilterAnchor(null); }}>
+            Cup
+          </MenuItem>
+        </Menu>
+        <Chip
+          icon={<CheckCircle sx={{ fontSize: 16, color: colors.brandWhite }} />}
+          label={`Active: ${activeCount}/5`}
+          sx={{
+            backgroundColor: colors.success,
+            color: colors.brandWhite,
+            fontWeight: 600,
+            fontSize: 13,
+            height: 36,
+          }}
+        />
+      </Box>
+
+      {/* Leagues List Header */}
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+        <Box
+          sx={{
+            padding: 0.75,
+            backgroundColor: colors.brandRed,
+            borderRadius: '8px',
+          }}
+        >
+          <ListIcon sx={{ fontSize: 18, color: colors.brandWhite }} />
+        </Box>
+        <Typography
+          variant="h6"
+          sx={{
+            fontWeight: 700,
+            color: colors.brandBlack,
+            fontSize: 18,
+          }}
+        >
+          Leagues List
+        </Typography>
+        <Typography
+          variant="body2"
+          sx={{
+            color: colors.textSecondary,
+            fontSize: 13,
+            ml: 1,
+          }}
+        >
+          {filteredLeagues.length} leagues found
+        </Typography>
+      </Box>
+
+      {/* Data Table */}
+      <DataTable
+        columns={columns}
+        data={paginatedLeagues}
+        loading={loading}
+        page={page}
+        rowsPerPage={rowsPerPage}
+        totalCount={filteredLeagues.length}
+        onPageChange={(e, newPage) => setPage(newPage)}
+        onRowsPerPageChange={(e) => {
+          setRowsPerPage(parseInt(e.target.value, 10));
+          setPage(0);
+        }}
+        emptyMessage="No leagues found"
+      />
+
+      {/* Actions Menu */}
+      <Menu
+        anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        onClose={handleMenuClose}
+        PaperProps={{
+          sx: {
+            borderRadius: '12px',
+            minWidth: 180,
+            boxShadow: `0 4px 12px ${colors.shadow}33`,
+          },
+        }}
+      >
+        <MenuItem
+          onClick={() => {
+            if (selectedLeague) {
+              navigate(`/leagues/edit/${selectedLeague.id}`);
+            }
+            handleMenuClose();
+          }}
+        >
+          <ListItemText primary="Edit" />
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            if (selectedLeague) {
+              toggleLeagueStatus(selectedLeague);
+            }
+            handleMenuClose();
+          }}
+        >
+          <ListItemText
+            primary={selectedLeague?.isActive ? 'Deactivate' : 'Activate'}
+          />
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            handleMenuClose();
+          }}
+          sx={{ color: colors.error }}
+        >
+          <ListItemText primary="Delete" />
+        </MenuItem>
+      </Menu>
+    </Box>
+  );
+};
+
+export default LeaguesPage;
