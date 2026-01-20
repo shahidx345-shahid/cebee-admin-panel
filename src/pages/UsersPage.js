@@ -117,13 +117,13 @@ const UsersPage = () => {
       
       // Try to load from Firebase
       try {
-        const usersRef = collection(db, 'users');
+      const usersRef = collection(db, 'users');
         const q = query(usersRef, orderBy('createdAt', 'desc'));
-        const snapshot = await getDocs(q);
+      const snapshot = await getDocs(q);
         usersData = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
+        id: doc.id,
+        ...doc.data(),
+      }));
       } catch (error) {
         console.log('Using dummy data:', error);
       }
@@ -647,50 +647,98 @@ const UsersPage = () => {
       </Grid>
 
       {/* User Status Tabs */}
-      <Box sx={{ mb: 3 }}>
-        <ToggleButtonGroup
-          value={selectedStatus}
-          exclusive
-          onChange={(e, newValue) => {
-            if (newValue !== null) setSelectedStatus(newValue);
-          }}
+      <Box sx={{ mb: 3, display: 'flex', gap: 1.5 }}>
+        <Button
+          variant={selectedStatus === 'active' ? 'contained' : 'outlined'}
+          onClick={() => setSelectedStatus('active')}
+          startIcon={
+            <Box
+              sx={{
+                width: 20,
+                height: 20,
+                borderRadius: '50%',
+                backgroundColor: selectedStatus === 'active' ? colors.brandWhite : colors.success,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <CheckCircle 
+                sx={{ 
+                  fontSize: 14, 
+                  color: selectedStatus === 'active' ? colors.success : colors.brandWhite 
+                }} 
+              />
+            </Box>
+          }
           sx={{
-            '& .MuiToggleButton-root': {
+            flex: 1,
+            borderRadius: '20px',
+            textTransform: 'none',
+            fontWeight: 600,
+            px: 3,
+            py: 1.5,
+            backgroundColor: selectedStatus === 'active' ? colors.success : colors.brandWhite,
+            color: selectedStatus === 'active' ? colors.brandWhite : colors.brandBlack,
+            border: `1.5px solid ${selectedStatus === 'active' ? colors.success : colors.divider}66`,
+            '&:hover': {
+              backgroundColor: selectedStatus === 'active' ? colors.success : colors.brandWhite,
+              borderColor: selectedStatus === 'active' ? colors.success : colors.divider,
+            },
+          }}
+        >
+          Active Users
+        </Button>
+        <Button
+          variant={selectedStatus === 'inactive' ? 'contained' : 'outlined'}
+          onClick={() => setSelectedStatus('inactive')}
+          startIcon={
+            <Box
+              sx={{
+                width: 20,
+                height: 20,
+                borderRadius: '50%',
+                backgroundColor: selectedStatus === 'inactive' ? colors.brandWhite : colors.textSecondary,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Cancel 
+                sx={{ 
+                  fontSize: 14, 
+                  color: selectedStatus === 'inactive' ? colors.error : colors.brandWhite 
+                }} 
+              />
+            </Box>
+          }
+          sx={{
+            flex: 1,
               borderRadius: '20px',
               textTransform: 'none',
               fontWeight: 600,
               px: 3,
-              py: 1,
-              border: `1.5px solid ${colors.divider}66`,
-              '&.Mui-selected': {
-                backgroundColor: colors.success,
-                color: colors.brandWhite,
-                borderColor: colors.success,
+            py: 1.5,
+            backgroundColor: selectedStatus === 'inactive' ? colors.success : colors.brandWhite,
+            color: selectedStatus === 'inactive' ? colors.brandWhite : colors.brandBlack,
+            border: `1.5px solid ${selectedStatus === 'inactive' ? colors.success : colors.divider}66`,
                 '&:hover': {
-                  backgroundColor: colors.success,
-                },
-              },
+              backgroundColor: selectedStatus === 'inactive' ? colors.success : colors.brandWhite,
+              borderColor: selectedStatus === 'inactive' ? colors.success : colors.divider,
             },
           }}
         >
-          <ToggleButton value="active">
-            <CheckCircle sx={{ fontSize: 18, mr: 1 }} />
-            Active Users
-          </ToggleButton>
-          <ToggleButton value="inactive">
-            <Cancel sx={{ fontSize: 18, mr: 1, color: colors.error }} />
             Inactive Users
-          </ToggleButton>
-        </ToggleButtonGroup>
+        </Button>
       </Box>
 
       {/* Search and Filter Bar */}
-      <Box sx={{ display: 'flex', gap: 1.5, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
-        <Box sx={{ flex: 1, minWidth: 300 }}>
+      <Box sx={{ display: 'flex', gap: 1.5, mb: 3, alignItems: 'center' }}>
+        <Box sx={{ flex: 2, minWidth: 0 }}>
           <SearchBar
             value={searchQuery}
             onChange={setSearchQuery}
-            placeholder="Search by username, email, user ID, or full name..."
+            placeholder="Search by username, email or user ID..."
           />
         </Box>
         <Button
@@ -698,8 +746,8 @@ const UsersPage = () => {
           startIcon={
             <Box
               sx={{
-                width: 24,
-                height: 24,
+                width: 20,
+                height: 20,
                 borderRadius: '50%',
                 backgroundColor: colors.brandRed,
                 display: 'flex',
@@ -707,57 +755,29 @@ const UsersPage = () => {
                 justifyContent: 'center',
               }}
             >
-              <ArrowUpward sx={{ fontSize: 14, color: colors.brandWhite }} />
+              <ArrowUpward sx={{ fontSize: 12, color: colors.brandWhite }} />
             </Box>
           }
-          endIcon={<ArrowDropDown sx={{ color: colors.brandRed }} />}
+          endIcon={<ArrowDropDown sx={{ color: colors.brandRed, fontSize: 20 }} />}
           onClick={(e) => setSpFilterAnchor(e.currentTarget)}
           sx={{
-            borderColor: colors.brandWhite,
+            flex: 1,
+            borderColor: `${colors.brandRed}26`,
             color: colors.brandBlack,
             backgroundColor: colors.brandWhite,
             borderRadius: '8px',
             textTransform: 'none',
             fontWeight: 500,
             px: 2,
-            py: 1,
+            py: 1.5,
             boxShadow: `0 2px 8px ${colors.shadow}14`,
+            '&:hover': {
+              borderColor: colors.brandRed,
+              backgroundColor: colors.brandWhite,
+            },
           }}
         >
-          SP: {selectedSort === 'spHigh' ? 'High' : selectedSort === 'spLow' ? 'Low' : 'High'}
-        </Button>
-        <Button
-          variant="outlined"
-          startIcon={
-            <Box
-              sx={{
-                width: 24,
-                height: 24,
-                borderRadius: '50%',
-                backgroundColor: colors.info,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <BarChart sx={{ fontSize: 14, color: colors.brandWhite }} />
-            </Box>
-          }
-          endIcon={<ArrowDropDown sx={{ color: colors.info }} />}
-          onClick={(e) => setAccuracyFilterAnchor(e.currentTarget)}
-          sx={{
-            borderColor: colors.brandWhite,
-            color: colors.brandBlack,
-            backgroundColor: colors.brandWhite,
-            borderRadius: '8px',
-            textTransform: 'none',
-            fontWeight: 500,
-            px: 2,
-            py: 1,
-            boxShadow: `0 2px 8px ${colors.shadow}14`,
-          }}
-        >
-          Accuracy: {accuracyFilter === 'all' ? 'All' : accuracyFilter === '0-25' ? '0-25%' : accuracyFilter === '26-50' ? '26-50%' : accuracyFilter === '51-75' ? '51-75%' : '76-100%'}
+          SP: High
         </Button>
         <Menu
           anchorEl={spFilterAnchor}
@@ -778,38 +798,11 @@ const UsersPage = () => {
             SP: Low
           </MenuItem>
         </Menu>
-        <Menu
-          anchorEl={accuracyFilterAnchor}
-          open={Boolean(accuracyFilterAnchor)}
-          onClose={() => setAccuracyFilterAnchor(null)}
-          PaperProps={{
-            sx: {
-              borderRadius: '12px',
-              minWidth: 180,
-              boxShadow: `0 4px 12px ${colors.shadow}33`,
-            },
-          }}
-        >
-          <MenuItem onClick={() => { setAccuracyFilter('all'); setAccuracyFilterAnchor(null); }}>
-            All
-          </MenuItem>
-          <MenuItem onClick={() => { setAccuracyFilter('0-25'); setAccuracyFilterAnchor(null); }}>
-            0-25%
-          </MenuItem>
-          <MenuItem onClick={() => { setAccuracyFilter('26-50'); setAccuracyFilterAnchor(null); }}>
-            26-50%
-          </MenuItem>
-          <MenuItem onClick={() => { setAccuracyFilter('51-75'); setAccuracyFilterAnchor(null); }}>
-            51-75%
-          </MenuItem>
-          <MenuItem onClick={() => { setAccuracyFilter('76-100'); setAccuracyFilterAnchor(null); }}>
-            76-100%
-          </MenuItem>
-        </Menu>
         <Button
           variant="outlined"
-          startIcon={<FilterList />}
+          startIcon={<FilterList sx={{ color: colors.textSecondary }} />}
           sx={{
+            flex: 1,
             borderColor: colors.brandWhite,
             color: colors.brandBlack,
             backgroundColor: colors.brandWhite,
@@ -817,8 +810,11 @@ const UsersPage = () => {
             textTransform: 'none',
             fontWeight: 500,
             px: 2,
-            py: 1,
+            py: 1.5,
             boxShadow: `0 2px 8px ${colors.shadow}14`,
+            '&:hover': {
+              backgroundColor: colors.brandWhite,
+            },
           }}
         >
           Filters
