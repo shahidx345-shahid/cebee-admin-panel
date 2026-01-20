@@ -64,17 +64,125 @@ const FixturesPage = () => {
       const fixturesRef = collection(db, 'fixtures');
       const q = query(fixturesRef, orderBy('kickoffTime', 'desc'));
       const snapshot = await getDocs(q);
-      const fixturesData = snapshot.docs.map((doc) => ({
+      let fixturesData = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
+
+      // If no fixtures exist, add sample data
+      if (fixturesData.length === 0) {
+        fixturesData = getSampleFixtures();
+      }
+
       setFixtures(fixturesData);
       setFilteredFixtures(fixturesData);
     } catch (error) {
       console.error('Error loading fixtures:', error);
+      // On error, use sample data
+      const sampleData = getSampleFixtures();
+      setFixtures(sampleData);
+      setFilteredFixtures(sampleData);
     } finally {
       setLoading(false);
     }
+  };
+
+  const getSampleFixtures = () => {
+    const now = new Date();
+    return [
+      // Scheduled fixtures
+      {
+        id: 'MATCH_001',
+        homeTeam: 'Manchester United',
+        awayTeam: 'Liverpool',
+        league: 'Premier League',
+        kickoffTime: new Date('2026-01-22T20:15:00'),
+        matchStatus: 'scheduled',
+        homeScore: undefined,
+        awayScore: undefined,
+        predictions: 0,
+      },
+      {
+        id: 'MATCH_006',
+        homeTeam: 'Real Madrid',
+        awayTeam: 'Barcelona',
+        league: 'La Liga',
+        kickoffTime: new Date('2026-01-25T20:15:00'),
+        matchStatus: 'scheduled',
+        homeScore: undefined,
+        awayScore: undefined,
+        predictions: 0,
+      },
+      {
+        id: 'MATCH_007',
+        homeTeam: 'Bayern Munich',
+        awayTeam: 'Borussia Dortmund',
+        league: 'Bundesliga',
+        kickoffTime: new Date('2026-01-27T20:15:00'),
+        matchStatus: 'scheduled',
+        homeScore: undefined,
+        awayScore: undefined,
+        predictions: 0,
+      },
+      // Live fixture
+      {
+        id: 'MATCH_003',
+        homeTeam: 'Manchester City',
+        awayTeam: 'Tottenham',
+        league: 'Premier League',
+        kickoffTime: new Date('2026-01-20T19:30:00'),
+        matchStatus: 'live',
+        homeScore: 2,
+        awayScore: 1,
+        predictions: 0,
+      },
+      // Result Pending fixture
+      {
+        id: 'MATCH_009',
+        homeTeam: 'Everton',
+        awayTeam: 'Fulham',
+        league: 'Premier League',
+        kickoffTime: new Date('2026-01-20T18:15:00'),
+        matchStatus: 'resultsProcessing',
+        homeScore: 1,
+        awayScore: 2,
+        predictions: 0,
+      },
+      // Completed fixtures
+      {
+        id: 'MATCH_004',
+        homeTeam: 'Newcastle',
+        awayTeam: 'Brighton',
+        league: 'Premier League',
+        kickoffTime: new Date('2026-01-19T20:15:00'),
+        matchStatus: 'completed',
+        homeScore: 2,
+        awayScore: 1,
+        predictions: 0,
+      },
+      {
+        id: 'MATCH_005',
+        homeTeam: 'West Ham',
+        awayTeam: 'Aston Villa',
+        league: 'Premier League',
+        kickoffTime: new Date('2026-01-18T20:15:00'),
+        matchStatus: 'completed',
+        homeScore: 1,
+        awayScore: 1,
+        predictions: 0,
+      },
+      {
+        id: 'MATCH_008',
+        homeTeam: 'Wolves',
+        awayTeam: 'Crystal Palace',
+        league: 'Premier League',
+        kickoffTime: new Date('2026-01-17T20:15:00'),
+        matchStatus: 'completed',
+        homeScore: 3,
+        awayScore: 0,
+        predictions: 0,
+      },
+    ];
   };
 
   const filterAndSortFixtures = () => {
