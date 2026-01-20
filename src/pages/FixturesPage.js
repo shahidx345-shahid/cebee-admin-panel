@@ -943,7 +943,7 @@ const FixturesPage = () => {
                   textTransform: 'none',
                   fontWeight: 600,
                   px: 2,
-                  py: 2.5,
+                  py: isSelected ? 3 : 2.5,
                   minHeight: 64,
                   borderRadius: 0,
                   backgroundColor: isSelected ? filter.color : 'transparent',
@@ -952,15 +952,16 @@ const FixturesPage = () => {
                   borderRight: index < statusFilters.length - 1 ? 'none' : 'none',
                   boxShadow: isSelected ? `0 2px 8px ${filter.color}40` : 'none',
                   position: 'relative',
-                  padding: isSelected ? '12px 16px' : '12px 16px',
                   margin: isSelected ? '4px' : '0',
                   '&:first-of-type': {
                     borderTopLeftRadius: '20px',
                     borderBottomLeftRadius: '20px',
+                    marginLeft: isSelected ? '4px' : '0',
                   },
                   '&:last-of-type': {
                     borderTopRightRadius: '20px',
                     borderBottomRightRadius: '20px',
+                    marginRight: isSelected ? '4px' : '0',
                   },
                   '&:hover': {
                     backgroundColor: isSelected ? filter.color : `${filter.color}0D`,
