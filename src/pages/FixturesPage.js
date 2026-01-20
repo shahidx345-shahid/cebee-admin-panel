@@ -825,7 +825,7 @@ const FixturesPage = () => {
   return (
     <Box sx={{ width: '100%', maxWidth: '100%' }}>
       {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+      <Box sx={{ mb: 3 }}>
         <Typography
           variant="h4"
           sx={{
@@ -836,19 +836,6 @@ const FixturesPage = () => {
         >
           Fixture Management
         </Typography>
-        <Button
-          variant="contained"
-          startIcon={<Add />}
-          onClick={() => navigate('/fixtures/add')}
-          sx={{
-            background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
-            borderRadius: '12px',
-            textTransform: 'none',
-            fontWeight: 600,
-          }}
-        >
-          Add Fixture
-        </Button>
       </Box>
 
       {/* Stats Cards - Dashboard Style */}
@@ -919,8 +906,8 @@ const FixturesPage = () => {
       </Grid>
 
       {/* Status Filter Buttons - Connected Style */}
-      <Card
-        sx={{
+            <Card
+              sx={{
           mb: 3,
           borderRadius: '20px',
           backgroundColor: colors.brandWhite,
@@ -938,10 +925,10 @@ const FixturesPage = () => {
               <Button
                 key={filter.value}
                 onClick={() => setSelectedStatus(filter.value)}
-                sx={{
+          sx={{
                   flex: 1,
-                  textTransform: 'none',
-                  fontWeight: 600,
+              textTransform: 'none',
+              fontWeight: 600,
                   px: 2,
                   py: isSelected ? 3 : 2.5,
                   minHeight: 64,
@@ -966,11 +953,11 @@ const FixturesPage = () => {
                   '&:hover': {
                     backgroundColor: isSelected ? filter.color : `${filter.color}0D`,
                     boxShadow: isSelected ? `0 2px 8px ${filter.color}40` : 'none',
-                  },
-                }}
-              >
+            },
+          }}
+        >
                 <Icon
-                  sx={{
+              sx={{
                     fontSize: 20,
                     mr: 1,
                     color: isSelected ? colors.brandWhite : filter.color,
