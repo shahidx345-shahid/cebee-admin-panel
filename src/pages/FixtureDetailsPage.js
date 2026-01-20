@@ -16,10 +16,12 @@ import {
 import {
   ArrowBack,
   Schedule,
-  Visibility,
+  Lock,
   PlayCircle,
   CheckCircle,
   SportsSoccer,
+  AccessTime,
+  HourglassEmpty,
 } from '@mui/icons-material';
 import { colors, constants } from '../config/theme';
 import SearchBar from '../components/common/SearchBar';
@@ -119,15 +121,52 @@ const FixtureDetailsPage = () => {
   }
 
   const getStatusChip = (status) => {
-    const statusConfig = {
-      scheduled: { label: 'Scheduled', color: colors.textSecondary, icon: Schedule },
-      published: { label: 'Published', color: colors.info, icon: Visibility },
-      live: { label: 'Live', color: colors.error, icon: PlayCircle },
-      completed: { label: 'Completed', color: colors.success, icon: CheckCircle },
-      resultsProcessing: { label: 'Result Pending', color: colors.warning, icon: Schedule },
+    // Map old statuses to new match flow states for backward compatibility
+    const statusMap = {
+      scheduled: 'predictionOpen',
+      published: 'predictionOpen',
+      predictionOpen: 'predictionOpen',
+      predictionLocked: 'predictionLocked',
+      locked: 'predictionLocked',
+      live: 'live',
+      fullTime: 'fullTime',
+      resultsProcessing: 'fullTimeProcessing',
+      fullTimeProcessing: 'fullTimeProcessing',
+      completed: 'fullTimeCompleted',
+      fullTimeCompleted: 'fullTimeCompleted',
     };
 
-    const config = statusConfig[status] || statusConfig.scheduled;
+    const mappedStatus = statusMap[status] || 'predictionOpen';
+
+    const statusConfig = {
+      predictionOpen: { 
+        label: 'Prediction Open', 
+        color: colors.info, 
+        icon: AccessTime 
+      },
+      predictionLocked: { 
+        label: 'Prediction Locked', 
+        color: colors.warning, 
+        icon: Lock 
+      },
+      live: { 
+        label: 'Live', 
+        color: colors.error, 
+        icon: PlayCircle 
+      },
+      fullTimeProcessing: { 
+        label: 'Full Time (Results Processing)', 
+        color: colors.warning, 
+        icon: HourglassEmpty 
+      },
+      fullTimeCompleted: { 
+        label: 'Full Time (Completed)', 
+        color: colors.success, 
+        icon: CheckCircle 
+      },
+    };
+
+    const config = statusConfig[mappedStatus] || statusConfig.predictionOpen;
     const Icon = config.icon;
 
     return (
@@ -143,14 +182,41 @@ const FixtureDetailsPage = () => {
     );
   };
 
-  const steps = ['Scheduled', 'Published', 'Live', 'Result Pending', 'Completed'];
+  const steps = [
+    'Prediction Open',
+    'Prediction Locked',
+    'Live',
+    'Full Time (Results Processing)',
+    'Full Time (Completed)'
+  ];
+
   const getActiveStep = () => {
     const status = fixture.matchStatus || fixture.status;
-    if (status === 'scheduled') return 0;
-    if (status === 'published') return 1;
-    if (status === 'live') return 2;
-    if (status === 'resultsProcessing') return 3;
-    if (status === 'completed') return 4;
+    
+    // Map old statuses to new match flow states
+    const statusMap = {
+      scheduled: 'predictionOpen',
+      published: 'predictionOpen',
+      predictionOpen: 'predictionOpen',
+      predictionLocked: 'predictionLocked',
+      locked: 'predictionLocked',
+      live: 'live',
+      fullTime: 'fullTimeProcessing',
+      resultsProcessing: 'fullTimeProcessing',
+      fullTimeProcessing: 'fullTimeProcessing',
+      completed: 'fullTimeCompleted',
+      fullTimeCompleted: 'fullTimeCompleted',
+    };
+
+    const mappedStatus = statusMap[status] || 'predictionOpen';
+
+    // Return step index based on match flow state
+    if (mappedStatus === 'predictionOpen') return 0;
+    if (mappedStatus === 'predictionLocked') return 1;
+    if (mappedStatus === 'live') return 2;
+    if (mappedStatus === 'fullTimeProcessing') return 3;
+    if (mappedStatus === 'fullTimeCompleted') return 4;
+    
     return 0;
   };
 
@@ -218,10 +284,10 @@ const FixtureDetailsPage = () => {
         Back to Fixtures
       </Button>
 
-      {/* State Flow Indicator */}
+      {/* Match Flow Indicator */}
       <Card sx={{ padding: 3, mb: 3, borderRadius: '16px' }}>
         <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
-          Match Status Flow
+          Match Flow Status
         </Typography>
         <Stepper activeStep={getActiveStep()} alternativeLabel>
           {steps.map((label) => (
