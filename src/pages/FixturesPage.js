@@ -1436,8 +1436,9 @@ const FixturesPage = () => {
           sx: {
             borderRadius: '12px',
             boxShadow: '0 4px 16px rgba(0, 0, 0, 0.15)',
-            minWidth: 200,
+            minWidth: 220,
             mt: 1,
+            padding: 0.5,
           },
         }}
         transformOrigin={{ horizontal: 'right', vertical: 'top' }}
@@ -1454,6 +1455,9 @@ const FixturesPage = () => {
           sx={{
             px: 2,
             py: 1.5,
+            borderRadius: '8px',
+            display: 'flex',
+            alignItems: 'center',
             '&:hover': {
               backgroundColor: `${colors.info}0D`,
             },
@@ -1464,16 +1468,16 @@ const FixturesPage = () => {
               width: 32,
               height: 32,
               borderRadius: '8px',
-              backgroundColor: `${colors.info}1A`,
+              backgroundColor: '#E3F2FD',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               mr: 1.5,
             }}
           >
-            <Visibility sx={{ fontSize: 18, color: colors.info }} />
+            <Visibility sx={{ fontSize: 18, color: '#1976D2' }} />
           </Box>
-          <Typography sx={{ flex: 1, fontWeight: 600 }}>View Details</Typography>
+          <Typography sx={{ flex: 1, fontWeight: 600, color: colors.brandBlack }}>View Details</Typography>
           <KeyboardArrowRight sx={{ fontSize: 18, color: colors.textSecondary }} />
         </MenuItem>
         <MenuItem
@@ -1487,6 +1491,9 @@ const FixturesPage = () => {
           sx={{
             px: 2,
             py: 1.5,
+            borderRadius: '8px',
+            display: 'flex',
+            alignItems: 'center',
             '&:hover': {
               backgroundColor: `${colors.warning}0D`,
             },
@@ -1497,16 +1504,16 @@ const FixturesPage = () => {
               width: 32,
               height: 32,
               borderRadius: '8px',
-              backgroundColor: `${colors.warning}1A`,
+              backgroundColor: '#FFF3E0',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               mr: 1.5,
             }}
           >
-            <Edit sx={{ fontSize: 18, color: colors.warning }} />
+            <Edit sx={{ fontSize: 18, color: '#FF9800' }} />
           </Box>
-          <Typography sx={{ flex: 1, fontWeight: 600 }}>Edit Fixture</Typography>
+          <Typography sx={{ flex: 1, fontWeight: 600, color: colors.brandBlack }}>Edit Fixture</Typography>
           <KeyboardArrowRight sx={{ fontSize: 18, color: colors.textSecondary }} />
         </MenuItem>
       </Menu>
