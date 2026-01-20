@@ -741,7 +741,13 @@ const PredictionsPage = () => {
                 borderBottomLeftRadius: '16px',
               },
               '&:hover': {
-                backgroundColor: selectedStatus === 'ongoing' ? colors.brandRed : `${colors.divider}0D`,
+                backgroundColor: selectedStatus === 'ongoing' ? colors.brandRed : 'transparent',
+                border: 'none',
+                boxShadow: 'none',
+              },
+              '&:focus': {
+                border: 'none',
+                boxShadow: 'none',
               },
             }}
           >
@@ -785,7 +791,13 @@ const PredictionsPage = () => {
                 borderBottomRightRadius: '16px',
               },
               '&:hover': {
-                backgroundColor: selectedStatus === 'completed' ? colors.success : `${colors.divider}0D`,
+                backgroundColor: selectedStatus === 'completed' ? colors.success : 'transparent',
+                border: 'none',
+                boxShadow: 'none',
+              },
+              '&:focus': {
+                border: 'none',
+                boxShadow: 'none',
               },
             }}
           >
