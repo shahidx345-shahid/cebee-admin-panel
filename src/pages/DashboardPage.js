@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Grid, Card, CardContent, Typography, Chip } from '@mui/material';
+import { Box, Grid, Card, CardContent, Typography, Chip, Button, IconButton } from '@mui/material';
 import {
   People,
   CheckCircle,
@@ -15,6 +15,11 @@ import {
   Edit,
   ArrowUpward,
   EmojiEvents,
+  ErrorOutline,
+  PersonAdd,
+  Lock,
+  ArrowForward,
+  KeyboardArrowRight,
 } from '@mui/icons-material';
 import { colors } from '../config/theme';
 import { collection, getDocs, query, where } from 'firebase/firestore';
