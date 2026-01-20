@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -786,7 +786,7 @@ const UsersPage = () => {
 
       {/* Search and Filter Bar */}
       <Box sx={{ display: 'flex', gap: 1.5, mb: 3, alignItems: 'center' }}>
-        <Box sx={{ flex: 2, minWidth: 0, position: 'relative' }}>
+        <Box ref={searchBoxRef} sx={{ flex: 2, minWidth: 0, position: 'relative' }}>
           <SearchBar
             value={searchQuery}
             onChange={(value) => {
