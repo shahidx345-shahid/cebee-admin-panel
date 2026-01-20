@@ -547,12 +547,12 @@ const FixturesPage = () => {
         <Chip
           label={row.id?.substring(0, 10) || row.matchId || 'N/A'}
           sx={{
-            backgroundColor: colors.brandRed,
-            color: colors.brandWhite,
+            backgroundColor: '#FFE5E5',
+            color: colors.brandRed,
             fontWeight: 600,
             fontSize: 11,
             height: 28,
-            borderRadius: '20px',
+            borderRadius: '8px',
             border: 'none',
           }}
         />
@@ -574,12 +574,12 @@ const FixturesPage = () => {
         <Chip
           label={row.league || 'N/A'}
           sx={{
-            backgroundColor: colors.brandRed,
-            color: colors.brandWhite,
+            backgroundColor: '#FFE5E5',
+            color: colors.brandRed,
             fontWeight: 600,
             fontSize: 11,
             height: 28,
-            borderRadius: '20px',
+            borderRadius: '8px',
             border: 'none',
           }}
         />
@@ -591,13 +591,39 @@ const FixturesPage = () => {
       render: (value, row) => {
         if (!row.kickoffTime) return '-';
         const date = row.kickoffTime?.toDate ? row.kickoffTime.toDate() : new Date(row.kickoffTime);
-        return format(date, 'MMM dd, yyyy HH:mm');
+        return (
+          <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13 }}>
+            {format(date, 'MMM dd, yyyy HH:mm')}
+          </Typography>
+        );
       },
     },
     {
       id: 'status',
       label: 'Status',
-      render: (_, row) => getStatusChip(row.matchStatus || row.status),
+      render: (_, row) => {
+        const status = row.matchStatus || row.status;
+        const isResultPending = status === 'resultsProcessing' || status === 'pending';
+        
+        if (isResultPending) {
+          return (
+            <Chip
+              label="RESULT PENDING"
+              sx={{
+                backgroundColor: colors.warning,
+                color: colors.brandWhite,
+                fontWeight: 700,
+                fontSize: 11,
+                height: 28,
+                borderRadius: '8px',
+                border: 'none',
+                textTransform: 'uppercase',
+              }}
+            />
+          );
+        }
+        return getStatusChip(status);
+      },
     },
     {
       id: 'score',
@@ -608,13 +634,13 @@ const FixturesPage = () => {
             <Chip
               label={`${row.homeScore}-${row.awayScore}`}
               sx={{
-                backgroundColor: 'transparent',
+                backgroundColor: colors.brandWhite,
                 color: colors.brandRed,
                 fontWeight: 600,
                 fontSize: 11,
                 height: 28,
-                borderRadius: '20px',
-                border: `1.5px solid ${colors.brandRed}`,
+                borderRadius: '8px',
+                border: `1px solid ${colors.brandRed}`,
               }}
             />
           );
