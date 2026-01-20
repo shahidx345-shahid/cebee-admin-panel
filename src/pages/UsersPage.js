@@ -15,6 +15,7 @@ import {
   Menu,
   ToggleButton,
   ToggleButtonGroup,
+  Badge,
 } from '@mui/material';
 import {
   Add,
@@ -55,6 +56,11 @@ const UsersPage = () => {
   const [accuracyFilter, setAccuracyFilter] = useState('all');
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [leaguePreference, setLeaguePreference] = useState('all');
+  const [clubPreference, setClubPreference] = useState('all');
+  const [countryFilter, setCountryFilter] = useState('all');
+  const [accuracyRange, setAccuracyRange] = useState('all');
 
   useEffect(() => {
     loadUsers();
@@ -90,6 +96,8 @@ const UsersPage = () => {
         firstName: firstName,
         lastName: lastName,
         country: countries[Math.floor(Math.random() * countries.length)],
+        preferredLeague: ['Premier League', 'La Liga', 'Serie A', 'Bundesliga', 'Ligue 1', 'All'][Math.floor(Math.random() * 6)],
+        preferredClub: ['Manchester United', 'Liverpool', 'Arsenal', 'Chelsea', 'Barcelona', 'Real Madrid', 'All'][Math.floor(Math.random() * 7)],
         isActive: isActive && !isBlocked && !isDeleted,
         isVerified: isVerified && !isBlocked && !isDeleted,
         isBlocked: isBlocked,
@@ -184,7 +192,19 @@ const UsersPage = () => {
       });
     }
 
-    // Accuracy filter
+    // Accuracy filter (from advanced filters)
+    if (accuracyRange !== 'all') {
+      filtered = filtered.filter((user) => {
+        const accuracy = user.predictionAccuracy || 0;
+        if (accuracyRange === '0-25') return accuracy >= 0 && accuracy <= 25;
+        if (accuracyRange === '26-50') return accuracy > 25 && accuracy <= 50;
+        if (accuracyRange === '51-75') return accuracy > 50 && accuracy <= 75;
+        if (accuracyRange === '76-100') return accuracy > 75 && accuracy <= 100;
+        return true;
+      });
+    }
+
+    // Legacy accuracy filter (keep for backward compatibility)
     if (accuracyFilter !== 'all') {
       filtered = filtered.filter((user) => {
         const accuracy = user.predictionAccuracy || 0;
@@ -193,6 +213,29 @@ const UsersPage = () => {
         if (accuracyFilter === '51-75') return accuracy > 50 && accuracy <= 75;
         if (accuracyFilter === '76-100') return accuracy > 75 && accuracy <= 100;
         return true;
+      });
+    }
+
+    // League Preference filter
+    if (leaguePreference !== 'all') {
+      filtered = filtered.filter((user) => {
+        // Assuming user has a preferredLeague field, or we can add it to dummy data
+        return user.preferredLeague === leaguePreference;
+      });
+    }
+
+    // Club Preference filter
+    if (clubPreference !== 'all') {
+      filtered = filtered.filter((user) => {
+        // Assuming user has a preferredClub field, or we can add it to dummy data
+        return user.preferredClub === clubPreference;
+      });
+    }
+
+    // Country filter
+    if (countryFilter !== 'all') {
+      filtered = filtered.filter((user) => {
+        return user.country === countryFilter;
       });
     }
 
@@ -1102,6 +1145,7 @@ const UsersPage = () => {
         <Button
           variant="outlined"
           startIcon={<FilterList sx={{ color: colors.textSecondary }} />}
+          onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
           sx={{
             flex: 1,
             borderColor: colors.brandWhite,
@@ -1116,11 +1160,199 @@ const UsersPage = () => {
             '&:hover': {
               backgroundColor: colors.brandWhite,
             },
+            position: 'relative',
           }}
         >
           Filters
+          {(leaguePreference !== 'all' || clubPreference !== 'all' || countryFilter !== 'all' || accuracyRange !== 'all') && (
+            <Badge
+              badgeContent={
+                [leaguePreference, clubPreference, countryFilter, accuracyRange].filter(f => f !== 'all').length
+              }
+              color="error"
+              sx={{
+                position: 'absolute',
+                top: 8,
+                right: 8,
+                '& .MuiBadge-badge': {
+                  backgroundColor: colors.brandRed,
+                  color: colors.brandWhite,
+                  fontSize: 10,
+                  minWidth: 18,
+                  height: 18,
+                },
+              }}
+            />
+          )}
         </Button>
       </Box>
+
+      {/* Advanced Filters Section */}
+      {showAdvancedFilters && (
+        <Card
+          sx={{
+            padding: 3,
+            mb: 3,
+            borderRadius: '16px',
+            backgroundColor: colors.brandWhite,
+            boxShadow: `0 2px 8px ${colors.shadow}14`,
+          }}
+        >
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <FilterList sx={{ color: colors.brandRed, fontSize: 20 }} />
+              <Typography variant="h6" sx={{ fontWeight: 700, color: colors.brandBlack }}>
+                Advanced Filters
+              </Typography>
+            </Box>
+            <Button
+              onClick={() => {
+                setLeaguePreference('all');
+                setClubPreference('all');
+                setCountryFilter('all');
+                setAccuracyRange('all');
+              }}
+              sx={{
+                color: colors.brandRed,
+                textTransform: 'none',
+                fontWeight: 600,
+                '&:hover': {
+                  backgroundColor: `${colors.brandRed}0D`,
+                },
+              }}
+            >
+              Clear All
+            </Button>
+          </Box>
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6} md={3}>
+              <FormControl fullWidth size="small">
+                <InputLabel sx={{ color: colors.textSecondary }}>League Preference</InputLabel>
+                <Select
+                  value={leaguePreference}
+                  onChange={(e) => setLeaguePreference(e.target.value)}
+                  label="League Preference"
+                  sx={{
+                    borderRadius: '8px',
+                    '& .MuiOutlinedInput-notchedOutline': {
+                      borderColor: `${colors.brandRed}26`,
+                    },
+                    '&:hover .MuiOutlinedInput-notchedOutline': {
+                      borderColor: colors.brandRed,
+                    },
+                    '& .MuiSvgIcon-root': {
+                      color: colors.brandRed,
+                    },
+                  }}
+                >
+                  <MenuItem value="all">All</MenuItem>
+                  <MenuItem value="Premier League">Premier League</MenuItem>
+                  <MenuItem value="La Liga">La Liga</MenuItem>
+                  <MenuItem value="Serie A">Serie A</MenuItem>
+                  <MenuItem value="Bundesliga">Bundesliga</MenuItem>
+                  <MenuItem value="Ligue 1">Ligue 1</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <FormControl fullWidth size="small">
+                <InputLabel sx={{ color: colors.textSecondary }}>Club Preference</InputLabel>
+                <Select
+                  value={clubPreference}
+                  onChange={(e) => setClubPreference(e.target.value)}
+                  label="Club Preference"
+                  sx={{
+                    borderRadius: '8px',
+                    '& .MuiOutlinedInput-notchedOutline': {
+                      borderColor: `${colors.brandRed}26`,
+                    },
+                    '&:hover .MuiOutlinedInput-notchedOutline': {
+                      borderColor: colors.brandRed,
+                    },
+                    '& .MuiSvgIcon-root': {
+                      color: colors.brandRed,
+                    },
+                  }}
+                >
+                  <MenuItem value="all">All</MenuItem>
+                  <MenuItem value="Manchester United">Manchester United</MenuItem>
+                  <MenuItem value="Liverpool">Liverpool</MenuItem>
+                  <MenuItem value="Arsenal">Arsenal</MenuItem>
+                  <MenuItem value="Chelsea">Chelsea</MenuItem>
+                  <MenuItem value="Barcelona">Barcelona</MenuItem>
+                  <MenuItem value="Real Madrid">Real Madrid</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <FormControl fullWidth size="small">
+                <InputLabel sx={{ color: colors.textSecondary }}>Country</InputLabel>
+                <Select
+                  value={countryFilter}
+                  onChange={(e) => setCountryFilter(e.target.value)}
+                  label="Country"
+                  sx={{
+                    borderRadius: '8px',
+                    '& .MuiOutlinedInput-notchedOutline': {
+                      borderColor: `${colors.brandRed}26`,
+                    },
+                    '&:hover .MuiOutlinedInput-notchedOutline': {
+                      borderColor: colors.brandRed,
+                    },
+                    '& .MuiSvgIcon-root': {
+                      color: colors.brandRed,
+                    },
+                  }}
+                >
+                  <MenuItem value="all">All</MenuItem>
+                  <MenuItem value="United States">United States</MenuItem>
+                  <MenuItem value="United Kingdom">United Kingdom</MenuItem>
+                  <MenuItem value="Canada">Canada</MenuItem>
+                  <MenuItem value="Australia">Australia</MenuItem>
+                  <MenuItem value="Germany">Germany</MenuItem>
+                  <MenuItem value="France">France</MenuItem>
+                  <MenuItem value="Spain">Spain</MenuItem>
+                  <MenuItem value="Italy">Italy</MenuItem>
+                  <MenuItem value="Brazil">Brazil</MenuItem>
+                  <MenuItem value="India">India</MenuItem>
+                  <MenuItem value="Nigeria">Nigeria</MenuItem>
+                  <MenuItem value="South Africa">South Africa</MenuItem>
+                  <MenuItem value="Kenya">Kenya</MenuItem>
+                  <MenuItem value="Ghana">Ghana</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <FormControl fullWidth size="small">
+                <InputLabel sx={{ color: colors.textSecondary }}>Accuracy Range</InputLabel>
+                <Select
+                  value={accuracyRange}
+                  onChange={(e) => setAccuracyRange(e.target.value)}
+                  label="Accuracy Range"
+                  sx={{
+                    borderRadius: '8px',
+                    '& .MuiOutlinedInput-notchedOutline': {
+                      borderColor: `${colors.brandRed}26`,
+                    },
+                    '&:hover .MuiOutlinedInput-notchedOutline': {
+                      borderColor: colors.brandRed,
+                    },
+                    '& .MuiSvgIcon-root': {
+                      color: colors.brandRed,
+                    },
+                  }}
+                >
+                  <MenuItem value="all">All</MenuItem>
+                  <MenuItem value="0-25">0-25%</MenuItem>
+                  <MenuItem value="26-50">26-50%</MenuItem>
+                  <MenuItem value="51-75">51-75%</MenuItem>
+                  <MenuItem value="76-100">76-100%</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+          </Grid>
+        </Card>
+      )}
 
       {/* Users List Header */}
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
