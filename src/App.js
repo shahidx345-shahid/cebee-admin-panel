@@ -26,6 +26,7 @@ import NotificationFormPage from './pages/NotificationFormPage';
 import PollFormPage from './pages/PollFormPage';
 import FaqFormPage from './pages/FaqFormPage';
 import PlaceholderPage from './pages/PlaceholderPage';
+import PredictionDetailsPage from './pages/PredictionDetailsPage';
 
 // Protected Route component
 const ProtectedRoute = ({ children }) => {
@@ -86,7 +87,7 @@ function App() {
                 <Route path="/leagues/add" element={<LeagueFormPage />} />
                 <Route path="/leagues/edit/:id" element={<LeagueFormPage />} />
                 <Route path={constants.routes.predictions} element={<PredictionsPage />} />
-                <Route path="/predictions/details/:id" element={<PlaceholderPage title="Prediction Details" />} />
+                <Route path="/predictions/details/:id" element={<PredictionDetailsPage />} />
                 <Route path={constants.routes.leaderboard} element={<LeaderboardPage />} />
                 <Route path="/leaderboard/details/:id" element={<PlaceholderPage title="Leaderboard Details" />} />
                 <Route path={constants.routes.rewards} element={<RewardsPage />} />

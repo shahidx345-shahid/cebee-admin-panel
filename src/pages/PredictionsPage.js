@@ -81,7 +81,10 @@ const PredictionsPage = () => {
         ...doc.data(),
       }));
       setPredictions(predictionsData);
-      setFilteredPredictions(predictionsData);
+      
+      // Group predictions by user + match combination
+      const grouped = groupPredictionsByUserMatch(predictionsData);
+      setFilteredPredictions(grouped);
     } catch (error) {
       console.error('Error loading predictions:', error);
     } finally {
@@ -89,45 +92,89 @@ const PredictionsPage = () => {
     }
   };
 
+  // Group predictions by user + match combination
+  const groupPredictionsByUserMatch = (predictions) => {
+    const groupedMap = new Map();
+    
+    predictions.forEach((pred) => {
+      const userId = pred.userId || pred.userId || 'unknown';
+      const matchId = pred.fixtureId || pred.matchId || 'unknown';
+      const key = `${userId}_${matchId}`;
+      
+      if (!groupedMap.has(key)) {
+        groupedMap.set(key, {
+          id: key,
+          userId: userId,
+          username: pred.username || 'Unknown User',
+          userEmail: pred.userEmail || '',
+          matchId: matchId,
+          matchName: pred.matchName || `${pred.homeTeam || 'TBD'} vs ${pred.awayTeam || 'TBD'}`,
+          homeTeam: pred.homeTeam || 'TBD',
+          awayTeam: pred.awayTeam || 'TBD',
+          fixtureId: pred.fixtureId || pred.matchId,
+          predictions: [],
+          totalPredictions: 0,
+          status: 'mixed', // Will be calculated based on individual predictions
+        });
+      }
+      
+      const group = groupedMap.get(key);
+      group.predictions.push(pred);
+      group.totalPredictions = group.predictions.length;
+      
+      // Determine overall status
+      const statuses = group.predictions.map(p => p.status || p.predictionStatus || 'ongoing');
+      if (statuses.every(s => s === 'ongoing')) {
+        group.status = 'ongoing';
+      } else if (statuses.every(s => s === 'correct')) {
+        group.status = 'all_correct';
+      } else if (statuses.every(s => s === 'incorrect')) {
+        group.status = 'all_incorrect';
+      } else {
+        group.status = 'mixed';
+      }
+    });
+    
+    return Array.from(groupedMap.values());
+  };
+
   const filterAndSortPredictions = () => {
-    let filtered = [...predictions];
+    // Group predictions first
+    const grouped = groupPredictionsByUserMatch(predictions);
+    let filtered = [...grouped];
 
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(
-        (pred) =>
-          pred.username?.toLowerCase().includes(query) ||
-          pred.userEmail?.toLowerCase().includes(query) ||
-          pred.id?.toLowerCase().includes(query) ||
-          pred.fixtureId?.toLowerCase().includes(query) ||
-          pred.matchName?.toLowerCase().includes(query)
+        (group) =>
+          group.username?.toLowerCase().includes(query) ||
+          group.userEmail?.toLowerCase().includes(query) ||
+          group.matchName?.toLowerCase().includes(query) ||
+          group.homeTeam?.toLowerCase().includes(query) ||
+          group.awayTeam?.toLowerCase().includes(query)
       );
     }
 
     if (selectedStatus === 'ongoing') {
-      filtered = filtered.filter((pred) => {
-        const status = pred.status || pred.predictionStatus;
-        return status === 'ongoing';
-      });
+      filtered = filtered.filter((group) => group.status === 'ongoing');
     } else if (selectedStatus === 'completed') {
-      filtered = filtered.filter((pred) => {
-        const status = pred.status || pred.predictionStatus;
-        return status === 'correct' || status === 'incorrect';
-      });
+      filtered = filtered.filter((group) => 
+        group.status === 'all_correct' || group.status === 'all_incorrect' || group.status === 'mixed'
+      );
     }
 
     switch (selectedSort) {
       case 'dateNewest':
         filtered.sort((a, b) => {
-          const dateA = a.predictionTime?.toDate ? a.predictionTime.toDate() : new Date(a.predictionTime);
-          const dateB = b.predictionTime?.toDate ? b.predictionTime.toDate() : new Date(b.predictionTime);
+          const dateA = a.predictions[0]?.predictionTime?.toDate ? a.predictions[0].predictionTime.toDate() : new Date(a.predictions[0]?.predictionTime || 0);
+          const dateB = b.predictions[0]?.predictionTime?.toDate ? b.predictions[0].predictionTime.toDate() : new Date(b.predictions[0]?.predictionTime || 0);
           return dateB - dateA;
         });
         break;
       case 'dateOldest':
         filtered.sort((a, b) => {
-          const dateA = a.predictionTime?.toDate ? a.predictionTime.toDate() : new Date(a.predictionTime);
-          const dateB = b.predictionTime?.toDate ? b.predictionTime.toDate() : new Date(b.predictionTime);
+          const dateA = a.predictions[0]?.predictionTime?.toDate ? a.predictions[0].predictionTime.toDate() : new Date(a.predictions[0]?.predictionTime || 0);
+          const dateB = b.predictions[0]?.predictionTime?.toDate ? b.predictions[0].predictionTime.toDate() : new Date(b.predictions[0]?.predictionTime || 0);
           return dateA - dateB;
         });
         break;
@@ -138,10 +185,18 @@ const PredictionsPage = () => {
         filtered.sort((a, b) => (b.username || '').localeCompare(a.username || ''));
         break;
       case 'spHighest':
-        filtered.sort((a, b) => (b.spAwarded || 0) - (a.spAwarded || 0));
+        filtered.sort((a, b) => {
+          const spA = a.predictions.reduce((sum, p) => sum + (p.spAwarded || 0), 0);
+          const spB = b.predictions.reduce((sum, p) => sum + (p.spAwarded || 0), 0);
+          return spB - spA;
+        });
         break;
       case 'spLowest':
-        filtered.sort((a, b) => (a.spAwarded || 0) - (b.spAwarded || 0));
+        filtered.sort((a, b) => {
+          const spA = a.predictions.reduce((sum, p) => sum + (p.spAwarded || 0), 0);
+          const spB = b.predictions.reduce((sum, p) => sum + (p.spAwarded || 0), 0);
+          return spA - spB;
+        });
         break;
       default:
         break;
@@ -213,35 +268,49 @@ const PredictionsPage = () => {
     );
   };
 
+  const getGroupStatusChip = (status) => {
+    const statusConfig = {
+      ongoing: { label: 'Ongoing', color: colors.info },
+      all_correct: { label: 'All Correct', color: colors.success },
+      all_incorrect: { label: 'All Incorrect', color: colors.error },
+      mixed: { label: 'Mixed', color: colors.warning },
+    };
+
+    const config = statusConfig[status] || statusConfig.ongoing;
+
+    return (
+      <Chip
+        label={config.label}
+        size="small"
+        sx={{
+          backgroundColor: `${config.color}1A`,
+          color: config.color,
+          fontWeight: 600,
+          fontSize: 11,
+          height: 28,
+          borderRadius: '6px',
+        }}
+      />
+    );
+  };
+
   const columns = [
     {
-      id: 'predictionId',
-      label: 'Pred. ID',
-      render: (_, row) => (
-        <Chip
-          label={row.id || 'N/A'}
-          size="small"
-          sx={{
-            backgroundColor: colors.brandWhite,
-            color: colors.brandRed,
-            border: `1.5px solid ${colors.brandRed}`,
-            fontWeight: 600,
-            fontSize: 11,
-            height: 28,
-            borderRadius: '6px',
-          }}
-        />
-      ),
-    },
-    {
       id: 'username',
-      label: 'Username',
+      label: 'User',
       render: (_, row) => (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Person sx={{ fontSize: 18, color: colors.info }} />
-          <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack }}>
-            {row.username || 'N/A'}
-          </Typography>
+          <Box>
+            <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack }}>
+              {row.username || 'Unknown User'}
+            </Typography>
+            {row.userEmail && (
+              <Typography variant="caption" sx={{ color: colors.textSecondary, fontSize: 10 }}>
+                {row.userEmail}
+              </Typography>
+            )}
+          </Box>
         </Box>
       ),
     },
@@ -249,94 +318,55 @@ const PredictionsPage = () => {
       id: 'match',
       label: 'Match',
       render: (_, row) => (
-        <Typography variant="body2" sx={{ fontWeight: 500, color: colors.brandBlack }}>
-          {row.matchName || `${row.homeTeam || 'TBD'} vs ${row.awayTeam || 'TBD'}`}
-        </Typography>
+        <Box>
+          <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack }}>
+            {row.matchName || `${row.homeTeam || 'TBD'} vs ${row.awayTeam || 'TBD'}`}
+          </Typography>
+          {row.fixtureId && (
+            <Typography variant="caption" sx={{ color: colors.textSecondary, fontSize: 10 }}>
+              ID: {String(row.fixtureId).substring(0, 8)}...
+            </Typography>
+          )}
+        </Box>
       ),
     },
     {
-      id: 'type',
-      label: 'Type',
-      render: (_, row) => getTypeChip(row.predictionType || row.type || 'correct_score'),
-    },
-    {
-      id: 'prediction',
-      label: 'Prediction',
+      id: 'totalPredictions',
+      label: 'Total Predictions',
       render: (_, row) => (
-        <Typography variant="body2" sx={{ fontWeight: 500, color: colors.brandBlack }}>
-          {row.prediction || row.selectedTeam || row.predictionText || 'N/A'}
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Numbers sx={{ fontSize: 18, color: colors.brandRed }} />
+          <Typography variant="body2" sx={{ fontWeight: 700, color: colors.brandBlack }}>
+            {row.totalPredictions || 0}
+          </Typography>
+        </Box>
       ),
-    },
-    {
-      id: 'predictionTime',
-      label: 'Date & Time',
-      render: (value) => {
-        if (!value) return 'N/A';
-        const date = value?.toDate ? value.toDate() : new Date(value);
-        return format(date, 'MMM dd, yyyy HH:mm');
-      },
     },
     {
       id: 'status',
       label: 'Status',
-      render: (_, row) => getStatusChip(row.status || row.predictionStatus || 'ongoing'),
-    },
-    {
-      id: 'sp',
-      label: 'SP',
-      render: (_, row) => {
-        const status = row.status || row.predictionStatus || 'ongoing';
-        const spValue = row.spAwarded || row.spTotal || 0;
-        
-        if (status === 'ongoing') {
-          return (
-            <Chip
-              icon={<AccessTime sx={{ fontSize: 14 }} />}
-              label="Pending"
-              size="small"
-              sx={{
-                backgroundColor: `${colors.warning}14`,
-                color: colors.warning,
-                border: `1.5px solid ${colors.warning}`,
-                fontWeight: 600,
-                fontSize: 11,
-                height: 28,
-                borderRadius: '6px',
-                '& .MuiChip-icon': {
-                  color: colors.warning,
-                },
-              }}
-            />
-          );
-        }
-        
-        return (
-          <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack }}>
-            {spValue.toLocaleString()}
-          </Typography>
-        );
-      },
+      render: (_, row) => getGroupStatusChip(row.status || 'ongoing'),
     },
     {
       id: 'actions',
       label: 'Actions',
       render: (_, row) => (
-        <IconButton
+        <Button
+          variant="contained"
           size="small"
+          onClick={() => navigate(`/predictions/details/${encodeURIComponent(row.id)}`)}
           sx={{
-            backgroundColor: `${colors.brandRed}14`,
-            color: colors.brandRed,
-            width: 32,
-            height: 32,
+            minWidth: 'auto',
+            padding: '6px 12px',
             borderRadius: '8px',
-            '&:hover': {
-              backgroundColor: `${colors.brandRed}26`,
-            },
+            background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
+            textTransform: 'none',
+            fontWeight: 600,
           }}
         >
-          <MoreVert sx={{ fontSize: 18 }} />
-        </IconButton>
+          <Visibility sx={{ fontSize: 16, mr: 0.5 }} />
+          View Details
+        </Button>
       ),
     },
   ];
