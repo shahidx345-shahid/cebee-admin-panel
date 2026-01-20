@@ -43,11 +43,17 @@ const FixtureFormPage = () => {
   });
 
   useEffect(() => {
-    loadLeagues();
-    if (isEditMode) {
-      loadFixtureData();
-    }
-  }, [id]);
+    const initialize = async () => {
+      setLoading(true);
+      await loadLeagues();
+      if (isEditMode) {
+        await loadFixtureData();
+      } else {
+        setLoading(false);
+      }
+    };
+    initialize();
+  }, [id, isEditMode]);
 
   const loadLeagues = async () => {
     try {
@@ -60,6 +66,10 @@ const FixtureFormPage = () => {
       setLeagues(leaguesData.filter((l) => l.isActive));
     } catch (error) {
       console.error('Error loading leagues:', error);
+    } finally {
+      if (!isEditMode) {
+        setLoading(false);
+      }
     }
   };
 
