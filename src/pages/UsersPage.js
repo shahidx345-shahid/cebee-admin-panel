@@ -68,7 +68,7 @@ const UsersPage = () => {
 
   useEffect(() => {
     filterAndSortUsers();
-  }, [users, searchQuery, selectedStatus, selectedSort, accuracyFilter]);
+  }, [users, searchQuery, selectedStatus, selectedSort, accuracyFilter, leaguePreference, clubPreference, countryFilter, accuracyRange]);
 
   const generateDummyUsers = () => {
     const firstNames = ['John', 'Jane', 'Mike', 'Sarah', 'David', 'Emily', 'Chris', 'Lisa', 'Tom', 'Amy'];
