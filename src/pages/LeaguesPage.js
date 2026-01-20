@@ -423,13 +423,14 @@ const LeaguesPage = () => {
       </Box>
 
       {/* Filter Chips */}
-      <Box sx={{ display: 'flex', gap: 1.5, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
+      <Box sx={{ display: 'flex', gap: 0, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
         <Button
           variant="outlined"
           startIcon={<AccessTime sx={{ fontSize: 18 }} />}
           endIcon={<ArrowDropDown sx={{ fontSize: 18 }} />}
           onClick={(e) => setDateFilterAnchor(e.currentTarget)}
           sx={{
+            flex: 1,
             borderColor: '#FFE5E5',
             color: colors.brandBlack,
             backgroundColor: '#FFF5F5',
@@ -438,6 +439,7 @@ const LeaguesPage = () => {
             fontWeight: 500,
             px: 2,
             py: 1,
+            minWidth: 'auto',
             '&:hover': {
               backgroundColor: '#FFE5E5',
               borderColor: '#FFE5E5',
@@ -585,6 +587,7 @@ const LeaguesPage = () => {
           endIcon={<ArrowDropDown sx={{ fontSize: 18 }} />}
           onClick={(e) => setTypeFilterAnchor(e.currentTarget)}
           sx={{
+            flex: 1,
             borderColor: '#FFE5E5',
             color: colors.brandBlack,
             backgroundColor: '#FFF5F5',
@@ -593,6 +596,7 @@ const LeaguesPage = () => {
             fontWeight: 500,
             px: 2,
             py: 1,
+            minWidth: 'auto',
             '&:hover': {
               backgroundColor: '#FFE5E5',
               borderColor: '#FFE5E5',
@@ -623,6 +627,7 @@ const LeaguesPage = () => {
           icon={<CheckCircle sx={{ fontSize: 16, color: colors.success }} />}
           label={`Active: ${activeCount}/5`}
           sx={{
+            flex: 1,
             backgroundColor: '#FFF5F5',
             borderColor: '#FFE5E5',
             border: '1px solid',
@@ -631,6 +636,12 @@ const LeaguesPage = () => {
             fontSize: 13,
             height: 36,
             borderRadius: '8px',
+            minWidth: 'auto',
+            justifyContent: 'flex-start',
+            '& .MuiChip-label': {
+              paddingLeft: 1,
+              paddingRight: 1.5,
+            },
           }}
         />
       </Box>
