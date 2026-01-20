@@ -61,7 +61,7 @@ const FixturesPage = () => {
   const [filteredFixtures, setFilteredFixtures] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState('resultsProcessing');
+  const [selectedStatus, setSelectedStatus] = useState('scheduled');
   const [selectedSort, setSelectedSort] = useState('dateNewest');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
