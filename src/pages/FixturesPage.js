@@ -1423,6 +1423,93 @@ const FixturesPage = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {/* Action Menu for Scheduled Fixtures */}
+      <Menu
+        anchorEl={actionMenuAnchor}
+        open={Boolean(actionMenuAnchor)}
+        onClose={() => {
+          setActionMenuAnchor(null);
+          setMenuFixture(null);
+        }}
+        PaperProps={{
+          sx: {
+            borderRadius: '12px',
+            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.15)',
+            minWidth: 200,
+            mt: 1,
+          },
+        }}
+        transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+        anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+      >
+        <MenuItem
+          onClick={() => {
+            if (menuFixture) {
+              navigate(`/fixtures/details/${menuFixture.id}`);
+            }
+            setActionMenuAnchor(null);
+            setMenuFixture(null);
+          }}
+          sx={{
+            px: 2,
+            py: 1.5,
+            '&:hover': {
+              backgroundColor: `${colors.info}0D`,
+            },
+          }}
+        >
+          <Box
+            sx={{
+              width: 32,
+              height: 32,
+              borderRadius: '8px',
+              backgroundColor: `${colors.info}1A`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              mr: 1.5,
+            }}
+          >
+            <Visibility sx={{ fontSize: 18, color: colors.info }} />
+          </Box>
+          <Typography sx={{ flex: 1, fontWeight: 600 }}>View Details</Typography>
+          <KeyboardArrowRight sx={{ fontSize: 18, color: colors.textSecondary }} />
+        </MenuItem>
+        <MenuItem
+          onClick={() => {
+            if (menuFixture) {
+              navigate(`/fixtures/edit/${menuFixture.id}`);
+            }
+            setActionMenuAnchor(null);
+            setMenuFixture(null);
+          }}
+          sx={{
+            px: 2,
+            py: 1.5,
+            '&:hover': {
+              backgroundColor: `${colors.warning}0D`,
+            },
+          }}
+        >
+          <Box
+            sx={{
+              width: 32,
+              height: 32,
+              borderRadius: '8px',
+              backgroundColor: `${colors.warning}1A`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              mr: 1.5,
+            }}
+          >
+            <Edit sx={{ fontSize: 18, color: colors.warning }} />
+          </Box>
+          <Typography sx={{ flex: 1, fontWeight: 600 }}>Edit Fixture</Typography>
+          <KeyboardArrowRight sx={{ fontSize: 18, color: colors.textSecondary }} />
+        </MenuItem>
+      </Menu>
     </Box>
   );
 };
