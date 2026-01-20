@@ -396,7 +396,9 @@ const FixturesPage = () => {
         (fixture) =>
           fixture.homeTeam?.toLowerCase().includes(query) ||
           fixture.awayTeam?.toLowerCase().includes(query) ||
-          fixture.matchId?.toLowerCase().includes(query)
+          fixture.matchId?.toLowerCase().includes(query) ||
+          fixture.id?.toLowerCase().includes(query) ||
+          fixture.league?.toLowerCase().includes(query)
       );
     }
 
