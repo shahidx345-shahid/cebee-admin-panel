@@ -23,6 +23,13 @@ import {
   AccessTime,
   PlayArrow,
   ArrowUpward,
+  List,
+  ArrowDownward,
+  ArrowUpward as ArrowUp,
+  Sort,
+  TrendingUp,
+  TrendingDown,
+  Check,
 } from '@mui/icons-material';
 import { colors, constants } from '../config/theme';
 import SearchBar from '../components/common/SearchBar';
@@ -106,6 +113,26 @@ const FixturesPage = () => {
           const dateB = b.kickoffTime?.toDate ? b.kickoffTime.toDate() : new Date(b.kickoffTime);
           return dateA - dateB;
         });
+        break;
+      case 'teamAZ':
+        filtered.sort((a, b) => {
+          const teamA = `${a.homeTeam || ''} vs ${a.awayTeam || ''}`.toLowerCase();
+          const teamB = `${b.homeTeam || ''} vs ${b.awayTeam || ''}`.toLowerCase();
+          return teamA.localeCompare(teamB);
+        });
+        break;
+      case 'teamZA':
+        filtered.sort((a, b) => {
+          const teamA = `${a.homeTeam || ''} vs ${a.awayTeam || ''}`.toLowerCase();
+          const teamB = `${b.homeTeam || ''} vs ${b.awayTeam || ''}`.toLowerCase();
+          return teamB.localeCompare(teamA);
+        });
+        break;
+      case 'predictionsHigh':
+        filtered.sort((a, b) => (b.predictions || 0) - (a.predictions || 0));
+        break;
+      case 'predictionsLow':
+        filtered.sort((a, b) => (a.predictions || 0) - (b.predictions || 0));
         break;
       default:
         break;
@@ -379,7 +406,7 @@ const FixturesPage = () => {
             color={colors.success}
             isPrimary={false}
           />
-        </Grid>
+          </Grid>
       </Grid>
 
       {/* Status Filter Buttons - Card Style */}
@@ -393,12 +420,12 @@ const FixturesPage = () => {
               key={filter.value}
               variant={isSelected ? 'contained' : 'outlined'}
               onClick={() => setSelectedStatus(filter.value)}
-              sx={{
+          sx={{
                 flex: 1,
                 minWidth: { xs: 'calc(50% - 4px)', sm: 'auto' },
                 borderRadius: 0,
-                textTransform: 'none',
-                fontWeight: 600,
+              textTransform: 'none',
+              fontWeight: 600,
                 px: 3,
                 py: 2,
                 minHeight: 56,
@@ -424,11 +451,11 @@ const FixturesPage = () => {
                 '&:hover': {
                   backgroundColor: isSelected ? filter.color : `${filter.color}0D`,
                   boxShadow: isSelected ? `0 4px 12px ${filter.color}50` : `0 2px 4px ${filter.color}20`,
-                },
-              }}
-            >
+            },
+          }}
+        >
               <Icon
-                sx={{
+              sx={{
                   fontSize: 18,
                   mr: 1,
                   color: isSelected ? colors.brandWhite : filter.color,
@@ -443,28 +470,96 @@ const FixturesPage = () => {
       {/* Search, Sort, and Add Fixture Row */}
       <Box sx={{ display: 'flex', gap: 1.5, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
         <Box sx={{ flex: 1, minWidth: { xs: '100%', md: '300px' } }}>
-          <SearchBar
-            value={searchQuery}
-            onChange={setSearchQuery}
-            placeholder="Search by team name or match ID..."
-          />
+            <SearchBar
+              value={searchQuery}
+              onChange={setSearchQuery}
+              placeholder="Search by team name or match ID..."
+            />
         </Box>
-        <FormControl sx={{ minWidth: { xs: '100%', md: 200 } }}>
-          <Select
-            value={selectedSort}
-            onChange={(e) => setSelectedSort(e.target.value)}
+        <FormControl sx={{ minWidth: { xs: '100%', md: 200 }, position: 'relative' }}>
+              <Select
+                value={selectedSort}
+                onChange={(e) => setSelectedSort(e.target.value)}
             displayEmpty
             sx={{
               borderRadius: '12px',
+              backgroundColor: colors.brandWhite,
               '& .MuiOutlinedInput-notchedOutline': {
                 borderColor: `${colors.divider}66`,
               },
+              '&:hover .MuiOutlinedInput-notchedOutline': {
+                borderColor: colors.brandRed,
+              },
+              '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                borderColor: colors.brandRed,
+                borderWidth: 2,
+              },
+            }}
+            MenuProps={{
+              PaperProps: {
+                sx: {
+                  borderRadius: '12px',
+                  mt: 1,
+                  boxShadow: '0 4px 16px rgba(0, 0, 0, 0.15)',
+                  '& .MuiMenuItem-root': {
+                    px: 2,
+                    py: 1.5,
+                    '&.Mui-selected': {
+                      backgroundColor: `${colors.brandRed}15`,
+                      color: colors.brandRed,
+                      '&:hover': {
+                        backgroundColor: `${colors.brandRed}20`,
+                      },
+                    },
+                  },
+                },
+              },
             }}
           >
-            <MenuItem value="dateNewest">Date: Newest First</MenuItem>
-            <MenuItem value="dateOldest">Date: Oldest First</MenuItem>
-          </Select>
-        </FormControl>
+            <MenuItem value="dateNewest">
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
+                {selectedSort === 'dateNewest' && <Check sx={{ fontSize: 18, color: colors.brandRed }} />}
+                <ArrowDownward sx={{ fontSize: 16, color: selectedSort === 'dateNewest' ? colors.brandRed : colors.textSecondary }} />
+                <Typography sx={{ flex: 1 }}>Date: Newest First</Typography>
+              </Box>
+            </MenuItem>
+            <MenuItem value="dateOldest">
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
+                {selectedSort === 'dateOldest' && <Check sx={{ fontSize: 18, color: colors.brandRed }} />}
+                <ArrowUp sx={{ fontSize: 16, color: selectedSort === 'dateOldest' ? colors.brandRed : colors.textSecondary }} />
+                <Typography sx={{ flex: 1 }}>Date: Oldest First</Typography>
+              </Box>
+            </MenuItem>
+            <MenuItem value="teamAZ">
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
+                {selectedSort === 'teamAZ' && <Check sx={{ fontSize: 18, color: colors.brandRed }} />}
+                <Sort sx={{ fontSize: 16, color: selectedSort === 'teamAZ' ? colors.brandRed : colors.textSecondary }} />
+                <Typography sx={{ flex: 1 }}>Team Name: A-Z</Typography>
+              </Box>
+            </MenuItem>
+            <MenuItem value="teamZA">
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
+                {selectedSort === 'teamZA' && <Check sx={{ fontSize: 18, color: colors.brandRed }} />}
+                <Sort sx={{ fontSize: 16, color: selectedSort === 'teamZA' ? colors.brandRed : colors.textSecondary, transform: 'rotate(180deg)' }} />
+                <Typography sx={{ flex: 1 }}>Team Name: Z-A</Typography>
+              </Box>
+            </MenuItem>
+            <MenuItem value="predictionsHigh">
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
+                {selectedSort === 'predictionsHigh' && <Check sx={{ fontSize: 18, color: colors.brandRed }} />}
+                <TrendingUp sx={{ fontSize: 16, color: selectedSort === 'predictionsHigh' ? colors.brandRed : colors.textSecondary }} />
+                <Typography sx={{ flex: 1 }}>Predictions: Highest</Typography>
+              </Box>
+            </MenuItem>
+            <MenuItem value="predictionsLow">
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
+                {selectedSort === 'predictionsLow' && <Check sx={{ fontSize: 18, color: colors.brandRed }} />}
+                <TrendingDown sx={{ fontSize: 16, color: selectedSort === 'predictionsLow' ? colors.brandRed : colors.textSecondary }} />
+                <Typography sx={{ flex: 1 }}>Predictions: Lowest</Typography>
+              </Box>
+            </MenuItem>
+              </Select>
+            </FormControl>
         <Button
           variant="contained"
           startIcon={<Add />}
@@ -481,6 +576,41 @@ const FixturesPage = () => {
           Add Fixture
         </Button>
       </Box>
+
+      {/* Fixtures List Header */}
+      <Card
+        sx={{
+          padding: 2.5,
+          mb: 3,
+          borderRadius: '16px',
+          background: colors.brandWhite,
+          border: `1.5px solid ${colors.divider}26`,
+          boxShadow: `0 4px 12px ${colors.shadow}14`,
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Box
+            sx={{
+              padding: 1.5,
+              background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
+              borderRadius: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <List sx={{ fontSize: 24, color: colors.brandWhite }} />
+          </Box>
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5 }}>
+              Fixtures List
+            </Typography>
+            <Typography variant="body2" sx={{ color: colors.textSecondary }}>
+              {filteredFixtures.length} {filteredFixtures.length === 1 ? 'fixture' : 'fixtures'} found
+            </Typography>
+          </Box>
+        </Box>
+      </Card>
 
       {/* Data Table */}
       <DataTable
