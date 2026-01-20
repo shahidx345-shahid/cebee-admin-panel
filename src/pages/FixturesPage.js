@@ -409,9 +409,12 @@ const FixturesPage = () => {
     if (selectedStatus && selectedStatus !== 'all') {
       filtered = filtered.filter((fixture) => {
         const status = fixture.matchStatus || fixture.status;
-        // Map match flow filter values to backend statuses
-        if (selectedStatus === 'predictionOpen') {
-          return status === 'scheduled' || status === 'published' || status === 'predictionOpen';
+        // Map filter values to backend statuses
+        if (selectedStatus === 'scheduled') {
+          return status === 'scheduled' || status === 'draft';
+        }
+        if (selectedStatus === 'published') {
+          return status === 'published' || status === 'predictionOpen';
         }
         if (selectedStatus === 'predictionLocked') {
           return status === 'predictionLocked' || status === 'locked';
