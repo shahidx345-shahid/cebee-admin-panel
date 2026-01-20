@@ -16,6 +16,7 @@ import {
   ToggleButton,
   ToggleButtonGroup,
   Badge,
+  Paper,
 } from '@mui/material';
 import {
   Add,
@@ -61,6 +62,9 @@ const UsersPage = () => {
   const [clubPreference, setClubPreference] = useState('all');
   const [countryFilter, setCountryFilter] = useState('all');
   const [accuracyRange, setAccuracyRange] = useState('all');
+  const [searchSuggestions, setSearchSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [searchInputRef, setSearchInputRef] = useState(null);
 
   useEffect(() => {
     loadUsers();

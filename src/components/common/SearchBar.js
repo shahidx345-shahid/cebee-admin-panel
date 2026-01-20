@@ -3,7 +3,7 @@ import { TextField, InputAdornment, Box } from '@mui/material';
 import { Search } from '@mui/icons-material';
 import { colors } from '../../config/theme';
 
-const SearchBar = ({ value, onChange, placeholder = 'Search...', sx = {} }) => {
+const SearchBar = ({ value, onChange, placeholder = 'Search...', sx = {}, onFocus }) => {
   return (
     <Box sx={{ ...sx }}>
       <TextField
@@ -11,6 +11,7 @@ const SearchBar = ({ value, onChange, placeholder = 'Search...', sx = {} }) => {
         placeholder={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onFocus={onFocus}
         sx={{
           '& .MuiOutlinedInput-root': {
             borderRadius: '12px',
