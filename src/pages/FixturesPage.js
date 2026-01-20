@@ -915,63 +915,67 @@ const FixturesPage = () => {
           </Grid>
       </Grid>
 
-      {/* Status Filter Buttons - Card Style */}
-      <Box sx={{ mb: 3, display: 'flex', flexWrap: 'wrap' }}>
-        {statusFilters.map((filter, index) => {
-          const isSelected = selectedStatus === filter.value;
-          const Icon = filter.icon;
+      {/* Status Filter Buttons - Connected Style */}
+      <Card
+        sx={{
+          mb: 3,
+          borderRadius: '20px',
+          backgroundColor: colors.brandWhite,
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+          overflow: 'hidden',
+          padding: 0,
+        }}
+      >
+        <Box sx={{ display: 'flex', width: '100%', gap: 0 }}>
+          {statusFilters.map((filter, index) => {
+            const isSelected = selectedStatus === filter.value;
+            const Icon = filter.icon;
 
-          return (
-            <Button
-              key={filter.value}
-              variant={isSelected ? 'contained' : 'outlined'}
-              onClick={() => setSelectedStatus(filter.value)}
-          sx={{
-                flex: 1,
-                minWidth: { xs: 'calc(50% - 4px)', sm: 'auto' },
-                borderRadius: 0,
-              textTransform: 'none',
-              fontWeight: 600,
-                px: 3,
-                py: 2,
-                minHeight: 56,
-                backgroundColor: isSelected ? filter.color : colors.brandWhite,
-                color: isSelected ? colors.brandWhite : filter.color,
-                border: 'none',
-                borderTop: index === 0 ? `1.5px solid ${isSelected ? filter.color : colors.divider}66` : 'none',
-                borderBottom: `1.5px solid ${isSelected ? filter.color : colors.divider}66`,
-                borderLeft: index === 0 ? `1.5px solid ${isSelected ? filter.color : colors.divider}66` : 'none',
-                borderRight: index === statusFilters.length - 1 ? `1.5px solid ${isSelected ? filter.color : colors.divider}66` : 'none',
-                boxShadow: isSelected ? `0 4px 16px ${filter.color}60, inset 0 2px 4px ${filter.color}20` : 'none',
-                transform: isSelected ? 'scale(1.02)' : 'scale(1)',
-                zIndex: isSelected ? 1 : 0,
-                position: 'relative',
-                '&:first-of-type': {
-                  borderTopLeftRadius: '20px',
-                  borderBottomLeftRadius: '20px',
-                },
-                '&:last-of-type': {
-                  borderTopRightRadius: '20px',
-                  borderBottomRightRadius: '20px',
-                },
-                '&:hover': {
-                  backgroundColor: isSelected ? filter.color : `${filter.color}0D`,
-                  boxShadow: isSelected ? `0 4px 12px ${filter.color}50` : `0 2px 4px ${filter.color}20`,
-            },
-          }}
-        >
-              <Icon
-              sx={{
-                  fontSize: 18,
-                  mr: 1,
-                  color: isSelected ? colors.brandWhite : filter.color,
+            return (
+              <Button
+                key={filter.value}
+                onClick={() => setSelectedStatus(filter.value)}
+                sx={{
+                  flex: 1,
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  px: 2,
+                  py: 2.5,
+                  minHeight: 64,
+                  borderRadius: 0,
+                  backgroundColor: isSelected ? filter.color : 'transparent',
+                  color: isSelected ? colors.brandWhite : colors.textSecondary,
+                  border: 'none',
+                  borderRight: index < statusFilters.length - 1 ? 'none' : 'none',
+                  boxShadow: isSelected ? `0 2px 8px ${filter.color}40` : 'none',
+                  position: 'relative',
+                  '&:first-of-type': {
+                    borderTopLeftRadius: '20px',
+                    borderBottomLeftRadius: '20px',
+                  },
+                  '&:last-of-type': {
+                    borderTopRightRadius: '20px',
+                    borderBottomRightRadius: '20px',
+                  },
+                  '&:hover': {
+                    backgroundColor: isSelected ? filter.color : `${filter.color}0D`,
+                    boxShadow: isSelected ? `0 2px 8px ${filter.color}40` : 'none',
+                  },
                 }}
-              />
-              {filter.label}
-            </Button>
-          );
-        })}
-      </Box>
+              >
+                <Icon
+                  sx={{
+                    fontSize: 20,
+                    mr: 1,
+                    color: isSelected ? colors.brandWhite : filter.color,
+                  }}
+                />
+                {filter.label}
+              </Button>
+            );
+          })}
+        </Box>
+      </Card>
 
       {/* Search, Sort, and Add Fixture Row */}
       <Box sx={{ display: 'flex', gap: 1.5, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
