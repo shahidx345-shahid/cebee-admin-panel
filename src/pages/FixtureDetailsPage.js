@@ -334,6 +334,7 @@ const FixtureDetailsPage = () => {
   };
 
   const statusConfig = getStatusCardConfig();
+  const StatusIcon = statusConfig.icon;
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%', pb: 4 }}>
@@ -386,7 +387,7 @@ const FixtureDetailsPage = () => {
                     : 'none',
                 }}
               >
-                <statusConfig.icon
+                <StatusIcon
                   sx={{
                     fontSize: { xs: 28, md: 32 },
                     color: statusConfig.isPrimary ? colors.brandWhite : statusConfig.color,
@@ -568,7 +569,7 @@ const FixtureDetailsPage = () => {
               }}
             >
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                <statusConfig.icon sx={{ fontSize: 18, color: statusConfig.color }} />
+                <StatusIcon sx={{ fontSize: 18, color: statusConfig.color }} />
                 <Typography variant="caption" sx={{ color: colors.textSecondary, fontWeight: 600 }}>
                   Match Status
                 </Typography>
