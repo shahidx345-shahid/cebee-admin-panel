@@ -598,30 +598,31 @@ const FixturesPage = () => {
 
       {/* Stats Cards - Dashboard Style */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
+        {/* Top Row - 4 Cards */}
         <Grid item xs={6} md={3}>
           <StatCard
-            title="Prediction Open"
+            title="Scheduled"
             value={fixtures.filter((f) => {
               const status = f.matchStatus || f.status;
-              return status === 'scheduled' || status === 'published' || status === 'predictionOpen';
+              return status === 'scheduled' || status === 'draft';
             }).length.toString()}
-            subtitle="Users can predict"
+            subtitle="Draft"
             icon={AccessTime}
-            color="#1976d2"
+            color="#9E9E9E"
             isPrimary={false}
             delay={0}
           />
         </Grid>
         <Grid item xs={6} md={3}>
           <StatCard
-            title="Prediction Locked"
+            title="Published"
             value={fixtures.filter((f) => {
               const status = f.matchStatus || f.status;
-              return status === 'predictionLocked' || status === 'locked';
+              return status === 'published' || status === 'predictionOpen';
             }).length.toString()}
-            subtitle="Predictions closed"
-            icon={Lock}
-            color="#ed6c02"
+            subtitle="Predictions Open"
+            icon={Visibility}
+            color="#1976d2"
             isPrimary={false}
             delay={100}
           />
@@ -640,14 +641,15 @@ const FixturesPage = () => {
         <Grid item xs={6} md={3}>
           <StatCard
             title="Result Pending"
-            value={fixtures.filter((f) => (f.matchStatus || f.status) === 'resultsProcessing').length.toString()}
+            value={fixtures.filter((f) => (f.matchStatus || f.status) === 'resultsProcessing' || (f.matchStatus || f.status) === 'pending').length.toString()}
             subtitle="Action Required"
             icon={Edit}
-            color="#ed6c02"
+            color="#FF9800"
             isPrimary={false}
             delay={300}
           />
         </Grid>
+        {/* Bottom Row - 1 Card on Left */}
         <Grid item xs={6} md={3}>
           <StatCard
             title="Completed"
@@ -656,6 +658,7 @@ const FixturesPage = () => {
             icon={CheckCircle}
             color={colors.success}
             isPrimary={false}
+            delay={400}
           />
           </Grid>
       </Grid>
