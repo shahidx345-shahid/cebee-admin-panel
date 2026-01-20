@@ -698,10 +698,10 @@ const FixturesPage = () => {
   );
 
   const statusFilters = [
-    { value: 'predictionOpen', label: 'Prediction Open', icon: AccessTime, color: '#1976d2' },
-    { value: 'predictionLocked', label: 'Prediction Locked', icon: Lock, color: '#ed6c02' },
+    { value: 'predictionOpen', label: 'Scheduled', icon: AccessTime, color: '#9E9E9E' },
+    { value: 'predictionOpen', label: 'Published', icon: Visibility, color: '#1976d2' },
     { value: 'live', label: 'Live', icon: PlayArrow, color: colors.brandRed },
-    { value: 'resultsProcessing', label: 'Result Pending', icon: Edit, color: '#ed6c02' },
+    { value: 'resultsProcessing', label: 'Result Pending', icon: Edit, color: '#FF9800' },
     { value: 'completed', label: 'Completed', icon: CheckCircle, color: colors.success },
   ];
 
