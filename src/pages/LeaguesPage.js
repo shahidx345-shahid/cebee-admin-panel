@@ -627,7 +627,21 @@ const LeaguesPage = () => {
           </MenuItem>
         </Menu>
         <Chip
-          icon={<CheckCircle sx={{ fontSize: 16, color: colors.success }} />}
+          icon={
+            <Box
+              sx={{
+                width: 20,
+                height: 20,
+                borderRadius: '50%',
+                backgroundColor: colors.success,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <CheckCircle sx={{ fontSize: 14, color: colors.brandWhite }} />
+            </Box>
+          }
           label={`Active: ${activeCount}/5`}
           sx={{
             flex: 1,
@@ -638,11 +652,15 @@ const LeaguesPage = () => {
             fontWeight: 600,
             fontSize: 13,
             height: 36,
-            borderRadius: '8px',
+            borderRadius: '20px',
             minWidth: 'auto',
             justifyContent: 'flex-start',
+            '& .MuiChip-icon': {
+              marginLeft: 1,
+              marginRight: 0.5,
+            },
             '& .MuiChip-label': {
-              paddingLeft: 1,
+              paddingLeft: 0.5,
               paddingRight: 1.5,
             },
           }}
