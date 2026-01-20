@@ -411,6 +411,10 @@ const FixturesPage = () => {
         if (selectedStatus === 'predictionLocked') {
           return status === 'predictionLocked' || status === 'locked';
         }
+        if (selectedStatus === 'resultsProcessing') {
+          // Result Pending includes both resultsProcessing and pending statuses
+          return status === 'resultsProcessing' || status === 'pending' || status === 'fullTimeProcessing';
+        }
         return status === selectedStatus;
       });
     }
