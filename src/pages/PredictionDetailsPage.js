@@ -44,24 +44,80 @@ const PredictionDetailsPage = () => {
     }
   }, [id]);
 
+  const generateDummyPredictionData = (userId, matchId) => {
+    const users = {
+      'john_doe': { username: 'John Doe', email: 'john@example.com' },
+      'jane_smith': { username: 'Jane Smith', email: 'jane@example.com' },
+      'mike_wilson': { username: 'Mike Wilson', email: 'mike@example.com' },
+      'sarah_jones': { username: 'Sarah Jones', email: 'sarah@example.com' },
+      'david_brown': { username: 'David Brown', email: 'david@example.com' },
+    };
+
+    const matches = {
+      'FIX_001': { homeTeam: 'Arsenal', awayTeam: 'Chelsea', matchName: 'Arsenal vs Chelsea' },
+      'FIX_002': { homeTeam: 'Liverpool', awayTeam: 'Manchester United', matchName: 'Liverpool vs Manchester United' },
+      'FIX_003': { homeTeam: 'Manchester City', awayTeam: 'Tottenham', matchName: 'Manchester City vs Tottenham' },
+      'FIX_004': { homeTeam: 'Newcastle', awayTeam: 'Brighton', matchName: 'Newcastle vs Brighton' },
+    };
+
+    const user = users[userId] || { username: 'Unknown User', email: 'unknown@example.com' };
+    const match = matches[matchId] || { homeTeam: 'Team A', awayTeam: 'Team B', matchName: 'Team A vs Team B' };
+
+    // Generate a sample prediction
+    const isCompleted = Math.random() > 0.5;
+    const isCorrect = isCompleted && Math.random() > 0.5;
+    
+    return {
+      id: `PRED_${userId}_${matchId}_001`,
+      userId: userId,
+      username: user.username,
+      userEmail: user.email,
+      fixtureId: matchId,
+      matchId: matchId,
+      matchName: match.matchName,
+      homeTeam: match.homeTeam,
+      awayTeam: match.awayTeam,
+      predictionType: 'correct_score',
+      prediction: '2-1',
+      predictionTime: isCompleted 
+        ? new Date(Date.now() - (14 + Math.random() * 7) * 24 * 60 * 60 * 1000)
+        : new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000),
+      status: isCompleted ? (isCorrect ? 'correct' : 'incorrect') : 'ongoing',
+      predictionStatus: isCompleted ? (isCorrect ? 'correct' : 'incorrect') : 'ongoing',
+      actualResult: isCompleted ? '2-1' : null,
+      spAwarded: isCompleted && isCorrect ? 50 : 0,
+    };
+  };
+
   const loadPredictionGroup = async () => {
     try {
       setLoading(true);
       const decodedId = decodeURIComponent(id);
       const [userId, matchId] = decodedId.split('_');
 
-      // Load all predictions for this user-match combination
-      const predictionsRef = collection(db, 'predictions');
-      const q = query(
-        predictionsRef,
-        where('userId', '==', userId),
-        where('fixtureId', '==', matchId)
-      );
-      const snapshot = await getDocs(q);
-      const predictionsData = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
+      // Try to load from Firebase
+      let predictionsData = [];
+      try {
+        const predictionsRef = collection(db, 'predictions');
+        const q = query(
+          predictionsRef,
+          where('userId', '==', userId),
+          where('fixtureId', '==', matchId)
+        );
+        const snapshot = await getDocs(q);
+        predictionsData = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+      } catch (error) {
+        console.log('Firebase query error, using dummy data:', error);
+      }
+
+      // Use dummy data if no Firebase data exists
+      if (predictionsData.length === 0) {
+        const dummyPred = generateDummyPredictionData(userId, matchId);
+        predictionsData = [dummyPred];
+      }
 
       if (predictionsData.length > 0) {
         const firstPred = predictionsData[0];
@@ -81,6 +137,22 @@ const PredictionDetailsPage = () => {
       }
     } catch (error) {
       console.error('Error loading prediction group:', error);
+      // Fallback to dummy data
+      const decodedId = decodeURIComponent(id);
+      const [userId, matchId] = decodedId.split('_');
+      const dummyPred = generateDummyPredictionData(userId, matchId);
+      setGroupData({
+        userId: userId,
+        username: dummyPred.username,
+        userEmail: dummyPred.userEmail,
+        matchId: matchId,
+        matchName: dummyPred.matchName,
+        homeTeam: dummyPred.homeTeam,
+        awayTeam: dummyPred.awayTeam,
+        fixtureId: matchId,
+      });
+      setPredictions([dummyPred]);
+      setSelectedPrediction(dummyPred);
     } finally {
       setLoading(false);
     }
