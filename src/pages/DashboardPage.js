@@ -497,6 +497,374 @@ const DashboardPage = () => {
         </Box>
       </Card>
 
+      {/* High-Risk Admin Action Alerts */}
+      <Card
+        sx={{
+          mb: { xs: 2.5, md: 3 },
+          borderRadius: '16px',
+          backgroundColor: colors.brandWhite,
+          boxShadow: `0 4px 12px ${colors.shadow}1F`,
+        }}
+      >
+        <Box sx={{ p: 2.5 }}>
+          {/* Header */}
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2.5 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Box
+                sx={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: '10px',
+                  backgroundColor: colors.brandRed,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <ErrorOutline sx={{ fontSize: 24, color: colors.brandWhite }} />
+              </Box>
+              <Box>
+                <Typography
+                  variant="h6"
+                  sx={{
+                    fontWeight: 700,
+                    color: colors.brandBlack,
+                    fontSize: { xs: 16, md: 18 },
+                    mb: 0.25,
+                  }}
+                >
+                  High-Risk Admin Action Alerts
+                </Typography>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    color: colors.textSecondary,
+                    fontSize: 12,
+                  }}
+                >
+                  3 critical events require attention
+                </Typography>
+              </Box>
+            </Box>
+            <Button
+              variant="contained"
+              endIcon={<ArrowForward sx={{ fontSize: 16 }} />}
+              sx={{
+                background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
+                borderRadius: '8px',
+                textTransform: 'none',
+                fontWeight: 600,
+                fontSize: 13,
+                px: 2,
+                py: 1,
+                '&:hover': {
+                  background: `linear-gradient(135deg, ${colors.brandDarkRed} 0%, ${colors.brandRed} 100%)`,
+                },
+              }}
+            >
+              View All Logs
+            </Button>
+          </Box>
+
+          {/* Alert Cards */}
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+            {/* Critical Alert 1 - SP Manual Adjustment */}
+            <Card
+              sx={{
+                backgroundColor: `${colors.error}0D`,
+                border: `1.5px solid ${colors.error}26`,
+                borderRadius: '12px',
+                padding: 1.5,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.5,
+                cursor: 'pointer',
+                transition: 'all 0.3s ease',
+                '&:hover': {
+                  backgroundColor: `${colors.error}1A`,
+                  transform: 'translateX(4px)',
+                },
+              }}
+            >
+              <Box
+                sx={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: '10px',
+                  backgroundColor: `${colors.error}26`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                <TrendingUp sx={{ fontSize: 20, color: colors.error }} />
+              </Box>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                  <Chip
+                    label="CRITICAL"
+                    size="small"
+                    sx={{
+                      backgroundColor: colors.error,
+                      color: colors.brandWhite,
+                      fontWeight: 700,
+                      fontSize: 10,
+                      height: 20,
+                      px: 0.5,
+                    }}
+                  />
+                </Box>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    fontWeight: 700,
+                    color: colors.brandBlack,
+                    fontSize: 13,
+                    mb: 0.25,
+                  }}
+                >
+                  SP Manual Adjustment
+                </Typography>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    color: colors.textSecondary,
+                    fontSize: 12,
+                    mb: 0.5,
+                  }}
+                >
+                  Admin "John Doe" manually adjusted 5,000 SP for user UID_12345
+                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <AccessTime sx={{ fontSize: 12, color: colors.textSecondary }} />
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      color: colors.textSecondary,
+                      fontSize: 11,
+                    }}
+                  >
+                    5 minutes ago
+                  </Typography>
+                </Box>
+              </Box>
+              <IconButton
+                size="small"
+                sx={{
+                  width: 32,
+                  height: 32,
+                  backgroundColor: colors.error,
+                  color: colors.brandWhite,
+                  flexShrink: 0,
+                  '&:hover': {
+                    backgroundColor: colors.brandDarkRed,
+                  },
+                }}
+              >
+                <KeyboardArrowRight sx={{ fontSize: 18 }} />
+              </IconButton>
+            </Card>
+
+            {/* Critical Alert 2 - Admin Role Changed */}
+            <Card
+              sx={{
+                backgroundColor: `${colors.error}0D`,
+                border: `1.5px solid ${colors.error}26`,
+                borderRadius: '12px',
+                padding: 1.5,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.5,
+                cursor: 'pointer',
+                transition: 'all 0.3s ease',
+                '&:hover': {
+                  backgroundColor: `${colors.error}1A`,
+                  transform: 'translateX(4px)',
+                },
+              }}
+            >
+              <Box
+                sx={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: '10px',
+                  backgroundColor: `${colors.error}26`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                <PersonAdd sx={{ fontSize: 20, color: colors.error }} />
+              </Box>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                  <Chip
+                    label="CRITICAL"
+                    size="small"
+                    sx={{
+                      backgroundColor: colors.error,
+                      color: colors.brandWhite,
+                      fontWeight: 700,
+                      fontSize: 10,
+                      height: 20,
+                      px: 0.5,
+                    }}
+                  />
+                </Box>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    fontWeight: 700,
+                    color: colors.brandBlack,
+                    fontSize: 13,
+                    mb: 0.25,
+                  }}
+                >
+                  Admin Role Changed
+                </Typography>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    color: colors.textSecondary,
+                    fontSize: 12,
+                    mb: 0.5,
+                  }}
+                >
+                  User "Jane Smith" promoted to Admin role by Super Admin
+                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <AccessTime sx={{ fontSize: 12, color: colors.textSecondary }} />
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      color: colors.textSecondary,
+                      fontSize: 11,
+                    }}
+                  >
+                    15 minutes ago
+                  </Typography>
+                </Box>
+              </Box>
+              <IconButton
+                size="small"
+                sx={{
+                  width: 32,
+                  height: 32,
+                  backgroundColor: colors.error,
+                  color: colors.brandWhite,
+                  flexShrink: 0,
+                  '&:hover': {
+                    backgroundColor: colors.brandDarkRed,
+                  },
+                }}
+              >
+                <KeyboardArrowRight sx={{ fontSize: 18 }} />
+              </IconButton>
+            </Card>
+
+            {/* Warning Alert - Multiple Failed Login Attempts */}
+            <Card
+              sx={{
+                backgroundColor: `${colors.warning}0D`,
+                border: `1.5px solid ${colors.warning}26`,
+                borderRadius: '12px',
+                padding: 1.5,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.5,
+                cursor: 'pointer',
+                transition: 'all 0.3s ease',
+                '&:hover': {
+                  backgroundColor: `${colors.warning}1A`,
+                  transform: 'translateX(4px)',
+                },
+              }}
+            >
+              <Box
+                sx={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: '10px',
+                  backgroundColor: `${colors.warning}26`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                <Lock sx={{ fontSize: 20, color: colors.warning }} />
+              </Box>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                  <Chip
+                    label="WARNING"
+                    size="small"
+                    sx={{
+                      backgroundColor: colors.warning,
+                      color: colors.brandWhite,
+                      fontWeight: 700,
+                      fontSize: 10,
+                      height: 20,
+                      px: 0.5,
+                    }}
+                  />
+                </Box>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    fontWeight: 700,
+                    color: colors.brandBlack,
+                    fontSize: 13,
+                    mb: 0.25,
+                  }}
+                >
+                  Multiple Failed Login Attempts
+                </Typography>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    color: colors.textSecondary,
+                    fontSize: 12,
+                    mb: 0.5,
+                  }}
+                >
+                  3 failed login attempts detected for user "mike@example.com"
+                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <AccessTime sx={{ fontSize: 12, color: colors.textSecondary }} />
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      color: colors.textSecondary,
+                      fontSize: 11,
+                    }}
+                  >
+                    1 hour ago
+                  </Typography>
+                </Box>
+              </Box>
+              <IconButton
+                size="small"
+                sx={{
+                  width: 32,
+                  height: 32,
+                  backgroundColor: colors.warning,
+                  color: colors.brandWhite,
+                  flexShrink: 0,
+                  '&:hover': {
+                    backgroundColor: '#F57C00',
+                  },
+                }}
+              >
+                <KeyboardArrowRight sx={{ fontSize: 18 }} />
+              </IconButton>
+            </Card>
+          </Box>
+        </Box>
+      </Card>
+
       {/* Quick Actions */}
       <Card
         sx={{
