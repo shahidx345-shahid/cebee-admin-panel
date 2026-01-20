@@ -603,41 +603,85 @@ const PredictionsPage = () => {
       </Grid>
 
       {/* Status Toggle Buttons */}
-      <Box sx={{ mb: 3 }}>
-        <ToggleButtonGroup
-          value={selectedStatus}
-          exclusive
-          onChange={(e, newValue) => {
-            if (newValue !== null) setSelectedStatus(newValue);
-          }}
+      <Box sx={{ mb: 3, display: 'flex', gap: 1.5 }}>
+        <Button
+          variant={selectedStatus === 'ongoing' ? 'contained' : 'outlined'}
+          onClick={() => setSelectedStatus('ongoing')}
+          startIcon={
+            <Box
+              sx={{
+                width: 24,
+                height: 24,
+                borderRadius: '50%',
+                backgroundColor: selectedStatus === 'ongoing' ? colors.brandWhite : colors.brandRed,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <PlayArrow 
+                sx={{ 
+                  fontSize: 14, 
+                  color: selectedStatus === 'ongoing' ? colors.brandRed : colors.brandWhite 
+                }} 
+              />
+            </Box>
+          }
           sx={{
-            '& .MuiToggleButton-root': {
-              borderRadius: '20px',
-              textTransform: 'none',
-              fontWeight: 600,
-              px: 3,
-              py: 1.5,
-              border: `1.5px solid ${colors.divider}66`,
-              '&.Mui-selected': {
-                backgroundColor: colors.brandRed,
-                color: colors.brandWhite,
-                borderColor: colors.brandRed,
-                '&:hover': {
-                  backgroundColor: colors.brandRed,
-                },
-              },
+            borderRadius: '20px',
+            textTransform: 'none',
+            fontWeight: 600,
+            px: 3,
+            py: 1.5,
+            backgroundColor: selectedStatus === 'ongoing' ? colors.brandRed : colors.brandWhite,
+            color: selectedStatus === 'ongoing' ? colors.brandWhite : colors.textSecondary,
+            border: `1.5px solid ${selectedStatus === 'ongoing' ? colors.brandRed : colors.divider}66`,
+            '&:hover': {
+              backgroundColor: selectedStatus === 'ongoing' ? colors.brandRed : `${colors.divider}0D`,
             },
           }}
         >
-          <ToggleButton value="ongoing">
-            <PlayArrow sx={{ fontSize: 18, mr: 1 }} />
-            Ongoing Predictions
-          </ToggleButton>
-          <ToggleButton value="completed">
-            <CheckCircle sx={{ fontSize: 18, mr: 1 }} />
-            Completed Predictions
-          </ToggleButton>
-        </ToggleButtonGroup>
+          Ongoing Predictions
+        </Button>
+        <Button
+          variant={selectedStatus === 'completed' ? 'contained' : 'outlined'}
+          onClick={() => setSelectedStatus('completed')}
+          startIcon={
+            <Box
+              sx={{
+                width: 24,
+                height: 24,
+                borderRadius: '50%',
+                backgroundColor: selectedStatus === 'completed' ? colors.brandWhite : colors.success,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <CheckCircle 
+                sx={{ 
+                  fontSize: 14, 
+                  color: selectedStatus === 'completed' ? colors.success : colors.brandWhite 
+                }} 
+              />
+            </Box>
+          }
+          sx={{
+            borderRadius: '20px',
+            textTransform: 'none',
+            fontWeight: 600,
+            px: 3,
+            py: 1.5,
+            backgroundColor: selectedStatus === 'completed' ? colors.brandRed : colors.brandWhite,
+            color: selectedStatus === 'completed' ? colors.brandWhite : colors.textSecondary,
+            border: `1.5px solid ${selectedStatus === 'completed' ? colors.brandRed : colors.divider}66`,
+            '&:hover': {
+              backgroundColor: selectedStatus === 'completed' ? colors.brandRed : `${colors.divider}0D`,
+            },
+          }}
+        >
+          Completed Predictions
+        </Button>
       </Box>
 
       {/* Search and Sort Bar */}
@@ -652,17 +696,22 @@ const PredictionsPage = () => {
         <Button
           variant="outlined"
           startIcon={<ArrowDropDown sx={{ fontSize: 18, color: colors.brandRed }} />}
-          endIcon={<ArrowDropDown sx={{ fontSize: 18, color: colors.brandRed }} />}
+          endIcon={<ArrowDropDown sx={{ fontSize: 14, color: colors.brandRed }} />}
           onClick={(e) => setSortAnchor(e.currentTarget)}
           sx={{
             borderColor: `${colors.brandRed}33`,
             color: colors.brandBlack,
-            backgroundColor: `${colors.brandRed}0D`,
-            borderRadius: '8px',
+            backgroundColor: colors.brandWhite,
+            borderRadius: '12px',
             textTransform: 'none',
             fontWeight: 500,
-            px: 2,
-            py: 1,
+            px: 2.5,
+            py: 1.5,
+            minWidth: 180,
+            '&:hover': {
+              borderColor: colors.brandRed,
+              backgroundColor: `${colors.brandRed}0A`,
+            },
           }}
         >
           Date: {selectedSort === 'dateNewest' ? 'Newest First' : 'Oldest First'}
