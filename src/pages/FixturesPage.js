@@ -8,12 +8,9 @@ import {
   CardContent,
   Grid,
   Chip,
-  Tabs,
-  Tab,
   Select,
   MenuItem,
   FormControl,
-  InputLabel,
 } from '@mui/material';
 import {
   Add,
@@ -87,7 +84,7 @@ const FixturesPage = () => {
     }
 
     // Status filter
-    if (selectedStatus !== 'all') {
+    if (selectedStatus && selectedStatus !== 'all') {
       filtered = filtered.filter((fixture) => {
         const status = fixture.matchStatus || fixture.status;
         return status === selectedStatus;
@@ -294,11 +291,12 @@ const FixturesPage = () => {
     page * rowsPerPage + rowsPerPage
   );
 
-  const statusTabs = [
-    { value: 'scheduled', label: 'Scheduled', count: fixtures.filter((f) => (f.matchStatus || f.status) === 'scheduled').length },
-    { value: 'published', label: 'Published', count: fixtures.filter((f) => (f.matchStatus || f.status) === 'published').length },
-    { value: 'live', label: 'Live', count: fixtures.filter((f) => (f.matchStatus || f.status) === 'live').length },
-    { value: 'resultsProcessing', label: 'Result Pending', count: fixtures.filter((f) => (f.matchStatus || f.status) === 'resultsProcessing').length },
+  const statusFilters = [
+    { value: 'scheduled', label: 'Scheduled', icon: AccessTime, color: '#1976d2' },
+    { value: 'published', label: 'Published', icon: Visibility, color: '#1976d2' },
+    { value: 'live', label: 'Live', icon: PlayArrow, color: colors.brandRed },
+    { value: 'resultsProcessing', label: 'Result Pending', icon: Edit, color: '#ed6c02' },
+    { value: 'completed', label: 'Completed', icon: CheckCircle, color: colors.success },
   ];
 
   return (
@@ -384,59 +382,96 @@ const FixturesPage = () => {
         </Grid>
       </Grid>
 
-      {/* Status Tabs */}
-      <Card sx={{ mb: 3, borderRadius: '16px', overflow: 'hidden' }}>
-        <Tabs
-          value={selectedStatus}
-          onChange={(e, newValue) => setSelectedStatus(newValue)}
+      {/* Status Filter Buttons - Card Style */}
+      <Box sx={{ mb: 3, display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+        {statusFilters.map((filter) => {
+          const isSelected = selectedStatus === filter.value;
+          const Icon = filter.icon;
+          const count = fixtures.filter((f) => {
+            const status = f.matchStatus || f.status;
+            if (filter.value === 'scheduled') return status === 'scheduled';
+            if (filter.value === 'published') return status === 'published';
+            if (filter.value === 'live') return status === 'live';
+            if (filter.value === 'resultsProcessing') return status === 'resultsProcessing';
+            if (filter.value === 'completed') return status === 'completed';
+            return false;
+          }).length;
+
+          return (
+            <Button
+              key={filter.value}
+              variant={isSelected ? 'contained' : 'outlined'}
+              onClick={() => setSelectedStatus(filter.value)}
+              sx={{
+                borderRadius: '20px',
+                textTransform: 'none',
+                fontWeight: 600,
+                px: 3,
+                py: 1.5,
+                backgroundColor: isSelected ? '#424242' : colors.brandWhite,
+                color: isSelected ? colors.brandWhite : filter.color,
+                border: `1.5px solid ${isSelected ? '#424242' : colors.divider}66`,
+                boxShadow: isSelected ? '0 2px 8px rgba(0, 0, 0, 0.15)' : 'none',
+                '&:hover': {
+                  backgroundColor: isSelected ? '#424242' : `${colors.divider}0D`,
+                  boxShadow: isSelected ? '0 2px 8px rgba(0, 0, 0, 0.15)' : '0 2px 4px rgba(0, 0, 0, 0.1)',
+                },
+              }}
+            >
+              <Icon
+                sx={{
+                  fontSize: 18,
+                  mr: 1,
+                  color: isSelected ? colors.brandWhite : filter.color,
+                }}
+              />
+              {filter.label}
+            </Button>
+          );
+        })}
+      </Box>
+
+      {/* Search, Sort, and Add Fixture Row */}
+      <Box sx={{ display: 'flex', gap: 1.5, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
+        <Box sx={{ flex: 1, minWidth: { xs: '100%', md: '300px' } }}>
+          <SearchBar
+            value={searchQuery}
+            onChange={setSearchQuery}
+            placeholder="Search by team name or match ID..."
+          />
+        </Box>
+        <FormControl sx={{ minWidth: { xs: '100%', md: 200 } }}>
+          <Select
+            value={selectedSort}
+            onChange={(e) => setSelectedSort(e.target.value)}
+            displayEmpty
+            sx={{
+              borderRadius: '12px',
+              '& .MuiOutlinedInput-notchedOutline': {
+                borderColor: `${colors.divider}66`,
+              },
+            }}
+          >
+            <MenuItem value="dateNewest">Date: Newest First</MenuItem>
+            <MenuItem value="dateOldest">Date: Oldest First</MenuItem>
+          </Select>
+        </FormControl>
+        <Button
+          variant="contained"
+          startIcon={<Add />}
+          onClick={() => navigate('/fixtures/add')}
           sx={{
-            borderBottom: `1px solid ${colors.divider}33`,
-            '& .MuiTab-root': {
-              textTransform: 'none',
-              fontWeight: 600,
-              fontSize: 14,
-            },
+            background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
+            borderRadius: '12px',
+            textTransform: 'none',
+            fontWeight: 600,
+            px: 3,
+            whiteSpace: 'nowrap',
           }}
         >
-          {statusTabs.map((tab) => (
-            <Tab
-              key={tab.value}
-              label={`${tab.label} (${tab.count})`}
-              value={tab.value}
-              sx={{
-                color: selectedStatus === tab.value ? colors.brandRed : colors.textSecondary,
-              }}
-            />
-          ))}
-        </Tabs>
-      </Card>
-
-      {/* Filters */}
-      <Card sx={{ padding: 2.5, mb: 3, borderRadius: '16px' }}>
-        <Grid container spacing={2} alignItems="center">
-          <Grid item xs={12} md={8}>
-            <SearchBar
-              value={searchQuery}
-              onChange={setSearchQuery}
-              placeholder="Search by team name or match ID..."
-            />
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <FormControl fullWidth>
-              <InputLabel>Sort By</InputLabel>
-              <Select
-                value={selectedSort}
-                onChange={(e) => setSelectedSort(e.target.value)}
-                label="Sort By"
-                sx={{ borderRadius: '12px' }}
-              >
-                <MenuItem value="dateNewest">Date (Newest)</MenuItem>
-                <MenuItem value="dateOldest">Date (Oldest)</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-        </Grid>
-      </Card>
+          Add Fixture
+        </Button>
+      </Box>
 
       {/* Data Table */}
       <DataTable
