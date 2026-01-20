@@ -703,10 +703,13 @@ const LeaguesPage = () => {
         PaperProps={{
           sx: {
             borderRadius: '12px',
-            minWidth: 180,
-            boxShadow: `0 4px 12px ${colors.shadow}33`,
+            minWidth: 220,
+            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.15)',
+            padding: 0.5,
           },
         }}
+        transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+        anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
       >
         <MenuItem
           onClick={() => {
@@ -715,28 +718,66 @@ const LeaguesPage = () => {
             }
             handleMenuClose();
           }}
+          sx={{
+            px: 2,
+            py: 1.5,
+            borderRadius: '8px',
+            display: 'flex',
+            alignItems: 'center',
+            '&:hover': {
+              backgroundColor: `${colors.warning}0D`,
+            },
+          }}
         >
-          <ListItemText primary="Edit" />
+          <Box
+            sx={{
+              width: 32,
+              height: 32,
+              borderRadius: '8px',
+              backgroundColor: '#FFF3E0',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              mr: 1.5,
+            }}
+          >
+            <Edit sx={{ fontSize: 18, color: '#FF9800' }} />
+          </Box>
+          <Typography sx={{ flex: 1, fontWeight: 600, color: colors.brandBlack }}>Edit League</Typography>
+          <KeyboardArrowRight sx={{ fontSize: 18, color: colors.textSecondary }} />
         </MenuItem>
         <MenuItem
           onClick={() => {
-            if (selectedLeague) {
-              toggleLeagueStatus(selectedLeague);
-            }
             handleMenuClose();
+            // TODO: Add delete confirmation dialog
+          }}
+          sx={{
+            px: 2,
+            py: 1.5,
+            borderRadius: '8px',
+            display: 'flex',
+            alignItems: 'center',
+            '&:hover': {
+              backgroundColor: `${colors.error}0D`,
+            },
           }}
         >
-          <ListItemText
-            primary={selectedLeague?.isActive ? 'Deactivate' : 'Activate'}
-          />
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            handleMenuClose();
-          }}
-          sx={{ color: colors.error }}
-        >
-          <ListItemText primary="Delete" />
+          <Box
+            sx={{
+              width: 32,
+              height: 32,
+              borderRadius: '8px',
+              backgroundColor: '#FFEBEE',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              mr: 1.5,
+            }}
+          >
+            <Delete sx={{ fontSize: 18, color: colors.error }} />
+          </Box>
+          <Typography sx={{ flex: 1, fontWeight: 600, color: colors.brandBlack }}>Delete League</Typography>
+          <KeyboardArrowRight sx={{ fontSize: 18, color: colors.textSecondary }} />
         </MenuItem>
       </Menu>
     </Box>
