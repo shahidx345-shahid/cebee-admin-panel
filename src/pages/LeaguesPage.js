@@ -60,6 +60,67 @@ const LeaguesPage = () => {
     filterAndSortLeagues();
   }, [leagues, searchQuery, typeFilter, selectedSort]);
 
+  const getSampleLeagues = () => {
+    return [
+      {
+        id: 'LEAGUE_001',
+        name: 'Africa Cup of Nations',
+        type: 'International',
+        isActive: false,
+        createdAt: new Date('2025-11-26'),
+      },
+      {
+        id: 'LEAGUE_002',
+        name: 'UEFA Europa League',
+        type: 'International',
+        isActive: false,
+        createdAt: new Date('2025-11-21'),
+      },
+      {
+        id: 'LEAGUE_003',
+        name: 'Premier League',
+        type: 'Domestic',
+        isActive: true,
+        createdAt: new Date('2025-10-15'),
+      },
+      {
+        id: 'LEAGUE_004',
+        name: 'La Liga',
+        type: 'Domestic',
+        isActive: true,
+        createdAt: new Date('2025-10-12'),
+      },
+      {
+        id: 'LEAGUE_005',
+        name: 'Bundesliga',
+        type: 'Domestic',
+        isActive: true,
+        createdAt: new Date('2025-10-10'),
+      },
+      {
+        id: 'LEAGUE_006',
+        name: 'Serie A',
+        type: 'Domestic',
+        isActive: true,
+        createdAt: new Date('2025-10-08'),
+      },
+      {
+        id: 'LEAGUE_007',
+        name: 'Ligue 1',
+        type: 'Domestic',
+        isActive: true,
+        createdAt: new Date('2025-10-05'),
+      },
+      {
+        id: 'LEAGUE_008',
+        name: 'Champions League',
+        type: 'International',
+        isActive: false,
+        createdAt: new Date('2025-09-20'),
+      },
+    ];
+  };
+
   const loadLeagues = async () => {
     try {
       setLoading(true);
