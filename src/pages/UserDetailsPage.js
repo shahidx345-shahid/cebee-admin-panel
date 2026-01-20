@@ -83,9 +83,9 @@ const UserDetailsPage = () => {
       
       // Try to load from Firebase
       try {
-        const userRef = doc(db, 'users', id);
-        const userDoc = await getDoc(userRef);
-        if (userDoc.exists()) {
+      const userRef = doc(db, 'users', id);
+      const userDoc = await getDoc(userRef);
+      if (userDoc.exists()) {
           userData = { id: userDoc.id, ...userDoc.data() };
         }
       } catch (error) {
@@ -279,13 +279,16 @@ const UserDetailsPage = () => {
                 <Typography variant="body2" sx={{ color: colors.textSecondary, mb: 0.5 }}>
                   @{user.username || 'N/A'}
                 </Typography>
-                <Typography variant="body2" sx={{ color: colors.textSecondary }}>
+                <Typography variant="body2" sx={{ color: colors.textSecondary, mb: 0.5 }}>
                   {user.email || 'No email'}
+                </Typography>
+                <Typography variant="body2" sx={{ color: colors.textSecondary }}>
+                  {user.country || 'N/A'}
                 </Typography>
               </Box>
             </Box>
             <Grid container spacing={2}>
-              <Grid item xs={6} md={2.4}>
+              <Grid item xs={6} md={3}>
                 <Typography variant="caption" sx={{ color: colors.textSecondary }}>
                   User ID
                 </Typography>
@@ -293,7 +296,7 @@ const UserDetailsPage = () => {
                   {user.id}
                 </Typography>
               </Grid>
-              <Grid item xs={6} md={2.4}>
+              <Grid item xs={6} md={3}>
                 <Typography variant="caption" sx={{ color: colors.textSecondary }}>
                   Account Status
                 </Typography>
@@ -301,15 +304,7 @@ const UserDetailsPage = () => {
                   {getAccountStatusChip()}
                 </Box>
               </Grid>
-              <Grid item xs={6} md={2.4}>
-                <Typography variant="caption" sx={{ color: colors.textSecondary }}>
-                  Country
-                </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                  {user.country || 'N/A'}
-                </Typography>
-              </Grid>
-              <Grid item xs={6} md={2.4}>
+              <Grid item xs={6} md={3}>
                 <Typography variant="caption" sx={{ color: colors.textSecondary }}>
                   Registration Date
                 </Typography>
@@ -319,7 +314,7 @@ const UserDetailsPage = () => {
                     : 'N/A'}
                 </Typography>
               </Grid>
-              <Grid item xs={6} md={2.4}>
+              <Grid item xs={6} md={3}>
                 <Typography variant="caption" sx={{ color: colors.textSecondary }}>
                   Last Login Date
                 </Typography>
@@ -464,20 +459,20 @@ const UserDetailsPage = () => {
           </Card>
         </Grid>
         <Grid item xs={6} md={3}>
-          <Card
-            sx={{
-              padding: 2,
+            <Card
+              sx={{
+                padding: 2,
               background: `linear-gradient(135deg, ${colors.success}1A 0%, ${colors.success}0D 100%)`,
               border: `1.5px solid ${colors.success}33`,
-              borderRadius: '16px',
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                borderRadius: '16px',
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
               <CheckCircle sx={{ fontSize: 24, color: colors.success }} />
-              <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 12 }}>
+                <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 12 }}>
                 Prediction Accuracy %
-              </Typography>
-            </Box>
+                </Typography>
+              </Box>
             <Typography variant="h4" sx={{ fontWeight: 700, color: colors.success }}>
               {(user.predictionAccuracy || 0).toFixed(1)}%
             </Typography>
@@ -572,8 +567,8 @@ const UserDetailsPage = () => {
                 </Typography>
               </Grid>
             </Grid>
-          </Card>
-        </Grid>
+            </Card>
+          </Grid>
       </Grid>
 
       {/* Activity Log */}
