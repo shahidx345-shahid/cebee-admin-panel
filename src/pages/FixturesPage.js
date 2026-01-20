@@ -23,6 +23,8 @@ import {
   List,
   ListItem,
   ListItemText,
+  Menu,
+  IconButton,
 } from '@mui/material';
 import {
   Add,
@@ -47,6 +49,8 @@ import {
   Info,
   CalendarToday,
   ListAlt,
+  MoreVert,
+  KeyboardArrowRight,
 } from '@mui/icons-material';
 import { colors, constants } from '../config/theme';
 import SearchBar from '../components/common/SearchBar';
@@ -74,6 +78,8 @@ const FixturesPage = () => {
     firstGoalMinute: '',
     markAsCompleted: false,
   });
+  const [actionMenuAnchor, setActionMenuAnchor] = useState(null);
+  const [menuFixture, setMenuFixture] = useState(null);
 
   useEffect(() => {
     loadFixtures();
@@ -771,39 +777,65 @@ const FixturesPage = () => {
       render: (_, row) => {
         const status = row.matchStatus || row.status;
         const isResultPending = status === 'resultsProcessing' || status === 'pending';
+        const isScheduled = status === 'scheduled' || status === 'draft';
         
         return (
-          <Button
-            onClick={(e) => {
-              e.stopPropagation();
-              if (isResultPending) {
-                setSelectedFixture(row);
-                setResultsForm({
-                  homeScore: row.homeScore || '',
-                  awayScore: row.awayScore || '',
-                  firstGoalScorer: row.firstGoalScorer || '',
-                  firstGoalMinute: row.firstGoalMinute || '',
-                  markAsCompleted: false,
-                });
-                setResultsModalOpen(true);
-              } else {
-                navigate(`/fixtures/details/${row.id}`);
-              }
-            }}
-            sx={{
-              minWidth: 40,
-              width: 40,
-              height: 40,
-              padding: 0,
-              backgroundColor: colors.brandRed,
-              borderRadius: '8px',
-              '&:hover': {
-                backgroundColor: colors.brandDarkRed,
-              },
-            }}
-          >
-            <Stadium sx={{ fontSize: 20, color: colors.brandWhite }} />
-          </Button>
+          <Box>
+            {isScheduled ? (
+              <IconButton
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setActionMenuAnchor(e.currentTarget);
+                  setMenuFixture(row);
+                }}
+                sx={{
+                  minWidth: 40,
+                  width: 40,
+                  height: 40,
+                  padding: 0,
+                  backgroundColor: colors.brandRed,
+                  borderRadius: '8px',
+                  '&:hover': {
+                    backgroundColor: colors.brandDarkRed,
+                  },
+                }}
+              >
+                <MoreVert sx={{ fontSize: 20, color: colors.brandWhite }} />
+              </IconButton>
+            ) : (
+              <Button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (isResultPending) {
+                    setSelectedFixture(row);
+                    setResultsForm({
+                      homeScore: row.homeScore || '',
+                      awayScore: row.awayScore || '',
+                      firstGoalScorer: row.firstGoalScorer || '',
+                      firstGoalMinute: row.firstGoalMinute || '',
+                      markAsCompleted: false,
+                    });
+                    setResultsModalOpen(true);
+                  } else {
+                    navigate(`/fixtures/details/${row.id}`);
+                  }
+                }}
+                sx={{
+                  minWidth: 40,
+                  width: 40,
+                  height: 40,
+                  padding: 0,
+                  backgroundColor: colors.brandRed,
+                  borderRadius: '8px',
+                  '&:hover': {
+                    backgroundColor: colors.brandDarkRed,
+                  },
+                }}
+              >
+                <Stadium sx={{ fontSize: 20, color: colors.brandWhite }} />
+              </Button>
+            )}
+          </Box>
         );
       },
     },
