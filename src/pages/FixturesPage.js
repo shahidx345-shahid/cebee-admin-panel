@@ -31,6 +31,7 @@ import {
   TrendingDown,
   Check,
   Stadium,
+  Lock,
 } from '@mui/icons-material';
 import { colors, constants } from '../config/theme';
 import SearchBar from '../components/common/SearchBar';
@@ -45,7 +46,7 @@ const FixturesPage = () => {
   const [filteredFixtures, setFilteredFixtures] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState('scheduled');
+  const [selectedStatus, setSelectedStatus] = useState('predictionOpen');
   const [selectedSort, setSelectedSort] = useState('dateNewest');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -199,10 +200,17 @@ const FixturesPage = () => {
       );
     }
 
-    // Status filter
+    // Status filter - map match flow states to backend statuses
     if (selectedStatus && selectedStatus !== 'all') {
       filtered = filtered.filter((fixture) => {
         const status = fixture.matchStatus || fixture.status;
+        // Map match flow filter values to backend statuses
+        if (selectedStatus === 'predictionOpen') {
+          return status === 'scheduled' || status === 'published' || status === 'predictionOpen';
+        }
+        if (selectedStatus === 'predictionLocked') {
+          return status === 'predictionLocked' || status === 'locked';
+        }
         return status === selectedStatus;
       });
     }
@@ -251,20 +259,34 @@ const FixturesPage = () => {
   };
 
   const getStatusChip = (status) => {
+    // Map backend statuses to match flow states
     const statusMap = {
-      scheduled: 'SCHEDULED',
-      published: 'SCHEDULED',
-      live: 'LIVE',
-      completed: 'COMPLETED',
-      resultsProcessing: 'RESULT PENDING',
+      scheduled: 'predictionOpen',
+      published: 'predictionOpen',
+      predictionOpen: 'predictionOpen',
+      predictionLocked: 'predictionLocked',
+      locked: 'predictionLocked',
+      live: 'live',
+      completed: 'completed',
+      resultsProcessing: 'resultsProcessing',
+      fullTimeProcessing: 'resultsProcessing',
+      fullTimeCompleted: 'completed',
     };
 
+    const mappedStatus = statusMap[status] || 'predictionOpen';
+
     const statusConfig = {
-      scheduled: { 
-        label: 'SCHEDULED', 
+      predictionOpen: { 
+        label: 'PREDICTION OPEN', 
         backgroundColor: '#E3F2FD', 
         color: '#1976D2',
         textColor: '#1976D2'
+      },
+      predictionLocked: { 
+        label: 'PREDICTION LOCKED', 
+        backgroundColor: '#FFF3E0', 
+        color: '#E65100',
+        textColor: '#E65100'
       },
       live: { 
         label: 'LIVE', 
@@ -286,8 +308,7 @@ const FixturesPage = () => {
       },
     };
 
-    const mappedStatus = statusMap[status] || 'SCHEDULED';
-    const config = statusConfig[status] || statusConfig.scheduled;
+    const config = statusConfig[mappedStatus] || statusConfig.predictionOpen;
 
     return (
       <Chip
@@ -531,8 +552,8 @@ const FixturesPage = () => {
   );
 
   const statusFilters = [
-    { value: 'scheduled', label: 'Scheduled', icon: AccessTime, color: '#1976d2' },
-    { value: 'published', label: 'Published', icon: Visibility, color: '#1976d2' },
+    { value: 'predictionOpen', label: 'Prediction Open', icon: AccessTime, color: '#1976d2' },
+    { value: 'predictionLocked', label: 'Prediction Locked', icon: Lock, color: '#ed6c02' },
     { value: 'live', label: 'Live', icon: PlayArrow, color: colors.brandRed },
     { value: 'resultsProcessing', label: 'Result Pending', icon: Edit, color: '#ed6c02' },
     { value: 'completed', label: 'Completed', icon: CheckCircle, color: colors.success },
