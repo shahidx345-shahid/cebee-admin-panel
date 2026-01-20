@@ -692,87 +692,92 @@ const PredictionsPage = () => {
       </Grid>
 
       {/* Status Toggle Buttons */}
-      <Box sx={{ mb: 3, display: 'flex', gap: 1.5 }}>
-        <Button
-          variant="outlined"
-          onClick={() => setSelectedStatus('ongoing')}
-          startIcon={
-            <Box
-              sx={{
-                width: 24,
-                height: 24,
-                borderRadius: '50%',
-                backgroundColor: colors.brandRed,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <PlayArrow 
-                sx={{ 
-                  fontSize: 14, 
-                  color: colors.brandWhite 
-                }} 
-              />
-            </Box>
-          }
-          sx={{
-            borderRadius: '20px',
-            textTransform: 'none',
-            fontWeight: 600,
-            px: 3,
-            py: 1.5,
-            backgroundColor: colors.brandWhite,
-            color: colors.textSecondary,
-            border: `1.5px solid ${colors.divider}66`,
-            boxShadow: selectedStatus === 'ongoing' ? `0 2px 8px ${colors.brandRed}33` : 'none',
-            '&:hover': {
-              backgroundColor: `${colors.divider}0D`,
-              boxShadow: `0 2px 8px ${colors.brandRed}33`,
-            },
-          }}
-        >
-          Ongoing Predictions
-        </Button>
-        <Button
-          variant={selectedStatus === 'completed' ? 'contained' : 'outlined'}
-          onClick={() => setSelectedStatus('completed')}
-          startIcon={
-            <Box
-              sx={{
-                width: 24,
-                height: 24,
-                borderRadius: '50%',
-                backgroundColor: selectedStatus === 'completed' ? colors.brandWhite : colors.success,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <CheckCircle 
-                sx={{ 
-                  fontSize: 14, 
-                  color: selectedStatus === 'completed' ? colors.success : colors.brandWhite 
-                }} 
-              />
-            </Box>
-          }
-          sx={{
-            borderRadius: '20px',
-            textTransform: 'none',
-            fontWeight: 600,
-            px: 3,
-            py: 1.5,
-            backgroundColor: selectedStatus === 'completed' ? colors.success : colors.brandWhite,
-            color: selectedStatus === 'completed' ? colors.brandWhite : colors.textSecondary,
-            border: `1.5px solid ${selectedStatus === 'completed' ? colors.success : colors.divider}66`,
-            '&:hover': {
-              backgroundColor: selectedStatus === 'completed' ? colors.success : `${colors.divider}0D`,
-            },
-          }}
-        >
-          Completed Predictions
-        </Button>
+      <Box sx={{ mb: 3, width: '100%' }}>
+        <Box sx={{ display: 'flex', gap: 1.5, width: '100%' }}>
+          <Button
+            variant="outlined"
+            onClick={() => setSelectedStatus('ongoing')}
+            startIcon={
+              <Box
+                sx={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: '50%',
+                  backgroundColor: colors.brandRed,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <PlayArrow 
+                  sx={{ 
+                    fontSize: 14, 
+                    color: colors.brandWhite 
+                  }} 
+                />
+              </Box>
+            }
+            sx={{
+              flex: 1,
+              borderRadius: '20px',
+              textTransform: 'none',
+              fontWeight: 600,
+              px: 3,
+              py: 1.5,
+              backgroundColor: colors.brandWhite,
+              color: colors.textSecondary,
+              border: `1.5px solid ${colors.divider}66`,
+              boxShadow: `0 2px 4px ${colors.shadow}1A`,
+              '&:hover': {
+                backgroundColor: `${colors.divider}0D`,
+                boxShadow: `0 2px 8px ${colors.brandRed}33`,
+              },
+            }}
+          >
+            Ongoing Predictions
+          </Button>
+          <Button
+            variant={selectedStatus === 'completed' ? 'contained' : 'outlined'}
+            onClick={() => setSelectedStatus('completed')}
+            startIcon={
+              <Box
+                sx={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: '50%',
+                  backgroundColor: selectedStatus === 'completed' ? colors.brandWhite : colors.success,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <CheckCircle 
+                  sx={{ 
+                    fontSize: 14, 
+                    color: selectedStatus === 'completed' ? colors.success : colors.brandWhite 
+                  }} 
+                />
+              </Box>
+            }
+            sx={{
+              flex: 1,
+              borderRadius: '20px',
+              textTransform: 'none',
+              fontWeight: 600,
+              px: 3,
+              py: 1.5,
+              backgroundColor: selectedStatus === 'completed' ? colors.success : colors.brandWhite,
+              color: selectedStatus === 'completed' ? colors.brandWhite : colors.textSecondary,
+              border: `1.5px solid ${selectedStatus === 'completed' ? colors.success : colors.divider}66`,
+              boxShadow: selectedStatus === 'completed' ? `0 2px 4px ${colors.shadow}1A` : `0 2px 4px ${colors.shadow}1A`,
+              '&:hover': {
+                backgroundColor: selectedStatus === 'completed' ? colors.success : `${colors.divider}0D`,
+              },
+            }}
+          >
+            Completed Predictions
+          </Button>
+        </Box>
       </Box>
 
       {/* Search and Sort Bar */}
