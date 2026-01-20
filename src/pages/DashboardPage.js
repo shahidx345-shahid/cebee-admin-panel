@@ -278,7 +278,7 @@ const DashboardPage = () => {
       </Box>
 
       {/* Stats Cards */}
-      <Grid container spacing={{ xs: 2, md: 2 }} sx={{ mb: { xs: 2, md: 2.5 } }}>
+      <Grid container spacing={{ xs: 1.5, md: 2 }} sx={{ mb: { xs: 2, md: 2.5 } }}>
         <Grid item xs={6} md={3}>
           <StatCard {...stats[0]} delay={0} />
         </Grid>
