@@ -355,10 +355,10 @@ const FixtureDetailsPage = () => {
         Back to Fixtures
       </Button>
 
-      {/* Match Flow Status Card */}
+      {/* Match Flow Status Card - Dashboard Style */}
       <Card
         sx={{
-          padding: { xs: 2.5, md: 3 },
+          padding: { xs: 2, md: 2.5 },
           mb: 3,
           borderRadius: '20px',
           background: statusConfig.isPrimary
@@ -370,81 +370,127 @@ const FixtureDetailsPage = () => {
           boxShadow: statusConfig.isPrimary
             ? `0 6px 18px ${statusConfig.color}40`
             : `0 6px 14px ${statusConfig.color}1F`,
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
         }}
       >
-        <CardContent sx={{ padding: 0, '&:last-child': { paddingBottom: 0 } }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Box
-                sx={{
-                  padding: { xs: 1.25, md: 1.5 },
-                  background: statusConfig.isPrimary
-                    ? `${colors.brandWhite}33`
-                    : `${statusConfig.color}1F`,
-                  borderRadius: '14px',
-                  boxShadow: statusConfig.isPrimary
-                    ? '0 3px 8px rgba(0, 0, 0, 0.12)'
-                    : 'none',
-                }}
-              >
-                <StatusIcon
-                  sx={{
-                    fontSize: { xs: 28, md: 32 },
-                    color: statusConfig.isPrimary ? colors.brandWhite : statusConfig.color,
-                  }}
-                />
-              </Box>
-              <Box>
-                <Typography
-                  variant="h5"
-                  sx={{
-                    fontWeight: 700,
-                    color: statusConfig.isPrimary ? colors.brandWhite : colors.brandBlack,
-                    mb: 0.5,
-                  }}
-                >
-                  {statusConfig.title}
-                </Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      fontWeight: 500,
-                      color: statusConfig.isPrimary ? `${colors.brandWhite}F0` : statusConfig.color,
-                      fontSize: 13,
-                    }}
-                  >
-                    {statusConfig.subtitle}
-                  </Typography>
-                  <ArrowUpward
-                    sx={{
-                      fontSize: 12,
-                      color: statusConfig.isPrimary ? `${colors.brandWhite}B3` : statusConfig.color,
-                    }}
-                  />
-                </Box>
-              </Box>
-            </Box>
-            <Box>
-              <Stepper activeStep={getActiveStep()} sx={{ minWidth: { xs: '100%', md: 500 } }}>
-                {steps.map((label, index) => (
-                  <Step key={label} completed={index < getActiveStep()}>
-                    <StepLabel
-                      sx={{
-                        '& .MuiStepLabel-label': {
-                          fontSize: 11,
-                          fontWeight: index === getActiveStep() ? 600 : 400,
-                        },
-                      }}
-                    >
-                      {label}
-                    </StepLabel>
-                  </Step>
-                ))}
-              </Stepper>
-            </Box>
+        <CardContent sx={{ padding: 0, '&:last-child': { paddingBottom: 0 }, position: 'relative' }}>
+          {/* Status Tag at Top Right */}
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 0,
+              right: 0,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 0.5,
+            }}
+          >
+            <Chip
+              label={statusConfig.subtitle}
+              icon={<ArrowUpward sx={{ fontSize: 12 }} />}
+              size="small"
+              sx={{
+                backgroundColor: `${colors.success}1A`,
+                color: colors.success,
+                fontWeight: 500,
+                fontSize: { xs: 10.5, md: 11.5 },
+                height: 24,
+                '& .MuiChip-icon': {
+                  color: colors.success,
+                  fontSize: 12,
+                },
+              }}
+            />
+          </Box>
+
+          {/* Icon at Top Left */}
+          <Box
+            sx={{
+              padding: { xs: 1.25, md: 1.5 },
+              width: 'fit-content',
+              background: statusConfig.isPrimary
+                ? `${colors.brandWhite}33`
+                : `${statusConfig.color}1F`,
+              borderRadius: '14px',
+              boxShadow: statusConfig.isPrimary
+                ? '0 3px 8px rgba(0, 0, 0, 0.12)'
+                : 'none',
+              mb: 2,
+            }}
+          >
+            <StatusIcon
+              sx={{
+                fontSize: { xs: 24, md: 28 },
+                color: statusConfig.isPrimary ? colors.brandWhite : statusConfig.color,
+              }}
+            />
+          </Box>
+
+          {/* Large Status Display */}
+          <Box>
+            <Typography
+              variant="h4"
+              sx={{
+                fontWeight: 700,
+                color: statusConfig.isPrimary ? colors.brandWhite : colors.brandBlack,
+                letterSpacing: -0.8,
+                fontSize: { xs: 24, md: 30 },
+                mb: 0.75,
+              }}
+            >
+              {getActiveStep() + 1}
+            </Typography>
+            <Typography
+              variant="body2"
+              sx={{
+                fontWeight: 600,
+                color: statusConfig.isPrimary ? `${colors.brandWhite}F0` : colors.brandBlack,
+                fontSize: { xs: 13, md: 14 },
+                mb: 0.5,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {statusConfig.title}
+            </Typography>
           </Box>
         </CardContent>
+      </Card>
+
+      {/* Match Flow Stepper */}
+      <Card
+        sx={{
+          padding: { xs: 2, md: 2.5 },
+          mb: 3,
+          borderRadius: '20px',
+          background: colors.brandWhite,
+          border: `1.5px solid ${colors.divider}26`,
+          boxShadow: `0 6px 14px ${colors.shadow}1F`,
+        }}
+      >
+        <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
+          Match Flow Progress
+        </Typography>
+        <Stepper activeStep={getActiveStep()} alternativeLabel>
+          {steps.map((label, index) => (
+            <Step key={label} completed={index < getActiveStep()}>
+              <StepLabel
+                sx={{
+                  '& .MuiStepLabel-label': {
+                    fontSize: 12,
+                    fontWeight: index === getActiveStep() ? 600 : 400,
+                  },
+                }}
+              >
+                {label}
+              </StepLabel>
+            </Step>
+          ))}
+        </Stepper>
       </Card>
 
       {/* Match Information Card */}
@@ -459,20 +505,20 @@ const FixtureDetailsPage = () => {
         }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
-          <Box
-            sx={{
-              padding: 2,
-              background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
-              borderRadius: '16px',
+              <Box
+                sx={{
+                  padding: 2,
+                  background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
+                  borderRadius: '16px',
               boxShadow: `0 4px 12px ${colors.brandRed}40`,
-            }}
-          >
+                }}
+              >
             <SportsSoccer sx={{ fontSize: 36, color: colors.brandWhite }} />
-          </Box>
+              </Box>
           <Box sx={{ flex: 1 }}>
             <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
-              {fixture.homeTeam || 'TBD'} vs {fixture.awayTeam || 'TBD'}
-            </Typography>
+                  {fixture.homeTeam || 'TBD'} vs {fixture.awayTeam || 'TBD'}
+                </Typography>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
               <Chip
                 icon={<SportsSoccer sx={{ fontSize: 16 }} />}
@@ -514,7 +560,7 @@ const FixtureDetailsPage = () => {
               </Typography>
               <Typography variant="h4" sx={{ fontWeight: 700, color: colors.success }}>
                 {fixture.homeScore} - {fixture.awayScore}
-              </Typography>
+                </Typography>
             </Box>
           )}
         </Box>
@@ -522,7 +568,7 @@ const FixtureDetailsPage = () => {
         <Divider sx={{ my: 2.5 }} />
 
         <Grid container spacing={3}>
-          <Grid item xs={6} md={3}>
+              <Grid item xs={6} md={3}>
             <Box
               sx={{
                 padding: 1.5,
@@ -538,15 +584,15 @@ const FixtureDetailsPage = () => {
                 </Typography>
               </Box>
               <Typography variant="body1" sx={{ fontWeight: 600, color: colors.brandBlack }}>
-                {fixture.kickoffTime
-                  ? format(
-                      fixture.kickoffTime?.toDate
-                        ? fixture.kickoffTime.toDate()
-                        : new Date(fixture.kickoffTime),
+                  {fixture.kickoffTime
+                    ? format(
+                        fixture.kickoffTime?.toDate
+                          ? fixture.kickoffTime.toDate()
+                          : new Date(fixture.kickoffTime),
                       'MMM dd, yyyy'
-                    )
-                  : 'TBD'}
-              </Typography>
+                      )
+                    : 'TBD'}
+                </Typography>
               <Typography variant="body2" sx={{ color: colors.textSecondary, mt: 0.5 }}>
                 {fixture.kickoffTime
                   ? format(
@@ -558,8 +604,8 @@ const FixtureDetailsPage = () => {
                   : ''}
               </Typography>
             </Box>
-          </Grid>
-          <Grid item xs={6} md={3}>
+              </Grid>
+              <Grid item xs={6} md={3}>
             <Box
               sx={{
                 padding: 1.5,
@@ -574,10 +620,10 @@ const FixtureDetailsPage = () => {
                   Match Status
                 </Typography>
               </Box>
-              <Box sx={{ mt: 0.5 }}>{getStatusChip(fixture.matchStatus || fixture.status)}</Box>
+                <Box sx={{ mt: 0.5 }}>{getStatusChip(fixture.matchStatus || fixture.status)}</Box>
             </Box>
-          </Grid>
-          <Grid item xs={6} md={3}>
+              </Grid>
+              <Grid item xs={6} md={3}>
             <Box
               sx={{
                 padding: 1.5,
@@ -593,16 +639,16 @@ const FixtureDetailsPage = () => {
                 </Typography>
               </Box>
               <Typography variant="h5" sx={{ fontWeight: 700, color: colors.success }}>
-                {predictions.length}
-              </Typography>
+                  {predictions.length}
+                </Typography>
               <Typography variant="caption" sx={{ color: colors.textSecondary, mt: 0.5, display: 'block' }}>
                 Total predictions
-              </Typography>
+                </Typography>
             </Box>
           </Grid>
           <Grid item xs={6} md={3}>
-            <Box
-              sx={{
+              <Box
+                sx={{
                 padding: 1.5,
                 background: `${colors.textSecondary}0D`,
                 borderRadius: '12px',
@@ -617,9 +663,9 @@ const FixtureDetailsPage = () => {
               </Box>
               <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack, fontFamily: 'monospace' }}>
                 {fixture.id?.substring(0, 8)}...
-              </Typography>
-            </Box>
-          </Grid>
+                </Typography>
+              </Box>
+            </Grid>
         </Grid>
       </Card>
 
@@ -627,7 +673,7 @@ const FixtureDetailsPage = () => {
       <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
         <Typography variant="h5" sx={{ fontWeight: 700 }}>
           User Predictions
-        </Typography>
+      </Typography>
         <Chip
           label={`${predictions.length} Total`}
           sx={{
