@@ -66,16 +66,17 @@ const UsersPage = () => {
     const lastNames = ['Doe', 'Smith', 'Wilson', 'Jones', 'Brown', 'Davis', 'Miller', 'Garcia', 'Martinez', 'Anderson'];
     const users = [];
     
-    // Generate more users for better statistics
-    for (let i = 0; i < 150; i++) {
+    // Generate 1000 users for better statistics
+    for (let i = 0; i < 1000; i++) {
       const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
       const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
       const username = `${firstName.toLowerCase()}_${lastName.toLowerCase()}_${i}`;
       const email = `${username}@example.com`;
-      const isActive = Math.random() > 0.2;
-      const isBlocked = Math.random() > 0.9;
-      const isDeleted = Math.random() > 0.95;
-      const hasFlags = Math.random() > 0.85;
+      const isActive = Math.random() > 0.12; // ~88% active
+      const isBlocked = Math.random() > 0.96; // ~4% blocked
+      const isDeleted = Math.random() > 0.98; // ~2% deleted/deactivated
+      const hasFlags = Math.random() > 0.94; // ~6% flagged
+      const isVerified = Math.random() > 0.20; // ~80% verified
       
       users.push({
         id: `USER_${i.toString().padStart(6, '0')}`,
