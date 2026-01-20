@@ -14,9 +14,10 @@ import {
   PlayArrow,
   Edit,
   ArrowUpward,
+  EmojiEvents,
 } from '@mui/icons-material';
 import { colors } from '../config/theme';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
 const StatCard = ({ title, value, subtitle, icon: Icon, color, isPrimary = false, delay = 0 }) => {
@@ -135,95 +136,98 @@ const StatCard = ({ title, value, subtitle, icon: Icon, color, isPrimary = false
 };
 
 const DashboardPage = () => {
-  const [fixtureStats, setFixtureStats] = useState({
-    scheduled: 0,
-    published: 0,
-    live: 0,
-    pending: 0,
-    completed: 0,
+  const [dashboardStats, setDashboardStats] = useState({
+    totalUsers: 0,
+    activeUsers: 0,
+    totalSPIssued: 0,
+    estimatedRewardsValue: 0,
   });
 
   useEffect(() => {
-    loadFixtureStats();
+    loadDashboardStats();
   }, []);
 
-  const loadFixtureStats = async () => {
+  const loadDashboardStats = async () => {
     try {
-      const fixturesRef = collection(db, 'fixtures');
-      const snapshot = await getDocs(fixturesRef);
+      // Load users
+      const usersRef = collection(db, 'users');
+      const usersSnapshot = await getDocs(usersRef);
       
-      const stats = {
-        scheduled: 0,
-        published: 0,
-        live: 0,
-        pending: 0,
-        completed: 0,
-      };
+      const now = new Date();
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      
+      let totalUsers = 0;
+      let activeUsers = 0;
+      let totalSPIssued = 0;
 
-      snapshot.docs.forEach((doc) => {
-        const data = doc.data();
-        const status = data.matchStatus || data.status || 'scheduled';
+      usersSnapshot.docs.forEach((doc) => {
+        const userData = doc.data();
+        totalUsers++;
         
-        if (status === 'scheduled') stats.scheduled++;
-        else if (status === 'published') stats.published++;
-        else if (status === 'live') stats.live++;
-        else if (status === 'pending' || status === 'result_pending') stats.pending++;
-        else if (status === 'completed' || status === 'finished') stats.completed++;
+        // Check if user is active (logged in last 30 days)
+        if (userData.lastLogin) {
+          const lastLogin = userData.lastLogin?.toDate ? userData.lastLogin.toDate() : new Date(userData.lastLogin);
+          if (lastLogin >= thirtyDaysAgo) {
+            activeUsers++;
+          }
+        }
+        
+        // Sum up SP from predictions
+        totalSPIssued += userData.spFromPredictions || 0;
       });
 
-      setFixtureStats(stats);
+      // Calculate estimated rewards value (assuming $0.02 per SP as example)
+      const estimatedRewardsValue = totalSPIssued * 0.02;
+
+      setDashboardStats({
+        totalUsers,
+        activeUsers,
+        totalSPIssued,
+        estimatedRewardsValue,
+      });
     } catch (error) {
-      console.error('Error loading fixture stats:', error);
+      console.error('Error loading dashboard stats:', error);
       // Set default values for demo
-      setFixtureStats({
-        scheduled: 4,
-        published: 0,
-        live: 1,
-        pending: 1,
-        completed: 3,
+      setDashboardStats({
+        totalUsers: 12345,
+        activeUsers: 8932,
+        totalSPIssued: 2458920,
+        estimatedRewardsValue: 45678,
       });
     }
   };
 
   const stats = [
     {
-      title: 'Scheduled Fixtures',
-      value: fixtureStats.scheduled.toString(),
-      subtitle: 'Draft',
-      icon: AccessTime,
-      color: '#1976d2', // Light blue
-      isPrimary: false,
-    },
-    {
-      title: 'Published Fixtures',
-      value: fixtureStats.published.toString(),
-      subtitle: 'Predictions Open',
-      icon: Visibility,
-      color: '#1976d2', // Light blue
-      isPrimary: false,
-    },
-    {
-      title: 'Live Matches',
-      value: fixtureStats.live.toString(),
-      subtitle: 'Now',
-      icon: PlayArrow,
+      title: 'Total Users',
+      value: dashboardStats.totalUsers.toLocaleString(),
+      subtitle: 'All registered users',
+      icon: People,
       color: colors.brandRed,
       isPrimary: true,
     },
     {
-      title: 'Result Pending',
-      value: fixtureStats.pending.toString(),
-      subtitle: 'Action Required',
-      icon: Edit,
-      color: '#ed6c02', // Orange
+      title: 'Active Users',
+      value: dashboardStats.activeUsers.toLocaleString(),
+      subtitle: 'Logged in last 30 days',
+      icon: CheckCircle,
+      color: colors.success,
       isPrimary: false,
     },
     {
-      title: 'Completed Fixtures',
-      value: fixtureStats.completed.toString(),
-      subtitle: 'SP Distributed',
-      icon: CheckCircle,
-      color: colors.success,
+      title: 'Total SP Issued',
+      value: dashboardStats.totalSPIssued.toLocaleString(),
+      subtitle: 'Prediction-based SP only',
+      icon: Star,
+      color: '#FF9800', // Orange
+      isPrimary: false,
+    },
+    {
+      title: 'Estimated Rewards Value',
+      value: `$${dashboardStats.estimatedRewardsValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`,
+      subtitle: 'USD converted payouts',
+      icon: AttachMoney,
+      color: '#2196F3', // Blue
       isPrimary: false,
     },
   ];
@@ -272,22 +276,17 @@ const DashboardPage = () => {
 
       {/* Stats Cards */}
       <Grid container spacing={{ xs: 2, md: 2 }} sx={{ mb: { xs: 2, md: 2.5 } }}>
-        {/* Row 1: Scheduled, Published, Live */}
-        <Grid item xs={4} md={4}>
+        <Grid item xs={6} md={3}>
           <StatCard {...stats[0]} delay={0} />
         </Grid>
-        <Grid item xs={4} md={4}>
+        <Grid item xs={6} md={3}>
           <StatCard {...stats[1]} delay={100} />
         </Grid>
-        <Grid item xs={4} md={4}>
+        <Grid item xs={6} md={3}>
           <StatCard {...stats[2]} delay={200} />
         </Grid>
-        {/* Row 2: Result Pending, Completed */}
-        <Grid item xs={6} md={6}>
+        <Grid item xs={6} md={3}>
           <StatCard {...stats[3]} delay={300} />
-        </Grid>
-        <Grid item xs={6} md={6}>
-          <StatCard {...stats[4]} delay={400} />
         </Grid>
       </Grid>
 
