@@ -963,14 +963,7 @@ const FixturesPage = () => {
         onRowClick={(row) => navigate(`/fixtures/details/${row.id}`)}
         emptyMessage="No fixtures found"
       />
-    </Box>
-  );
-};
 
-  return (
-    <Box sx={{ width: '100%', maxWidth: '100%' }}>
-      {/* ... existing code ... */}
-      
       {/* Enter Match Results Modal */}
       <Dialog
         open={resultsModalOpen}
