@@ -795,7 +795,7 @@ const UsersPage = () => {
             onFocus={() => {
               if (searchSuggestions.length > 0) setShowSuggestions(true);
             }}
-            placeholder="Search by username, email or user ID..."
+            placeholder="Search by username, email, user ID or full name..."
           />
           {/* Search Suggestions Dropdown */}
           {showSuggestions && searchSuggestions.length > 0 && (
