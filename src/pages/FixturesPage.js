@@ -383,19 +383,10 @@ const FixturesPage = () => {
       </Grid>
 
       {/* Status Filter Buttons - Card Style */}
-      <Box sx={{ mb: 3, display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', gap: 1.5, flexWrap: 'wrap' }}>
         {statusFilters.map((filter) => {
           const isSelected = selectedStatus === filter.value;
           const Icon = filter.icon;
-          const count = fixtures.filter((f) => {
-            const status = f.matchStatus || f.status;
-            if (filter.value === 'scheduled') return status === 'scheduled';
-            if (filter.value === 'published') return status === 'published';
-            if (filter.value === 'live') return status === 'live';
-            if (filter.value === 'resultsProcessing') return status === 'resultsProcessing';
-            if (filter.value === 'completed') return status === 'completed';
-            return false;
-          }).length;
 
           return (
             <Button
@@ -403,18 +394,21 @@ const FixturesPage = () => {
               variant={isSelected ? 'contained' : 'outlined'}
               onClick={() => setSelectedStatus(filter.value)}
               sx={{
+                flex: 1,
+                minWidth: { xs: 'calc(50% - 8px)', sm: 'auto' },
                 borderRadius: '20px',
                 textTransform: 'none',
                 fontWeight: 600,
                 px: 3,
                 py: 1.5,
-                backgroundColor: isSelected ? '#424242' : colors.brandWhite,
+                backgroundColor: isSelected ? filter.color : colors.brandWhite,
                 color: isSelected ? colors.brandWhite : filter.color,
-                border: `1.5px solid ${isSelected ? '#424242' : colors.divider}66`,
-                boxShadow: isSelected ? '0 2px 8px rgba(0, 0, 0, 0.15)' : 'none',
+                border: `1.5px solid ${isSelected ? filter.color : colors.divider}66`,
+                boxShadow: isSelected ? `0 2px 8px ${filter.color}40` : 'none',
                 '&:hover': {
-                  backgroundColor: isSelected ? '#424242' : `${colors.divider}0D`,
-                  boxShadow: isSelected ? '0 2px 8px rgba(0, 0, 0, 0.15)' : '0 2px 4px rgba(0, 0, 0, 0.1)',
+                  backgroundColor: isSelected ? filter.color : `${filter.color}0D`,
+                  boxShadow: isSelected ? `0 2px 8px ${filter.color}40` : `0 2px 4px ${filter.color}20`,
+                  borderColor: isSelected ? filter.color : `${filter.color}66`,
                 },
               }}
             >
