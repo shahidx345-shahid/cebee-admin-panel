@@ -86,7 +86,7 @@ const UsersPage = () => {
         firstName: firstName,
         lastName: lastName,
         isActive: isActive && !isBlocked && !isDeleted,
-        isVerified: isVerified,
+        isVerified: isVerified && !isBlocked && !isDeleted,
         isBlocked: isBlocked,
         isDeleted: isDeleted,
         isDeactivated: isDeleted,
