@@ -66,7 +66,8 @@ const UsersPage = () => {
     const lastNames = ['Doe', 'Smith', 'Wilson', 'Jones', 'Brown', 'Davis', 'Miller', 'Garcia', 'Martinez', 'Anderson'];
     const users = [];
     
-    for (let i = 0; i < 20; i++) {
+    // Generate more users for better statistics
+    for (let i = 0; i < 150; i++) {
       const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
       const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
       const username = `${firstName.toLowerCase()}_${lastName.toLowerCase()}_${i}`;
@@ -83,8 +84,8 @@ const UsersPage = () => {
         fullName: `${firstName} ${lastName}`,
         firstName: firstName,
         lastName: lastName,
-        isActive: isActive,
-        isVerified: Math.random() > 0.3,
+        isActive: isActive && !isBlocked && !isDeleted,
+        isVerified: isVerified,
         isBlocked: isBlocked,
         isDeleted: isDeleted,
         isDeactivated: isDeleted,
