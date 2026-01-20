@@ -142,7 +142,18 @@ const FixturesPage = () => {
       }
 
       // Always use sample data (for demo purposes)
-      // You can change this to only use sample data if fixturesData.length === 0
+      // Merge Firebase data with sample data, or use sample data if Firebase is empty
+      if (fixturesData.length === 0) {
+        fixturesData = getSampleFixtures();
+      } else {
+        // Merge: use Firebase data but add sample data if needed
+        const sampleData = getSampleFixtures();
+        const existingIds = new Set(fixturesData.map(f => f.id));
+        const newSamples = sampleData.filter(f => !existingIds.has(f.id));
+        fixturesData = [...fixturesData, ...newSamples];
+      }
+      
+      // For demo: always use sample data
       fixturesData = getSampleFixtures();
 
       setFixtures(fixturesData);
