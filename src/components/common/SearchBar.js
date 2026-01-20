@@ -32,7 +32,7 @@ const SearchBar = ({ value, onChange, placeholder = 'Search...', sx = {} }) => {
         InputProps={{
           startAdornment: (
             <InputAdornment position="start">
-              <Search sx={{ color: colors.textSecondary, fontSize: 20 }} />
+              <Search sx={{ color: colors.brandRed, fontSize: 20 }} />
             </InputAdornment>
           ),
         }}
