@@ -54,16 +54,252 @@ const FixtureDetailsPage = () => {
     filterPredictions();
   }, [predictions, searchQuery]);
 
+  const getSampleFixtures = () => {
+    const now = new Date();
+    return [
+      // Scheduled fixtures
+      {
+        id: 'MATCH_001',
+        homeTeam: 'Manchester United',
+        awayTeam: 'Liverpool',
+        league: 'Premier League',
+        kickoffTime: new Date('2026-01-22T20:15:00'),
+        matchStatus: 'scheduled',
+        status: 'scheduled',
+        homeScore: undefined,
+        awayScore: undefined,
+        predictions: 0,
+      },
+      {
+        id: 'MATCH_006',
+        homeTeam: 'Real Madrid',
+        awayTeam: 'Barcelona',
+        league: 'La Liga',
+        kickoffTime: new Date('2026-01-25T20:15:00'),
+        matchStatus: 'scheduled',
+        status: 'scheduled',
+        homeScore: undefined,
+        awayScore: undefined,
+        predictions: 0,
+      },
+      {
+        id: 'MATCH_007',
+        homeTeam: 'Bayern Munich',
+        awayTeam: 'Borussia Dortmund',
+        league: 'Bundesliga',
+        kickoffTime: new Date('2026-01-27T20:15:00'),
+        matchStatus: 'scheduled',
+        status: 'scheduled',
+        homeScore: undefined,
+        awayScore: undefined,
+        predictions: 0,
+      },
+      {
+        id: 'MATCH_012',
+        homeTeam: 'PSG',
+        awayTeam: 'Marseille',
+        league: 'Ligue 1',
+        kickoffTime: new Date('2026-01-23T21:00:00'),
+        matchStatus: 'scheduled',
+        status: 'scheduled',
+        homeScore: undefined,
+        awayScore: undefined,
+        predictions: 0,
+      },
+      // Published fixtures
+      {
+        id: 'MATCH_014',
+        homeTeam: 'Manchester City',
+        awayTeam: 'Tottenham',
+        league: 'Premier League',
+        kickoffTime: new Date('2026-01-21T15:00:00'),
+        matchStatus: 'published',
+        status: 'published',
+        homeScore: undefined,
+        awayScore: undefined,
+        predictions: 25,
+      },
+      {
+        id: 'MATCH_015',
+        homeTeam: 'AC Milan',
+        awayTeam: 'Inter Milan',
+        league: 'Serie A',
+        kickoffTime: new Date('2026-01-21T20:00:00'),
+        matchStatus: 'published',
+        status: 'published',
+        homeScore: undefined,
+        awayScore: undefined,
+        predictions: 18,
+      },
+      // Live fixtures
+      {
+        id: 'MATCH_003',
+        homeTeam: 'Arsenal',
+        awayTeam: 'Chelsea',
+        league: 'Premier League',
+        kickoffTime: new Date(now.getTime() - 1 * 60 * 60 * 1000),
+        matchStatus: 'live',
+        status: 'live',
+        homeScore: 1,
+        awayScore: 1,
+        predictions: 52,
+      },
+      {
+        id: 'MATCH_016',
+        homeTeam: 'Leicester City',
+        awayTeam: 'Southampton',
+        league: 'Premier League',
+        kickoffTime: new Date(now.getTime() - 0.5 * 60 * 60 * 1000),
+        matchStatus: 'live',
+        status: 'live',
+        homeScore: 2,
+        awayScore: 0,
+        predictions: 31,
+      },
+      // Result Pending fixtures
+      {
+        id: 'MATCH_009',
+        homeTeam: 'Everton',
+        awayTeam: 'Fulham',
+        league: 'Premier League',
+        kickoffTime: new Date('2026-01-20T18:15:00'),
+        matchStatus: 'resultsProcessing',
+        status: 'resultsProcessing',
+        homeScore: 1,
+        awayScore: 2,
+        firstGoalScorer: '',
+        firstGoalMinute: '',
+        predictions: 45,
+      },
+      {
+        id: 'MATCH_010',
+        homeTeam: 'Tottenham',
+        awayTeam: 'Newcastle',
+        league: 'Premier League',
+        kickoffTime: new Date(now.getTime() - 3 * 60 * 60 * 1000),
+        matchStatus: 'resultsProcessing',
+        status: 'resultsProcessing',
+        homeScore: 2,
+        awayScore: 1,
+        firstGoalScorer: '',
+        firstGoalMinute: '',
+        predictions: 38,
+      },
+      {
+        id: 'MATCH_011',
+        homeTeam: 'Brighton',
+        awayTeam: 'Crystal Palace',
+        league: 'Premier League',
+        kickoffTime: new Date(now.getTime() - 4 * 60 * 60 * 1000),
+        matchStatus: 'pending',
+        status: 'pending',
+        homeScore: 0,
+        awayScore: 1,
+        firstGoalScorer: '',
+        firstGoalMinute: '',
+        predictions: 22,
+      },
+      // Completed fixtures
+      {
+        id: 'MATCH_004',
+        homeTeam: 'Newcastle',
+        awayTeam: 'Brighton',
+        league: 'Premier League',
+        kickoffTime: new Date('2026-01-19T20:15:00'),
+        matchStatus: 'completed',
+        status: 'completed',
+        homeScore: 2,
+        awayScore: 1,
+        firstGoalScorer: 'Wilson',
+        firstGoalMinute: 23,
+        predictions: 48,
+      },
+      {
+        id: 'MATCH_005',
+        homeTeam: 'West Ham',
+        awayTeam: 'Aston Villa',
+        league: 'Premier League',
+        kickoffTime: new Date('2026-01-18T20:15:00'),
+        matchStatus: 'completed',
+        status: 'completed',
+        homeScore: 1,
+        awayScore: 1,
+        firstGoalScorer: 'Watkins',
+        firstGoalMinute: 15,
+        predictions: 42,
+      },
+      {
+        id: 'MATCH_008',
+        homeTeam: 'Wolves',
+        awayTeam: 'Crystal Palace',
+        league: 'Premier League',
+        kickoffTime: new Date('2026-01-17T20:15:00'),
+        matchStatus: 'completed',
+        status: 'completed',
+        homeScore: 3,
+        awayScore: 0,
+        firstGoalScorer: 'Neto',
+        firstGoalMinute: 8,
+        predictions: 35,
+      },
+      {
+        id: 'MATCH_017',
+        homeTeam: 'Burnley',
+        awayTeam: 'Sheffield United',
+        league: 'Premier League',
+        kickoffTime: new Date('2026-01-16T15:00:00'),
+        matchStatus: 'completed',
+        status: 'completed',
+        homeScore: 2,
+        awayScore: 2,
+        firstGoalScorer: 'Brownhill',
+        firstGoalMinute: 12,
+        predictions: 28,
+      },
+      {
+        id: 'MATCH_018',
+        homeTeam: 'Brentford',
+        awayTeam: 'Nottingham Forest',
+        league: 'Premier League',
+        kickoffTime: new Date('2026-01-15T17:30:00'),
+        matchStatus: 'completed',
+        status: 'completed',
+        homeScore: 1,
+        awayScore: 0,
+        firstGoalScorer: 'Toney',
+        firstGoalMinute: 34,
+        predictions: 39,
+      },
+    ];
+  };
+
   const loadFixtureData = async () => {
     try {
       setLoading(true);
+      let fixtureData = null;
+      
+      // Try to load from Firebase
+      try {
       const fixtureRef = doc(db, 'fixtures', id);
       const fixtureDoc = await getDoc(fixtureRef);
       if (fixtureDoc.exists()) {
-        const fixtureData = { id: fixtureDoc.id, ...fixtureDoc.data() };
+          fixtureData = { id: fixtureDoc.id, ...fixtureDoc.data() };
+        }
+      } catch (error) {
+        console.log('Firebase load failed, using sample data:', error);
+      }
+
+      // If not found in Firebase, use sample data
+      if (!fixtureData) {
+        const sampleFixtures = getSampleFixtures();
+        fixtureData = sampleFixtures.find(f => f.id === id);
+      }
+
+      if (fixtureData) {
         setFixture(fixtureData);
 
-        // Load predictions for this fixture
+        // Load predictions for this fixture (or use empty array for demo)
+        try {
         const predictionsRef = collection(db, 'predictions');
         const q = query(predictionsRef, where('fixtureId', '==', id));
         const snapshot = await getDocs(q);
@@ -73,6 +309,11 @@ const FixtureDetailsPage = () => {
         }));
         setPredictions(predictionsData);
         setFilteredPredictions(predictionsData);
+        } catch (error) {
+          // If no predictions found, use empty array
+          setPredictions([]);
+          setFilteredPredictions([]);
+        }
       }
     } catch (error) {
       console.error('Error loading fixture:', error);
