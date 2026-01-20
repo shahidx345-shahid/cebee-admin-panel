@@ -203,15 +203,15 @@ const PollsPage = () => {
       label: 'League',
       render: (value, row) => (
         <Box>
-          <Chip
-            label={value || 'N/A'}
-            size="small"
-            sx={{
-              backgroundColor: `${colors.brandRed}1A`,
-              color: colors.brandRed,
-              fontWeight: 600,
-              fontSize: 12,
-              borderRadius: '8px',
+        <Chip
+          label={value || 'N/A'}
+          size="small"
+          sx={{
+            backgroundColor: `${colors.brandRed}1A`,
+            color: colors.brandRed,
+            fontWeight: 600,
+            fontSize: 12,
+            borderRadius: '8px',
               mb: 0.5,
             }}
           />
@@ -375,6 +375,12 @@ const PollsPage = () => {
               width: '100%',
               display: 'flex',
               flexDirection: 'column',
+              animation: 'fadeInUp 0.6s ease-out 0ms both',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: `0 8px 20px ${colors.info}2F`,
+              },
             }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
@@ -399,6 +405,12 @@ const PollsPage = () => {
               width: '100%',
               display: 'flex',
               flexDirection: 'column',
+              animation: 'fadeInUp 0.6s ease-out 100ms both',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: `0 8px 20px ${colors.success}2F`,
+              },
             }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
@@ -423,6 +435,12 @@ const PollsPage = () => {
               width: '100%',
               display: 'flex',
               flexDirection: 'column',
+              animation: 'fadeInUp 0.6s ease-out 200ms both',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: `0 8px 20px ${colors.warning}2F`,
+              },
             }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
@@ -447,6 +465,12 @@ const PollsPage = () => {
               width: '100%',
               display: 'flex',
               flexDirection: 'column',
+              animation: 'fadeInUp 0.6s ease-out 300ms both',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: `0 8px 20px ${colors.brandRed}2F`,
+              },
             }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>

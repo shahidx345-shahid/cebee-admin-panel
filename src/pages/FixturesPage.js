@@ -328,7 +328,7 @@ const FixturesPage = () => {
   };
 
   // Dashboard-style StatCard component
-  const StatCard = ({ title, value, subtitle, icon: Icon, color, isPrimary = false }) => {
+  const StatCard = ({ title, value, subtitle, icon: Icon, color, isPrimary = false, delay = 0 }) => {
     return (
       <Card
         sx={{
@@ -347,6 +347,14 @@ const FixturesPage = () => {
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
+          animation: `fadeInUp 0.6s ease-out ${delay}ms both`,
+          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          '&:hover': {
+            transform: 'translateY(-4px)',
+            boxShadow: isPrimary
+              ? `0 8px 24px ${colors.brandRed}50`
+              : `0 8px 20px ${color}2F`,
+          },
         }}
       >
         <CardContent sx={{ padding: 0, '&:last-child': { paddingBottom: 0 }, position: 'relative' }}>
@@ -601,6 +609,7 @@ const FixturesPage = () => {
             icon={AccessTime}
             color="#1976d2"
             isPrimary={false}
+            delay={0}
           />
         </Grid>
         <Grid item xs={6} md={3}>
@@ -614,6 +623,7 @@ const FixturesPage = () => {
             icon={Lock}
             color="#ed6c02"
             isPrimary={false}
+            delay={100}
           />
         </Grid>
         <Grid item xs={6} md={3}>
@@ -624,6 +634,7 @@ const FixturesPage = () => {
             icon={PlayArrow}
             color={colors.brandRed}
             isPrimary={true}
+            delay={200}
           />
         </Grid>
         <Grid item xs={6} md={3}>
@@ -634,6 +645,7 @@ const FixturesPage = () => {
             icon={Edit}
             color="#ed6c02"
             isPrimary={false}
+            delay={300}
           />
         </Grid>
         <Grid item xs={6} md={3}>
