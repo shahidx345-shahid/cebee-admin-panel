@@ -65,6 +65,23 @@ const UsersPage = () => {
   const [searchSuggestions, setSearchSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const searchBoxRef = useRef(null);
+  
+  // Click outside handler for search suggestions
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (searchBoxRef.current && !searchBoxRef.current.contains(event.target)) {
+        setShowSuggestions(false);
+      }
+    };
+
+    if (showSuggestions) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showSuggestions]);
 
   useEffect(() => {
     loadUsers();
