@@ -274,6 +274,42 @@ const FixtureDetailsPage = () => {
     ];
   };
 
+  const getSamplePredictions = (fixtureId) => {
+    // Sample predictions data matching the design
+    return [
+      {
+        id: 'PRED_001',
+        userId: 'USER001',
+        username: 'john_doe',
+        email: 'john@example.com',
+        fullName: 'John Doe',
+        prediction: 'Newcastle Win',
+        predictionTime: new Date('2026-01-18T20:17:00'),
+        status: 'won',
+      },
+      {
+        id: 'PRED_002',
+        userId: 'USER006',
+        username: 'emma_davis',
+        email: 'emma@example.com',
+        fullName: 'Emma Davis',
+        prediction: 'Brighton Win',
+        predictionTime: new Date('2026-01-18T20:17:00'),
+        status: 'lost',
+      },
+      {
+        id: 'PRED_003',
+        userId: 'USER007',
+        username: 'alex_miller',
+        email: 'alex@example.com',
+        fullName: 'Alex Miller',
+        prediction: 'Newcastle Win',
+        predictionTime: new Date('2026-01-18T20:17:00'),
+        status: 'won',
+      },
+    ];
+  };
+
   const loadFixtureData = async () => {
     try {
       setLoading(true);
@@ -341,7 +377,9 @@ const FixtureDetailsPage = () => {
     const filtered = predictions.filter(
       (pred) =>
         pred.username?.toLowerCase().includes(query) ||
-        pred.userId?.toLowerCase().includes(query)
+        pred.userId?.toLowerCase().includes(query) ||
+        pred.email?.toLowerCase().includes(query) ||
+        pred.fullName?.toLowerCase().includes(query)
     );
     setFilteredPredictions(filtered);
   };
