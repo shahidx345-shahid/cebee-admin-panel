@@ -27,6 +27,7 @@ import {
   CalendarToday,
   People,
   ArrowUpward,
+  Person,
 } from '@mui/icons-material';
 import { colors, constants } from '../config/theme';
 import SearchBar from '../components/common/SearchBar';
@@ -298,7 +299,7 @@ const FixtureDetailsPage = () => {
       if (fixtureData) {
         setFixture(fixtureData);
 
-        // Load predictions for this fixture (or use empty array for demo)
+        // Load predictions for this fixture (or use sample data for demo)
         try {
         const predictionsRef = collection(db, 'predictions');
         const q = query(predictionsRef, where('fixtureId', '==', id));
@@ -307,12 +308,21 @@ const FixtureDetailsPage = () => {
           id: doc.id,
           ...doc.data(),
         }));
+        
+        // If no predictions found, use sample data
+        if (predictionsData.length === 0) {
+          const samplePredictions = getSamplePredictions(id);
+          setPredictions(samplePredictions);
+          setFilteredPredictions(samplePredictions);
+        } else {
         setPredictions(predictionsData);
         setFilteredPredictions(predictionsData);
+        }
         } catch (error) {
-          // If no predictions found, use empty array
-          setPredictions([]);
-          setFilteredPredictions([]);
+          // If error, use sample data
+          const samplePredictions = getSamplePredictions(id);
+          setPredictions(samplePredictions);
+          setFilteredPredictions(samplePredictions);
         }
       }
     } catch (error) {
@@ -468,19 +478,72 @@ const FixtureDetailsPage = () => {
 
   const columns = [
     {
+      id: 'userId',
+      label: 'User ID',
+      render: (_, row) => (
+        <Chip
+          label={row.userId || 'N/A'}
+          sx={{
+            backgroundColor: '#FFE5E5',
+            color: colors.brandRed,
+            fontWeight: 600,
+            fontSize: 11,
+            height: 28,
+            borderRadius: '20px',
+            border: 'none',
+          }}
+        />
+      ),
+    },
+    {
       id: 'username',
-      label: 'User',
-      render: (value) => value || 'N/A',
+      label: 'Username',
+      render: (_, row) => (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Box
+            sx={{
+              width: 32,
+              height: 32,
+              borderRadius: '50%',
+              backgroundColor: colors.brandRed,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Person sx={{ fontSize: 18, color: colors.brandWhite }} />
+          </Box>
+          <Box>
+            <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack }}>
+              {row.username || row.fullName || 'N/A'}
+            </Typography>
+            <Typography variant="caption" sx={{ color: colors.textSecondary, fontSize: 11 }}>
+              {row.email || ''}
+            </Typography>
+          </Box>
+        </Box>
+      ),
     },
     {
       id: 'prediction',
       label: 'Prediction',
-      render: (value, row) => row.selectedTeam || row.prediction || 'N/A',
+      render: (_, row) => (
+        <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack }}>
+          {row.prediction || row.selectedTeam || 'N/A'}
+        </Typography>
+      ),
     },
     {
-      id: 'spAwarded',
-      label: 'SP Awarded',
-      render: (value) => value || 0,
+      id: 'predictionTime',
+      label: 'Prediction Time',
+      render: (_, row) => {
+        const time = row.predictionTime?.toDate ? row.predictionTime.toDate() : new Date(row.predictionTime);
+        return (
+          <Typography variant="body2" sx={{ color: colors.brandBlack }}>
+            {row.predictionTime ? format(time, 'MMM dd, yyyy HH:mm') : 'N/A'}
+          </Typography>
+        );
+      },
     },
     {
       id: 'status',
@@ -488,8 +551,10 @@ const FixtureDetailsPage = () => {
       render: (_, row) => {
         const status = row.status || row.predictionStatus;
         const statusConfig = {
-          correct: { label: 'Correct', color: colors.success },
-          incorrect: { label: 'Incorrect', color: colors.error },
+          won: { label: 'WON', color: colors.success },
+          lost: { label: 'LOST', color: colors.error },
+          correct: { label: 'WON', color: colors.success },
+          incorrect: { label: 'LOST', color: colors.error },
           ongoing: { label: 'Ongoing', color: colors.info },
           pending: { label: 'Pending', color: colors.warning },
         };
@@ -501,7 +566,10 @@ const FixtureDetailsPage = () => {
             sx={{
               backgroundColor: `${config.color}1A`,
               color: config.color,
-              fontWeight: 600,
+              fontWeight: 700,
+              fontSize: 11,
+              height: 28,
+              borderRadius: '20px',
             }}
           />
         );
@@ -910,34 +978,55 @@ const FixtureDetailsPage = () => {
         </Grid>
       </Card>
 
-      {/* Predictions Section */}
-      <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
-        <Typography variant="h5" sx={{ fontWeight: 700 }}>
-          User Predictions
-      </Typography>
-        <Chip
-          label={`${predictions.length} Total`}
-          sx={{
-            backgroundColor: `${colors.info}1A`,
-            color: colors.info,
-            fontWeight: 600,
-          }}
-        />
-      </Box>
+      {/* User Predictions Section */}
       <Card
         sx={{
-          padding: { xs: 2, md: 2.5 },
           borderRadius: '20px',
           background: colors.brandWhite,
           border: `1.5px solid ${colors.divider}26`,
           boxShadow: `0 6px 14px ${colors.shadow}1F`,
+          overflow: 'hidden',
         }}
       >
+        {/* Header with light pink background */}
+        <Box
+          sx={{
+            backgroundColor: '#FFF5F5',
+            padding: { xs: 2, md: 2.5 },
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.5,
+          }}
+        >
+          <Box
+            sx={{
+              padding: 1,
+              backgroundColor: colors.brandRed,
+              borderRadius: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <People sx={{ fontSize: 20, color: colors.brandWhite }} />
+          </Box>
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.25 }}>
+              User Predictions
+            </Typography>
+            <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13 }}>
+              {filteredPredictions.length} {filteredPredictions.length === 1 ? 'prediction' : 'predictions'} found
+      </Typography>
+          </Box>
+        </Box>
+
+        {/* Table Section */}
+        <Box sx={{ padding: { xs: 2, md: 2.5 } }}>
         <SearchBar
           value={searchQuery}
           onChange={setSearchQuery}
           placeholder="Search by username or user ID..."
-          sx={{ mb: 2.5 }}
+            sx={{ mb: 2.5 }}
         />
         <DataTable
           columns={columns}
@@ -953,6 +1042,7 @@ const FixtureDetailsPage = () => {
           }}
           emptyMessage="No predictions found"
         />
+        </Box>
       </Card>
     </Box>
   );
