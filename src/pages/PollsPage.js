@@ -463,7 +463,7 @@ const PollsPage = () => {
       </Grid>
 
       {/* Filter Buttons */}
-      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', gap: 1.5, flexWrap: 'wrap' }}>
+      <Box sx={{ mb: 3, display: 'flex', flexWrap: 'wrap' }}>
         <Button
           variant={statusFilter === 'all' ? 'contained' : 'outlined'}
           onClick={() => setStatusFilter('all')}
@@ -504,15 +504,17 @@ const PollsPage = () => {
           onClick={() => setStatusFilter('active')}
           sx={{
             flex: 1,
-            minWidth: { xs: 'calc(50% - 8px)', sm: 'auto' },
-            borderRadius: '20px',
+            minWidth: { xs: 'calc(50% - 1px)', sm: 'auto' },
+            borderRadius: 0,
             textTransform: 'none',
             fontWeight: 600,
             px: 3,
-            py: 1.5,
+            py: 2.5,
+            minHeight: 64,
             backgroundColor: statusFilter === 'active' ? colors.success : colors.brandWhite,
             color: statusFilter === 'active' ? colors.brandWhite : colors.success,
             border: `1.5px solid ${statusFilter === 'active' ? colors.success : colors.divider}66`,
+            borderRight: 'none',
             '&:hover': {
               backgroundColor: statusFilter === 'active' ? colors.success : `${colors.divider}0D`,
             },
@@ -539,15 +541,17 @@ const PollsPage = () => {
           onClick={() => setStatusFilter('scheduled')}
           sx={{
             flex: 1,
-            minWidth: { xs: 'calc(50% - 8px)', sm: 'auto' },
-            borderRadius: '20px',
+            minWidth: { xs: 'calc(50% - 1px)', sm: 'auto' },
+            borderRadius: 0,
             textTransform: 'none',
             fontWeight: 600,
             px: 3,
-            py: 1.5,
+            py: 2.5,
+            minHeight: 64,
             backgroundColor: statusFilter === 'scheduled' ? colors.info : colors.brandWhite,
             color: statusFilter === 'scheduled' ? colors.brandWhite : colors.info,
             border: `1.5px solid ${statusFilter === 'scheduled' ? colors.info : colors.divider}66`,
+            borderRight: 'none',
             '&:hover': {
               backgroundColor: statusFilter === 'scheduled' ? colors.info : `${colors.divider}0D`,
             },
@@ -574,15 +578,21 @@ const PollsPage = () => {
           onClick={() => setStatusFilter('closed')}
           sx={{
             flex: 1,
-            minWidth: { xs: 'calc(50% - 8px)', sm: 'auto' },
-            borderRadius: '20px',
+            minWidth: { xs: 'calc(50% - 1px)', sm: 'auto' },
+            borderRadius: 0,
             textTransform: 'none',
             fontWeight: 600,
             px: 3,
-            py: 1.5,
+            py: 2.5,
+            minHeight: 64,
             backgroundColor: statusFilter === 'closed' ? colors.textSecondary : colors.brandWhite,
             color: statusFilter === 'closed' ? colors.brandWhite : colors.textSecondary,
             border: `1.5px solid ${statusFilter === 'closed' ? colors.textSecondary : colors.divider}66`,
+            '&:last-of-type': {
+              borderTopRightRadius: '20px',
+              borderBottomRightRadius: '20px',
+              borderRight: `1.5px solid ${statusFilter === 'closed' ? colors.textSecondary : colors.divider}66`,
+            },
             '&:hover': {
               backgroundColor: statusFilter === 'closed' ? colors.textSecondary : `${colors.divider}0D`,
             },
