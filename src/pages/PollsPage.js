@@ -468,6 +468,8 @@ const PollsPage = () => {
           variant={statusFilter === 'all' ? 'contained' : 'outlined'}
           onClick={() => setStatusFilter('all')}
           sx={{
+            flex: 1,
+            minWidth: { xs: 'calc(50% - 8px)', sm: 'auto' },
             borderRadius: '20px',
             textTransform: 'none',
             fontWeight: 600,
@@ -501,6 +503,8 @@ const PollsPage = () => {
           variant={statusFilter === 'active' ? 'contained' : 'outlined'}
           onClick={() => setStatusFilter('active')}
           sx={{
+            flex: 1,
+            minWidth: { xs: 'calc(50% - 8px)', sm: 'auto' },
             borderRadius: '20px',
             textTransform: 'none',
             fontWeight: 600,
@@ -534,6 +538,8 @@ const PollsPage = () => {
           variant={statusFilter === 'scheduled' ? 'contained' : 'outlined'}
           onClick={() => setStatusFilter('scheduled')}
           sx={{
+            flex: 1,
+            minWidth: { xs: 'calc(50% - 8px)', sm: 'auto' },
             borderRadius: '20px',
             textTransform: 'none',
             fontWeight: 600,
@@ -567,6 +573,8 @@ const PollsPage = () => {
           variant={statusFilter === 'closed' ? 'contained' : 'outlined'}
           onClick={() => setStatusFilter('closed')}
           sx={{
+            flex: 1,
+            minWidth: { xs: 'calc(50% - 8px)', sm: 'auto' },
             borderRadius: '20px',
             textTransform: 'none',
             fontWeight: 600,
