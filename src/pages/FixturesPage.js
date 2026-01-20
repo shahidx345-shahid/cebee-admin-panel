@@ -812,8 +812,8 @@ const FixturesPage = () => {
   );
 
   const statusFilters = [
-    { value: 'predictionOpen', label: 'Scheduled', icon: AccessTime, color: '#9E9E9E' },
-    { value: 'predictionOpen', label: 'Published', icon: Visibility, color: '#1976d2' },
+    { value: 'scheduled', label: 'Scheduled', icon: AccessTime, color: '#9E9E9E' },
+    { value: 'published', label: 'Published', icon: Visibility, color: '#1976d2' },
     { value: 'live', label: 'Live', icon: PlayArrow, color: colors.brandRed },
     { value: 'resultsProcessing', label: 'Result Pending', icon: Edit, color: '#FF9800' },
     { value: 'completed', label: 'Completed', icon: CheckCircle, color: colors.success },
