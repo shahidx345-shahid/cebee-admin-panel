@@ -691,11 +691,20 @@ const PredictionsPage = () => {
         </Grid>
       </Grid>
 
-      {/* Status Toggle Buttons */}
-      <Box sx={{ mb: 3, width: '100%' }}>
-        <Box sx={{ display: 'flex', gap: 1.5, width: '100%' }}>
+      {/* Status Toggle Buttons - Tabs Container */}
+      <Box 
+        sx={{ 
+          mb: 3, 
+          width: '100%',
+          backgroundColor: colors.brandWhite,
+          borderRadius: '20px',
+          padding: 0.5,
+          boxShadow: `0 2px 8px ${colors.shadow}1A`,
+        }}
+      >
+        <Box sx={{ display: 'flex', width: '100%', gap: 0 }}>
           <Button
-            variant="outlined"
+            variant={selectedStatus === 'ongoing' ? 'contained' : 'outlined'}
             onClick={() => setSelectedStatus('ongoing')}
             startIcon={
               <Box
@@ -703,7 +712,7 @@ const PredictionsPage = () => {
                   width: 24,
                   height: 24,
                   borderRadius: '50%',
-                  backgroundColor: colors.brandRed,
+                  backgroundColor: selectedStatus === 'ongoing' ? colors.brandWhite : colors.brandRed,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -712,25 +721,27 @@ const PredictionsPage = () => {
                 <PlayArrow 
                   sx={{ 
                     fontSize: 14, 
-                    color: colors.brandWhite 
+                    color: selectedStatus === 'ongoing' ? colors.brandRed : colors.brandWhite 
                   }} 
                 />
               </Box>
             }
             sx={{
               flex: 1,
-              borderRadius: '20px',
+              borderRadius: '16px',
               textTransform: 'none',
               fontWeight: 600,
               px: 3,
               py: 1.5,
-              backgroundColor: colors.brandWhite,
-              color: colors.textSecondary,
-              border: `1.5px solid ${colors.divider}66`,
-              boxShadow: `0 2px 4px ${colors.shadow}1A`,
+              backgroundColor: selectedStatus === 'ongoing' ? colors.brandRed : 'transparent',
+              color: selectedStatus === 'ongoing' ? colors.brandWhite : colors.textSecondary,
+              border: 'none',
+              '&:first-of-type': {
+                borderTopLeftRadius: '16px',
+                borderBottomLeftRadius: '16px',
+              },
               '&:hover': {
-                backgroundColor: `${colors.divider}0D`,
-                boxShadow: `0 2px 8px ${colors.brandRed}33`,
+                backgroundColor: selectedStatus === 'ongoing' ? colors.brandRed : `${colors.divider}0D`,
               },
             }}
           >
@@ -761,15 +772,18 @@ const PredictionsPage = () => {
             }
             sx={{
               flex: 1,
-              borderRadius: '20px',
+              borderRadius: '16px',
               textTransform: 'none',
               fontWeight: 600,
               px: 3,
               py: 1.5,
-              backgroundColor: selectedStatus === 'completed' ? colors.success : colors.brandWhite,
+              backgroundColor: selectedStatus === 'completed' ? colors.success : 'transparent',
               color: selectedStatus === 'completed' ? colors.brandWhite : colors.textSecondary,
-              border: `1.5px solid ${selectedStatus === 'completed' ? colors.success : colors.divider}66`,
-              boxShadow: selectedStatus === 'completed' ? `0 2px 4px ${colors.shadow}1A` : `0 2px 4px ${colors.shadow}1A`,
+              border: 'none',
+              '&:last-of-type': {
+                borderTopRightRadius: '16px',
+                borderBottomRightRadius: '16px',
+              },
               '&:hover': {
                 backgroundColor: selectedStatus === 'completed' ? colors.success : `${colors.divider}0D`,
               },
