@@ -30,6 +30,7 @@ import {
   Info,
   CheckCircle,
   RadioButtonUnchecked,
+  SportsSoccer,
 } from '@mui/icons-material';
 import { colors, constants } from '../config/theme';
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, getDocs, query, where } from 'firebase/firestore';
@@ -45,6 +46,7 @@ const PollFormPage = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [leagues, setLeagues] = useState([]);
+  const [leagueFixtures, setLeagueFixtures] = useState([]);
 
   const [formData, setFormData] = useState({
     leagueId: '',
@@ -72,6 +74,26 @@ const PollFormPage = () => {
       setLeagues(leaguesData.filter((l) => l.isActive));
     } catch (error) {
       console.error('Error loading leagues:', error);
+    }
+  };
+
+  const loadLeagueFixtures = async (leagueId) => {
+    if (!leagueId) {
+      setLeagueFixtures([]);
+      return;
+    }
+    try {
+      const fixturesRef = collection(db, 'fixtures');
+      const q = query(fixturesRef, where('leagueId', '==', leagueId));
+      const snapshot = await getDocs(q);
+      const fixturesData = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setLeagueFixtures(fixturesData);
+    } catch (error) {
+      console.error('Error loading fixtures:', error);
+      setLeagueFixtures([]);
     }
   };
 
@@ -338,6 +360,55 @@ const PollFormPage = () => {
                 </FormControl>
               </Box>
             </Grid>
+
+            {/* Teams/Matches Display */}
+            {formData.leagueId && (
+              <Grid item xs={12}>
+                <Box
+                  sx={{
+                    padding: 2,
+                    borderRadius: '12px',
+                    backgroundColor: `${colors.info}0D`,
+                    border: `1px solid ${colors.info}26`,
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                    <SportsSoccer sx={{ fontSize: 18, color: colors.info }} />
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack }}>
+                      Teams / Matches in this Poll
+                    </Typography>
+                  </Box>
+                  {leagueFixtures.length > 0 ? (
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                      {leagueFixtures.slice(0, 5).map((fixture) => (
+                        <Box
+                          key={fixture.id}
+                          sx={{
+                            padding: 1,
+                            borderRadius: '8px',
+                            backgroundColor: colors.brandWhite,
+                            border: `1px solid ${colors.divider}33`,
+                          }}
+                        >
+                          <Typography variant="body2" sx={{ fontWeight: 500, color: colors.brandBlack }}>
+                            {fixture.homeTeam || 'TBD'} vs {fixture.awayTeam || 'TBD'}
+                          </Typography>
+                        </Box>
+                      ))}
+                      {leagueFixtures.length > 5 && (
+                        <Typography variant="caption" sx={{ color: colors.textSecondary, mt: 0.5 }}>
+                          + {leagueFixtures.length - 5} more matches
+                        </Typography>
+                      )}
+                    </Box>
+                  ) : (
+                    <Typography variant="body2" sx={{ color: colors.textSecondary, fontStyle: 'italic' }}>
+                      No fixtures found for this league. Users will vote on teams from this league.
+                    </Typography>
+                  )}
+                </Box>
+              </Grid>
+            )}
 
             {/* Start Date & Time */}
             <Grid item xs={12}>

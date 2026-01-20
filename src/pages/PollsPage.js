@@ -94,7 +94,8 @@ const PollsPage = () => {
     if (statusFilter !== 'all') {
       filtered = filtered.filter((poll) => {
         const status = poll.status || poll.pollStatus;
-        if (statusFilter === 'pending') {
+        // Map 'scheduled' filter to both 'pending' and 'scheduled' statuses
+        if (statusFilter === 'scheduled') {
           return status === 'pending' || status === 'scheduled';
         }
         return status === statusFilter;
@@ -153,14 +154,16 @@ const PollsPage = () => {
   };
 
   const getStatusChip = (status) => {
+    // Map pending to scheduled for display
+    const displayStatus = status === 'pending' ? 'scheduled' : status;
+    
     const statusConfig = {
       active: { label: 'ACTIVE', color: colors.success },
-      pending: { label: 'PENDING', color: colors.warning },
-      closed: { label: 'CLOSED', color: colors.textSecondary },
       scheduled: { label: 'SCHEDULED', color: colors.info },
+      closed: { label: 'CLOSED', color: colors.textSecondary },
     };
 
-    const config = statusConfig[status] || statusConfig.active;
+    const config = statusConfig[displayStatus] || statusConfig.active;
 
     return (
       <Chip
@@ -198,18 +201,33 @@ const PollsPage = () => {
     {
       id: 'leagueName',
       label: 'League',
-      render: (value) => (
-        <Chip
-          label={value || 'N/A'}
-          size="small"
-          sx={{
-            backgroundColor: `${colors.brandRed}1A`,
-            color: colors.brandRed,
-            fontWeight: 600,
-            fontSize: 12,
-            borderRadius: '8px',
-          }}
-        />
+      render: (value, row) => (
+        <Box>
+          <Chip
+            label={value || 'N/A'}
+            size="small"
+            sx={{
+              backgroundColor: `${colors.brandRed}1A`,
+              color: colors.brandRed,
+              fontWeight: 600,
+              fontSize: 12,
+              borderRadius: '8px',
+              mb: 0.5,
+            }}
+          />
+          {row.teams && Array.isArray(row.teams) && row.teams.length > 0 && (
+            <Typography variant="caption" sx={{ color: colors.textSecondary, display: 'block', fontSize: 11, mt: 0.5 }}>
+              Teams: {row.teams.slice(0, 3).join(', ')}
+              {row.teams.length > 3 && ` +${row.teams.length - 3} more`}
+            </Typography>
+          )}
+          {row.matches && Array.isArray(row.matches) && row.matches.length > 0 && (
+            <Typography variant="caption" sx={{ color: colors.textSecondary, display: 'block', fontSize: 11, mt: 0.5 }}>
+              Matches: {row.matches.slice(0, 2).map(m => (m && m.homeTeam && m.awayTeam ? `${m.homeTeam} vs ${m.awayTeam}` : 'TBD')).join(', ')}
+              {row.matches.length > 2 && ` +${row.matches.length - 2} more`}
+            </Typography>
+          )}
+        </Box>
       ),
     },
     {
@@ -414,7 +432,7 @@ const PollsPage = () => {
               {polls.filter((p) => (p.status || p.pollStatus) === 'pending' || (p.status || p.pollStatus) === 'scheduled').length}
             </Typography>
             <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13 }}>
-              Pending
+              Scheduled
             </Typography>
           </Card>
         </Grid>
@@ -513,19 +531,19 @@ const PollsPage = () => {
           Active
         </Button>
         <Button
-          variant={statusFilter === 'pending' ? 'contained' : 'outlined'}
-          onClick={() => setStatusFilter('pending')}
+          variant={statusFilter === 'scheduled' ? 'contained' : 'outlined'}
+          onClick={() => setStatusFilter('scheduled')}
           sx={{
             borderRadius: '20px',
             textTransform: 'none',
             fontWeight: 600,
             px: 3,
             py: 1.5,
-            backgroundColor: statusFilter === 'pending' ? colors.warning : colors.brandWhite,
-            color: statusFilter === 'pending' ? colors.brandWhite : colors.warning,
-            border: `1.5px solid ${statusFilter === 'pending' ? colors.warning : colors.divider}66`,
+            backgroundColor: statusFilter === 'scheduled' ? colors.info : colors.brandWhite,
+            color: statusFilter === 'scheduled' ? colors.brandWhite : colors.info,
+            border: `1.5px solid ${statusFilter === 'scheduled' ? colors.info : colors.divider}66`,
             '&:hover': {
-              backgroundColor: statusFilter === 'pending' ? colors.warning : `${colors.divider}0D`,
+              backgroundColor: statusFilter === 'scheduled' ? colors.info : `${colors.divider}0D`,
             },
           }}
         >
@@ -534,16 +552,16 @@ const PollsPage = () => {
               width: 24,
               height: 24,
               borderRadius: '6px',
-              backgroundColor: `${colors.warning}1A`,
+              backgroundColor: statusFilter === 'scheduled' ? `${colors.brandWhite}33` : `${colors.info}1A`,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               mr: 1.5,
             }}
           >
-            <Schedule sx={{ fontSize: 14, color: colors.warning }} />
+            <Schedule sx={{ fontSize: 14, color: statusFilter === 'scheduled' ? colors.brandWhite : colors.info }} />
           </Box>
-          Pending
+          Scheduled
         </Button>
         <Button
           variant={statusFilter === 'closed' ? 'contained' : 'outlined'}
