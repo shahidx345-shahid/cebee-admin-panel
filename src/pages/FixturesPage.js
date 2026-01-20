@@ -592,9 +592,12 @@ const FixturesPage = () => {
       <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid item xs={6} md={3}>
           <StatCard
-            title="Scheduled"
-            value={fixtures.filter((f) => (f.matchStatus || f.status) === 'scheduled').length.toString()}
-            subtitle="Draft"
+            title="Prediction Open"
+            value={fixtures.filter((f) => {
+              const status = f.matchStatus || f.status;
+              return status === 'scheduled' || status === 'published' || status === 'predictionOpen';
+            }).length.toString()}
+            subtitle="Users can predict"
             icon={AccessTime}
             color="#1976d2"
             isPrimary={false}
@@ -602,11 +605,14 @@ const FixturesPage = () => {
         </Grid>
         <Grid item xs={6} md={3}>
           <StatCard
-            title="Published"
-            value={fixtures.filter((f) => (f.matchStatus || f.status) === 'published').length.toString()}
-            subtitle="Predictions Open"
-            icon={Visibility}
-            color="#1976d2"
+            title="Prediction Locked"
+            value={fixtures.filter((f) => {
+              const status = f.matchStatus || f.status;
+              return status === 'predictionLocked' || status === 'locked';
+            }).length.toString()}
+            subtitle="Predictions closed"
+            icon={Lock}
+            color="#ed6c02"
             isPrimary={false}
           />
         </Grid>
