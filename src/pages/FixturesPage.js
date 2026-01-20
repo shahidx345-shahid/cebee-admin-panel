@@ -815,6 +815,7 @@ const FixturesPage = () => {
   );
 
   const statusFilters = [
+    { value: 'scheduled', label: 'Scheduled', icon: AccessTime, color: '#9E9E9E' },
     { value: 'published', label: 'Published', icon: Visibility, color: '#1976d2' },
     { value: 'live', label: 'Live', icon: PlayArrow, color: colors.brandRed },
     { value: 'resultsProcessing', label: 'Result Pending', icon: Edit, color: '#FF9800' },
@@ -951,6 +952,8 @@ const FixturesPage = () => {
                   borderRight: index < statusFilters.length - 1 ? 'none' : 'none',
                   boxShadow: isSelected ? `0 2px 8px ${filter.color}40` : 'none',
                   position: 'relative',
+                  padding: isSelected ? '12px 16px' : '12px 16px',
+                  margin: isSelected ? '4px' : '0',
                   '&:first-of-type': {
                     borderTopLeftRadius: '20px',
                     borderBottomLeftRadius: '20px',
