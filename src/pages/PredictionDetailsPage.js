@@ -132,8 +132,7 @@ const PredictionDetailsPage = () => {
           fixtureId: firstPred.fixtureId || matchId,
         });
         setPredictions(predictionsData);
-        // Show the first prediction by default
-        setSelectedPrediction(predictionsData[0]);
+        setSelectedPredictionIndex(0);
       }
     } catch (error) {
       console.error('Error loading prediction group:', error);
@@ -152,7 +151,7 @@ const PredictionDetailsPage = () => {
         fixtureId: matchId,
       });
       setPredictions([dummyPred]);
-      setSelectedPrediction(dummyPred);
+      setSelectedPredictionIndex(0);
     } finally {
       setLoading(false);
     }
@@ -270,7 +269,7 @@ const PredictionDetailsPage = () => {
     );
   }
 
-  if (!groupData || !selectedPrediction) {
+  if (!groupData || predictions.length === 0) {
     return (
       <Box>
         <Button
@@ -292,6 +291,9 @@ const PredictionDetailsPage = () => {
     );
   }
 
+  const selectedPrediction = predictions[selectedPredictionIndex] || predictions[0];
+  if (!selectedPrediction) return null;
+  
   const predStatus = selectedPrediction.status || selectedPrediction.predictionStatus || 'ongoing';
   const isCompleted = predStatus === 'correct' || predStatus === 'incorrect';
 
@@ -485,6 +487,122 @@ const PredictionDetailsPage = () => {
           </Grid>
         </CardContent>
       </Card>
+
+      {/* All Predictions List - Show all predictions if more than one */}
+      {predictions.length > 1 && (
+        <Card
+          sx={{
+            padding: 3,
+            mb: 3,
+            borderRadius: '20px',
+            background: colors.brandWhite,
+            border: `1.5px solid ${colors.divider}26`,
+            boxShadow: `0 6px 14px ${colors.shadow}1F`,
+          }}
+        >
+          <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
+            All Predictions ({predictions.length})
+          </Typography>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {predictions.map((pred, index) => {
+              const status = pred.status || pred.predictionStatus || 'ongoing';
+              const isSelected = index === selectedPredictionIndex;
+              return (
+                <Card
+                  key={pred.id}
+                  onClick={() => setSelectedPredictionIndex(index)}
+                  sx={{
+                    padding: 2,
+                    borderRadius: '12px',
+                    border: `2px solid ${isSelected ? colors.brandRed : colors.divider}66`,
+                    backgroundColor: isSelected ? `${colors.brandRed}0A` : colors.brandWhite,
+                    cursor: 'pointer',
+                    '&:hover': {
+                      borderColor: colors.brandRed,
+                      backgroundColor: `${colors.brandRed}0D`,
+                    },
+                  }}
+                >
+                  <Grid container spacing={2} alignItems="center">
+                    <Grid item xs={12} md={2}>
+                      {getTypeChip(pred.predictionType || pred.type || 'correct_score')}
+                    </Grid>
+                    <Grid item xs={12} md={3}>
+                      <Typography variant="body2" sx={{ color: colors.textSecondary, mb: 0.5 }}>
+                        Prediction
+                      </Typography>
+                      <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                        {pred.prediction || pred.selectedTeam || pred.predictionText || 'N/A'}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} md={2}>
+                      <Typography variant="body2" sx={{ color: colors.textSecondary, mb: 0.5 }}>
+                        Prediction Time
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                        {pred.predictionTime
+                          ? format(
+                              pred.predictionTime?.toDate
+                                ? pred.predictionTime.toDate()
+                                : new Date(pred.predictionTime),
+                              'MMM dd, yyyy HH:mm'
+                            )
+                          : 'N/A'}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} md={2}>
+                      <Typography variant="body2" sx={{ color: colors.textSecondary, mb: 0.5 }}>
+                        Actual Result
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {pred.actualResult || 'N/A'}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} md={1.5}>
+                      <Typography variant="body2" sx={{ color: colors.textSecondary, mb: 0.5 }}>
+                        SP Status
+                      </Typography>
+                      {status === 'ongoing' ? (
+                        <Chip
+                          icon={<AccessTime sx={{ fontSize: 12 }} />}
+                          label="Pending"
+                          size="small"
+                          sx={{
+                            backgroundColor: `${colors.warning}1A`,
+                            color: colors.warning,
+                            fontWeight: 600,
+                            fontSize: 10,
+                            height: 24,
+                          }}
+                        />
+                      ) : (
+                        <Chip
+                          icon={<Star sx={{ fontSize: 12 }} />}
+                          label={`${pred.spAwarded || 0} SP`}
+                          size="small"
+                          sx={{
+                            backgroundColor: `${colors.success}1A`,
+                            color: colors.success,
+                            fontWeight: 600,
+                            fontSize: 10,
+                            height: 24,
+                          }}
+                        />
+                      )}
+                    </Grid>
+                    <Grid item xs={12} md={1.5}>
+                      <Typography variant="body2" sx={{ color: colors.textSecondary, mb: 0.5 }}>
+                        Correctness
+                      </Typography>
+                      {getCorrectnessChip(status)}
+                    </Grid>
+                  </Grid>
+                </Card>
+              );
+            })}
+          </Box>
+        </Card>
+      )}
 
       {/* User Details and Match Details Cards */}
       <Grid container spacing={3}>
