@@ -383,8 +383,8 @@ const FixturesPage = () => {
       </Grid>
 
       {/* Status Filter Buttons - Card Style */}
-      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', gap: 1.5, flexWrap: 'wrap' }}>
-        {statusFilters.map((filter) => {
+      <Box sx={{ mb: 3, display: 'flex', flexWrap: 'wrap' }}>
+        {statusFilters.map((filter, index) => {
           const isSelected = selectedStatus === filter.value;
           const Icon = filter.icon;
 
@@ -395,8 +395,8 @@ const FixturesPage = () => {
               onClick={() => setSelectedStatus(filter.value)}
               sx={{
                 flex: 1,
-                minWidth: { xs: 'calc(50% - 8px)', sm: 'auto' },
-                borderRadius: '20px',
+                minWidth: { xs: 'calc(50% - 4px)', sm: 'auto' },
+                borderRadius: 0,
                 textTransform: 'none',
                 fontWeight: 600,
                 px: 3,
@@ -404,10 +404,23 @@ const FixturesPage = () => {
                 backgroundColor: isSelected ? filter.color : colors.brandWhite,
                 color: isSelected ? colors.brandWhite : filter.color,
                 border: `1.5px solid ${isSelected ? filter.color : colors.divider}66`,
-                boxShadow: isSelected ? `0 2px 8px ${filter.color}40` : 'none',
+                borderRight: index < statusFilters.length - 1 ? 'none' : `1.5px solid ${isSelected ? filter.color : colors.divider}66`,
+                boxShadow: isSelected ? `0 4px 16px ${filter.color}60, inset 0 2px 4px ${filter.color}20` : 'none',
+                transform: isSelected ? 'scale(1.02)' : 'scale(1)',
+                zIndex: isSelected ? 1 : 0,
+                position: 'relative',
+                '&:first-of-type': {
+                  borderTopLeftRadius: '20px',
+                  borderBottomLeftRadius: '20px',
+                },
+                '&:last-of-type': {
+                  borderTopRightRadius: '20px',
+                  borderBottomRightRadius: '20px',
+                  borderRight: `1.5px solid ${isSelected ? filter.color : colors.divider}66`,
+                },
                 '&:hover': {
                   backgroundColor: isSelected ? filter.color : `${filter.color}0D`,
-                  boxShadow: isSelected ? `0 2px 8px ${filter.color}40` : `0 2px 4px ${filter.color}20`,
+                  boxShadow: isSelected ? `0 4px 12px ${filter.color}50` : `0 2px 4px ${filter.color}20`,
                   borderColor: isSelected ? filter.color : `${filter.color}66`,
                 },
               }}
