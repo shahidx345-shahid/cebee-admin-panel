@@ -63,6 +63,14 @@ const PollFormPage = () => {
     }
   }, [id]);
 
+  useEffect(() => {
+    if (formData.leagueId) {
+      loadLeagueFixtures(formData.leagueId);
+    } else {
+      setLeagueFixtures([]);
+    }
+  }, [formData.leagueId]);
+
   const loadLeagues = async () => {
     try {
       const leaguesRef = collection(db, 'leagues');
