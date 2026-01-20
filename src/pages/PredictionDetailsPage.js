@@ -36,7 +36,7 @@ const PredictionDetailsPage = () => {
   const [loading, setLoading] = useState(true);
   const [groupData, setGroupData] = useState(null);
   const [predictions, setPredictions] = useState([]);
-  const [selectedPrediction, setSelectedPrediction] = useState(null);
+  const [selectedPredictionIndex, setSelectedPredictionIndex] = useState(0);
 
   useEffect(() => {
     if (id) {
