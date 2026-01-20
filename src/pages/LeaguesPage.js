@@ -276,84 +276,91 @@ const LeaguesPage = () => {
     <Box sx={{ width: '100%', maxWidth: '100%' }}>
       {/* Header */}
       <Box sx={{ mb: 3 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
           <Box
             sx={{
-              padding: 1.5,
-              background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
-              borderRadius: '14px',
-              border: `2px solid ${colors.brandWhite}`,
+              width: 48,
+              height: 48,
+              backgroundColor: colors.brandRed,
+              borderRadius: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
           >
-            <Stadium sx={{ fontSize: 28, color: colors.brandWhite }} />
+            <Stadium sx={{ fontSize: 24, color: colors.brandWhite }} />
           </Box>
-          <Typography
-            variant="h4"
-            sx={{
-              fontWeight: 700,
-              color: colors.brandBlack,
-              fontSize: { xs: 24, md: 28 },
-            }}
-          >
-            League Management
-          </Typography>
+          <Box>
+            <Typography
+              variant="h4"
+              sx={{
+                fontWeight: 700,
+                color: colors.brandBlack,
+                fontSize: { xs: 24, md: 28 },
+                mb: 0.25,
+              }}
+            >
+              League Management
+            </Typography>
+            <Typography
+              variant="body2"
+              sx={{
+                color: colors.textSecondary,
+                fontSize: 13,
+              }}
+            >
+              Manage football leagues and competitions (Max 5 active)
+            </Typography>
+          </Box>
         </Box>
-        <Typography
-          variant="body2"
-          sx={{
-            color: colors.textSecondary,
-            fontSize: 14,
-            ml: 8.5,
-          }}
-        >
-          Manage football leagues and competitions (Max 5 active)
-        </Typography>
       </Box>
 
       {/* Search and Add Button */}
-      <Grid container spacing={2} sx={{ mb: 2 }}>
-        <Grid item xs={12} md={8}>
+      <Box sx={{ display: 'flex', gap: 1.5, mb: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+        <Box sx={{ flex: 1, minWidth: { xs: '100%', md: '300px' } }}>
           <SearchBar
             value={searchQuery}
             onChange={setSearchQuery}
             placeholder="Search leagues..."
           />
-        </Grid>
-        <Grid item xs={12} md={4}>
-          <Button
-            variant="contained"
-            startIcon={<Add />}
-            onClick={() => navigate('/leagues/add')}
-            fullWidth
-            sx={{
-              background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
-              borderRadius: '12px',
-              textTransform: 'none',
-              fontWeight: 600,
-              py: 1.5,
-            }}
-          >
-            Add League
-          </Button>
-        </Grid>
-      </Grid>
+        </Box>
+        <Button
+          variant="contained"
+          startIcon={<Add />}
+          onClick={() => navigate('/leagues/add')}
+          sx={{
+            background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
+            borderRadius: '12px',
+            textTransform: 'none',
+            fontWeight: 600,
+            px: 2.5,
+            py: 1.25,
+          }}
+        >
+          Add League
+        </Button>
+      </Box>
 
       {/* Filter Chips */}
       <Box sx={{ display: 'flex', gap: 1.5, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
         <Button
           variant="outlined"
           startIcon={<AccessTime sx={{ fontSize: 18 }} />}
-          endIcon={<ArrowDropDown sx={{ color: colors.brandRed }} />}
+          endIcon={<ArrowDropDown sx={{ fontSize: 18 }} />}
           onClick={(e) => setDateFilterAnchor(e.currentTarget)}
           sx={{
-            borderColor: colors.backgroundLight,
+            borderColor: '#FFE5E5',
             color: colors.brandBlack,
-            backgroundColor: colors.brandWhite,
+            backgroundColor: '#FFF5F5',
             borderRadius: '8px',
             textTransform: 'none',
             fontWeight: 500,
             px: 2,
             py: 1,
+            '&:hover': {
+              backgroundColor: '#FFE5E5',
+              borderColor: '#FFE5E5',
+            },
           }}
         >
           {selectedSort === 'nameAZ' ? 'Name: A-Z' :
@@ -494,17 +501,21 @@ const LeaguesPage = () => {
         <Button
           variant="outlined"
           startIcon={<ListIcon sx={{ fontSize: 18 }} />}
-          endIcon={<ArrowDropDown sx={{ color: colors.brandRed }} />}
+          endIcon={<ArrowDropDown sx={{ fontSize: 18 }} />}
           onClick={(e) => setTypeFilterAnchor(e.currentTarget)}
           sx={{
-            borderColor: colors.backgroundLight,
+            borderColor: '#FFE5E5',
             color: colors.brandBlack,
-            backgroundColor: colors.brandWhite,
+            backgroundColor: '#FFF5F5',
             borderRadius: '8px',
             textTransform: 'none',
             fontWeight: 500,
             px: 2,
             py: 1,
+            '&:hover': {
+              backgroundColor: '#FFE5E5',
+              borderColor: '#FFE5E5',
+            },
           }}
         >
           {typeFilter === 'all' ? 'All Types' : typeFilter.charAt(0).toUpperCase() + typeFilter.slice(1)}
@@ -528,14 +539,17 @@ const LeaguesPage = () => {
           </MenuItem>
         </Menu>
         <Chip
-          icon={<CheckCircle sx={{ fontSize: 16, color: colors.brandWhite }} />}
+          icon={<CheckCircle sx={{ fontSize: 16, color: colors.success }} />}
           label={`Active: ${activeCount}/5`}
           sx={{
-            backgroundColor: colors.success,
-            color: colors.brandWhite,
+            backgroundColor: '#FFF5F5',
+            borderColor: '#FFE5E5',
+            border: '1px solid',
+            color: colors.brandBlack,
             fontWeight: 600,
             fontSize: 13,
             height: 36,
+            borderRadius: '8px',
           }}
         />
       </Box>
