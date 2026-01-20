@@ -46,6 +46,7 @@ import {
   Person,
   Info,
   CalendarToday,
+  ListAlt,
 } from '@mui/icons-material';
 import { colors, constants } from '../config/theme';
 import SearchBar from '../components/common/SearchBar';
@@ -1108,7 +1109,7 @@ const FixturesPage = () => {
               justifyContent: 'center',
             }}
           >
-            <List sx={{ fontSize: 24, color: colors.brandWhite }} />
+            <ListAlt sx={{ fontSize: 24, color: colors.brandWhite }} />
           </Box>
           <Box>
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 0.5 }}>
