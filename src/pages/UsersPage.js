@@ -26,9 +26,12 @@ import {
   VerifiedUser,
   BarChart,
   ArrowUpward,
+  ArrowDownward,
   FilterList,
   ArrowDropDown,
   MoreVert,
+  Check,
+  Sort,
 } from '@mui/icons-material';
 import { colors, constants } from '../config/theme';
 import SearchBar from '../components/common/SearchBar';
@@ -666,7 +669,7 @@ const UsersPage = () => {
               }}
             >
               <CheckCircle 
-                sx={{ 
+          sx={{
                   fontSize: 14, 
                   color: selectedStatus === 'active' ? colors.success : colors.brandWhite 
                 }} 
@@ -675,21 +678,21 @@ const UsersPage = () => {
           }
           sx={{
             flex: 1,
-            borderRadius: '20px',
-            textTransform: 'none',
-            fontWeight: 600,
-            px: 3,
+              borderRadius: '20px',
+              textTransform: 'none',
+              fontWeight: 600,
+              px: 3,
             py: 1.5,
             backgroundColor: selectedStatus === 'active' ? colors.success : colors.brandWhite,
             color: selectedStatus === 'active' ? colors.brandWhite : colors.brandBlack,
             border: `1.5px solid ${selectedStatus === 'active' ? colors.success : colors.divider}66`,
-            '&:hover': {
+                '&:hover': {
               backgroundColor: selectedStatus === 'active' ? colors.success : colors.brandWhite,
               borderColor: selectedStatus === 'active' ? colors.success : colors.divider,
             },
           }}
         >
-          Active Users
+            Active Users
         </Button>
         <Button
           variant={selectedStatus === 'inactive' ? 'contained' : 'outlined'}
@@ -779,7 +782,14 @@ const UsersPage = () => {
             },
           }}
         >
-          SP: High
+          {selectedSort === 'spHigh' ? 'SP: High' : 
+           selectedSort === 'spLow' ? 'SP: Low' :
+           selectedSort === 'predictionsHigh' ? 'Predictions: Most' :
+           selectedSort === 'predictionsLow' ? 'Predictions: Least' :
+           selectedSort === 'dateNewest' ? 'Join Date: Newest' :
+           selectedSort === 'dateOldest' ? 'Join Date: Oldest' :
+           selectedSort === 'nameAZ' ? 'Name: A-Z' :
+           selectedSort === 'nameZA' ? 'Name: Z-A' : 'SP: High'}
         </Button>
         <Menu
           anchorEl={spFilterAnchor}
@@ -788,16 +798,291 @@ const UsersPage = () => {
           PaperProps={{
             sx: {
               borderRadius: '12px',
-              minWidth: 180,
+              minWidth: 220,
               boxShadow: `0 4px 12px ${colors.shadow}33`,
+              padding: '8px 0',
             },
           }}
         >
-          <MenuItem onClick={() => { setSelectedSort('spHigh'); setSpFilterAnchor(null); }}>
+          <MenuItem 
+            onClick={() => { setSelectedSort('spHigh'); setSpFilterAnchor(null); }}
+            selected={selectedSort === 'spHigh'}
+            sx={{
+              py: 1.5,
+              px: 2,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1.5,
+              backgroundColor: selectedSort === 'spHigh' ? `${colors.brandRed}0D` : 'transparent',
+              '&:hover': {
+                backgroundColor: `${colors.brandRed}0D`,
+              },
+              '&.Mui-selected': {
+                backgroundColor: `${colors.brandRed}0D`,
+                '&:hover': {
+                  backgroundColor: `${colors.brandRed}1A`,
+                },
+              },
+            }}
+          >
+            <Box
+              sx={{
+                width: 24,
+                height: 24,
+                borderRadius: '50%',
+                backgroundColor: colors.brandRed,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <ArrowUpward sx={{ fontSize: 14, color: colors.brandWhite }} />
+            </Box>
+            <Typography variant="body2" sx={{ flex: 1, fontWeight: selectedSort === 'spHigh' ? 700 : 500 }}>
             SP: High
+            </Typography>
+            {selectedSort === 'spHigh' && (
+              <Check sx={{ fontSize: 18, color: colors.brandRed }} />
+            )}
           </MenuItem>
-          <MenuItem onClick={() => { setSelectedSort('spLow'); setSpFilterAnchor(null); }}>
+          <MenuItem 
+            onClick={() => { setSelectedSort('spLow'); setSpFilterAnchor(null); }}
+            selected={selectedSort === 'spLow'}
+            sx={{
+              py: 1.5,
+              px: 2,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1.5,
+              backgroundColor: selectedSort === 'spLow' ? `${colors.brandRed}0D` : 'transparent',
+              '&:hover': {
+                backgroundColor: `${colors.brandRed}0D`,
+              },
+              '&.Mui-selected': {
+                backgroundColor: `${colors.brandRed}0D`,
+                '&:hover': {
+                  backgroundColor: `${colors.brandRed}1A`,
+                },
+              },
+            }}
+          >
+            <Box
+              sx={{
+                width: 24,
+                height: 24,
+                borderRadius: '50%',
+                backgroundColor: colors.textSecondary,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <ArrowDownward sx={{ fontSize: 14, color: colors.brandWhite }} />
+            </Box>
+            <Typography variant="body2" sx={{ flex: 1, fontWeight: selectedSort === 'spLow' ? 700 : 500 }}>
             SP: Low
+            </Typography>
+            {selectedSort === 'spLow' && (
+              <Check sx={{ fontSize: 18, color: colors.brandRed }} />
+            )}
+          </MenuItem>
+          <MenuItem 
+            onClick={() => { setSelectedSort('predictionsHigh'); setSpFilterAnchor(null); }}
+            selected={selectedSort === 'predictionsHigh'}
+            sx={{
+              py: 1.5,
+              px: 2,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1.5,
+              backgroundColor: selectedSort === 'predictionsHigh' ? `${colors.brandRed}0D` : 'transparent',
+              '&:hover': {
+                backgroundColor: `${colors.brandRed}0D`,
+              },
+              '&.Mui-selected': {
+                backgroundColor: `${colors.brandRed}0D`,
+                '&:hover': {
+                  backgroundColor: `${colors.brandRed}1A`,
+                },
+              },
+            }}
+          >
+            <Box
+              sx={{
+                width: 24,
+                height: 24,
+                borderRadius: '50%',
+                backgroundColor: selectedSort === 'predictionsHigh' ? colors.brandRed : colors.textSecondary,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <BarChart sx={{ fontSize: 14, color: colors.brandWhite }} />
+            </Box>
+            <Typography variant="body2" sx={{ flex: 1, fontWeight: selectedSort === 'predictionsHigh' ? 700 : 500 }}>
+              Predictions: Most
+            </Typography>
+            {selectedSort === 'predictionsHigh' && (
+              <Check sx={{ fontSize: 18, color: colors.brandRed }} />
+            )}
+          </MenuItem>
+          <MenuItem 
+            onClick={() => { setSelectedSort('predictionsLow'); setSpFilterAnchor(null); }}
+            selected={selectedSort === 'predictionsLow'}
+            sx={{
+              py: 1.5,
+              px: 2,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1.5,
+              backgroundColor: selectedSort === 'predictionsLow' ? `${colors.brandRed}0D` : 'transparent',
+              '&:hover': {
+                backgroundColor: `${colors.brandRed}0D`,
+              },
+              '&.Mui-selected': {
+                backgroundColor: `${colors.brandRed}0D`,
+                '&:hover': {
+                  backgroundColor: `${colors.brandRed}1A`,
+                },
+              },
+            }}
+          >
+            <Box
+              sx={{
+                width: 24,
+                height: 24,
+                borderRadius: '50%',
+                backgroundColor: colors.textSecondary,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <BarChart sx={{ fontSize: 14, color: colors.brandWhite }} />
+            </Box>
+            <Typography variant="body2" sx={{ flex: 1, fontWeight: selectedSort === 'predictionsLow' ? 700 : 500 }}>
+              Predictions: Least
+            </Typography>
+            {selectedSort === 'predictionsLow' && (
+              <Check sx={{ fontSize: 18, color: colors.brandRed }} />
+            )}
+          </MenuItem>
+          <MenuItem 
+            onClick={() => { setSelectedSort('dateNewest'); setSpFilterAnchor(null); }}
+            selected={selectedSort === 'dateNewest'}
+            sx={{
+              py: 1.5,
+              px: 2,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1.5,
+              backgroundColor: selectedSort === 'dateNewest' ? `${colors.brandRed}0D` : 'transparent',
+              '&:hover': {
+                backgroundColor: `${colors.brandRed}0D`,
+              },
+              '&.Mui-selected': {
+                backgroundColor: `${colors.brandRed}0D`,
+                '&:hover': {
+                  backgroundColor: `${colors.brandRed}1A`,
+                },
+              },
+            }}
+          >
+            <ArrowDownward sx={{ fontSize: 18, color: colors.textSecondary }} />
+            <Typography variant="body2" sx={{ flex: 1, fontWeight: selectedSort === 'dateNewest' ? 700 : 500 }}>
+              Join Date: Newest
+            </Typography>
+            {selectedSort === 'dateNewest' && (
+              <Check sx={{ fontSize: 18, color: colors.brandRed }} />
+            )}
+          </MenuItem>
+          <MenuItem 
+            onClick={() => { setSelectedSort('dateOldest'); setSpFilterAnchor(null); }}
+            selected={selectedSort === 'dateOldest'}
+            sx={{
+              py: 1.5,
+              px: 2,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1.5,
+              backgroundColor: selectedSort === 'dateOldest' ? `${colors.brandRed}0D` : 'transparent',
+              '&:hover': {
+                backgroundColor: `${colors.brandRed}0D`,
+              },
+              '&.Mui-selected': {
+                backgroundColor: `${colors.brandRed}0D`,
+                '&:hover': {
+                  backgroundColor: `${colors.brandRed}1A`,
+                },
+              },
+            }}
+          >
+            <ArrowUpward sx={{ fontSize: 18, color: colors.textSecondary }} />
+            <Typography variant="body2" sx={{ flex: 1, fontWeight: selectedSort === 'dateOldest' ? 700 : 500 }}>
+              Join Date: Oldest
+            </Typography>
+            {selectedSort === 'dateOldest' && (
+              <Check sx={{ fontSize: 18, color: colors.brandRed }} />
+            )}
+          </MenuItem>
+          <MenuItem 
+            onClick={() => { setSelectedSort('nameAZ'); setSpFilterAnchor(null); }}
+            selected={selectedSort === 'nameAZ'}
+            sx={{
+              py: 1.5,
+              px: 2,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1.5,
+              backgroundColor: selectedSort === 'nameAZ' ? `${colors.brandRed}0D` : 'transparent',
+              '&:hover': {
+                backgroundColor: `${colors.brandRed}0D`,
+              },
+              '&.Mui-selected': {
+                backgroundColor: `${colors.brandRed}0D`,
+                '&:hover': {
+                  backgroundColor: `${colors.brandRed}1A`,
+                },
+              },
+            }}
+          >
+            <Sort sx={{ fontSize: 18, color: colors.textSecondary }} />
+            <Typography variant="body2" sx={{ flex: 1, fontWeight: selectedSort === 'nameAZ' ? 700 : 500 }}>
+              Name: A-Z
+            </Typography>
+            {selectedSort === 'nameAZ' && (
+              <Check sx={{ fontSize: 18, color: colors.brandRed }} />
+            )}
+          </MenuItem>
+          <MenuItem 
+            onClick={() => { setSelectedSort('nameZA'); setSpFilterAnchor(null); }}
+            selected={selectedSort === 'nameZA'}
+            sx={{
+              py: 1.5,
+              px: 2,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1.5,
+              backgroundColor: selectedSort === 'nameZA' ? `${colors.brandRed}0D` : 'transparent',
+              '&:hover': {
+                backgroundColor: `${colors.brandRed}0D`,
+              },
+              '&.Mui-selected': {
+                backgroundColor: `${colors.brandRed}0D`,
+                '&:hover': {
+                  backgroundColor: `${colors.brandRed}1A`,
+                },
+              },
+            }}
+          >
+            <Sort sx={{ fontSize: 18, color: colors.textSecondary, transform: 'rotate(180deg)' }} />
+            <Typography variant="body2" sx={{ flex: 1, fontWeight: selectedSort === 'nameZA' ? 700 : 500 }}>
+              Name: Z-A
+            </Typography>
+            {selectedSort === 'nameZA' && (
+              <Check sx={{ fontSize: 18, color: colors.brandRed }} />
+            )}
           </MenuItem>
         </Menu>
         <Button
