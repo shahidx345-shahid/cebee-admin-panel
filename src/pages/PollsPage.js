@@ -463,14 +463,14 @@ const PollsPage = () => {
       </Grid>
 
       {/* Filter Buttons */}
-      <Box sx={{ mb: 3, display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+      <Box sx={{ mb: 3, display: 'flex', flexWrap: 'wrap' }}>
         <Button
           variant={statusFilter === 'all' ? 'contained' : 'outlined'}
           onClick={() => setStatusFilter('all')}
           sx={{
             flex: 1,
-            minWidth: { xs: 'calc(50% - 1px)', sm: 'auto' },
-            borderRadius: 0,
+            minWidth: { xs: 'calc(50% - 8px)', sm: 'auto' },
+            borderRadius: '20px',
             textTransform: 'none',
             fontWeight: 600,
             px: 3,
@@ -479,14 +479,10 @@ const PollsPage = () => {
             backgroundColor: statusFilter === 'all' ? colors.brandRed : colors.brandWhite,
             color: statusFilter === 'all' ? colors.brandWhite : colors.textSecondary,
             border: `1.5px solid ${statusFilter === 'all' ? colors.brandRed : colors.divider}66`,
-            borderRight: 'none',
-            '&:first-of-type': {
-              borderTopLeftRadius: '20px',
-              borderBottomLeftRadius: '20px',
-              borderLeft: `1.5px solid ${statusFilter === 'all' ? colors.brandRed : colors.divider}66`,
-            },
+            boxShadow: statusFilter === 'all' ? `0 4px 12px ${colors.brandRed}40, 0 2px 4px ${colors.brandRed}20` : 'none',
             '&:hover': {
               backgroundColor: statusFilter === 'all' ? colors.brandRed : `${colors.divider}0D`,
+              boxShadow: statusFilter === 'all' ? `0 4px 16px ${colors.brandRed}50` : `0 2px 4px ${colors.divider}20`,
             },
           }}
         >
@@ -511,8 +507,8 @@ const PollsPage = () => {
           onClick={() => setStatusFilter('active')}
           sx={{
             flex: 1,
-            minWidth: { xs: 'calc(50% - 8px)', sm: 'auto' },
-            borderRadius: '20px',
+            minWidth: { xs: 'calc(50% - 1px)', sm: 'auto' },
+            borderRadius: 0,
             textTransform: 'none',
             fontWeight: 600,
             px: 3,
@@ -521,6 +517,7 @@ const PollsPage = () => {
             backgroundColor: statusFilter === 'active' ? colors.success : colors.brandWhite,
             color: statusFilter === 'active' ? colors.brandWhite : colors.success,
             border: `1.5px solid ${statusFilter === 'active' ? colors.success : colors.divider}66`,
+            borderRight: 'none',
             boxShadow: statusFilter === 'active' ? `0 4px 12px ${colors.success}40, 0 2px 4px ${colors.success}20` : 'none',
             '&:hover': {
               backgroundColor: statusFilter === 'active' ? colors.success : `${colors.divider}0D`,
@@ -549,8 +546,8 @@ const PollsPage = () => {
           onClick={() => setStatusFilter('scheduled')}
           sx={{
             flex: 1,
-            minWidth: { xs: 'calc(50% - 8px)', sm: 'auto' },
-            borderRadius: '20px',
+            minWidth: { xs: 'calc(50% - 1px)', sm: 'auto' },
+            borderRadius: 0,
             textTransform: 'none',
             fontWeight: 600,
             px: 3,
@@ -559,6 +556,7 @@ const PollsPage = () => {
             backgroundColor: statusFilter === 'scheduled' ? colors.info : colors.brandWhite,
             color: statusFilter === 'scheduled' ? colors.brandWhite : colors.info,
             border: `1.5px solid ${statusFilter === 'scheduled' ? colors.info : colors.divider}66`,
+            borderRight: 'none',
             boxShadow: statusFilter === 'scheduled' ? `0 4px 12px ${colors.info}40, 0 2px 4px ${colors.info}20` : 'none',
             '&:hover': {
               backgroundColor: statusFilter === 'scheduled' ? colors.info : `${colors.divider}0D`,
@@ -587,8 +585,8 @@ const PollsPage = () => {
           onClick={() => setStatusFilter('closed')}
           sx={{
             flex: 1,
-            minWidth: { xs: 'calc(50% - 8px)', sm: 'auto' },
-            borderRadius: '20px',
+            minWidth: { xs: 'calc(50% - 1px)', sm: 'auto' },
+            borderRadius: 0,
             textTransform: 'none',
             fontWeight: 600,
             px: 3,
@@ -597,6 +595,11 @@ const PollsPage = () => {
             backgroundColor: statusFilter === 'closed' ? colors.textSecondary : colors.brandWhite,
             color: statusFilter === 'closed' ? colors.brandWhite : colors.textSecondary,
             border: `1.5px solid ${statusFilter === 'closed' ? colors.textSecondary : colors.divider}66`,
+            '&:last-of-type': {
+              borderTopRightRadius: '20px',
+              borderBottomRightRadius: '20px',
+              borderRight: `1.5px solid ${statusFilter === 'closed' ? colors.textSecondary : colors.divider}66`,
+            },
             boxShadow: statusFilter === 'closed' ? `0 4px 12px ${colors.textSecondary}40, 0 2px 4px ${colors.textSecondary}20` : 'none',
             '&:hover': {
               backgroundColor: statusFilter === 'closed' ? colors.textSecondary : `${colors.divider}0D`,
