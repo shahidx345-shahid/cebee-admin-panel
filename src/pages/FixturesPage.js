@@ -11,6 +11,15 @@ import {
   Select,
   MenuItem,
   FormControl,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  InputAdornment,
+  Checkbox,
+  FormControlLabel,
+  Alert,
 } from '@mui/material';
 import {
   Add,
@@ -32,6 +41,9 @@ import {
   Check,
   Stadium,
   Lock,
+  Person,
+  Info,
+  CalendarToday,
 } from '@mui/icons-material';
 import { colors, constants } from '../config/theme';
 import SearchBar from '../components/common/SearchBar';
@@ -50,6 +62,15 @@ const FixturesPage = () => {
   const [selectedSort, setSelectedSort] = useState('dateNewest');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [resultsModalOpen, setResultsModalOpen] = useState(false);
+  const [selectedFixture, setSelectedFixture] = useState(null);
+  const [resultsForm, setResultsForm] = useState({
+    homeScore: '',
+    awayScore: '',
+    firstGoalScorer: '',
+    firstGoalMinute: '',
+    markAsCompleted: false,
+  });
 
   useEffect(() => {
     loadFixtures();
@@ -58,6 +79,49 @@ const FixturesPage = () => {
   useEffect(() => {
     filterAndSortFixtures();
   }, [fixtures, searchQuery, selectedStatus, selectedSort]);
+
+  const handleCloseResultsModal = () => {
+    setResultsModalOpen(false);
+    setSelectedFixture(null);
+    setResultsForm({
+      homeScore: '',
+      awayScore: '',
+      firstGoalScorer: '',
+      firstGoalMinute: '',
+      markAsCompleted: false,
+    });
+  };
+
+  const handleUpdateResults = async () => {
+    if (!selectedFixture) return;
+    
+    // Validate form
+    if (!resultsForm.homeScore || !resultsForm.awayScore) {
+      alert('Please enter both home and away scores');
+      return;
+    }
+    
+    if (resultsForm.markAsCompleted && (!resultsForm.firstGoalScorer || !resultsForm.firstGoalMinute)) {
+      alert('Please fill all fields to mark as completed');
+      return;
+    }
+    
+    try {
+      // Here you would update the fixture in Firebase
+      // await updateDoc(doc(db, 'fixtures', selectedFixture.id), { ... });
+      
+      console.log('Updating results:', resultsForm);
+      handleCloseResultsModal();
+      // Reload fixtures
+      loadFixtures();
+    } catch (error) {
+      console.error('Error updating results:', error);
+      alert('Failed to update results');
+    }
+  };
+
+  const isFormValid = resultsForm.homeScore && resultsForm.awayScore && 
+                      resultsForm.firstGoalScorer && resultsForm.firstGoalMinute;
 
   const loadFixtures = async () => {
     try {
@@ -530,27 +594,44 @@ const FixturesPage = () => {
     {
       id: 'action',
       label: 'Action',
-      render: (_, row) => (
-        <Button
-          onClick={(e) => {
-            e.stopPropagation();
-            navigate(`/fixtures/details/${row.id}`);
-          }}
-          sx={{
-            minWidth: 40,
-            width: 40,
-            height: 40,
-            padding: 0,
-            backgroundColor: colors.brandRed,
-            borderRadius: '8px',
-            '&:hover': {
-              backgroundColor: colors.brandDarkRed,
-            },
-          }}
-        >
-          <Stadium sx={{ fontSize: 20, color: colors.brandWhite }} />
-        </Button>
-      ),
+      render: (_, row) => {
+        const status = row.matchStatus || row.status;
+        const isResultPending = status === 'resultsProcessing' || status === 'pending';
+        
+        return (
+          <Button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (isResultPending) {
+                setSelectedFixture(row);
+                setResultsForm({
+                  homeScore: row.homeScore || '',
+                  awayScore: row.awayScore || '',
+                  firstGoalScorer: row.firstGoalScorer || '',
+                  firstGoalMinute: row.firstGoalMinute || '',
+                  markAsCompleted: false,
+                });
+                setResultsModalOpen(true);
+              } else {
+                navigate(`/fixtures/details/${row.id}`);
+              }
+            }}
+            sx={{
+              minWidth: 40,
+              width: 40,
+              height: 40,
+              padding: 0,
+              backgroundColor: colors.brandRed,
+              borderRadius: '8px',
+              '&:hover': {
+                backgroundColor: colors.brandDarkRed,
+              },
+            }}
+          >
+            <Stadium sx={{ fontSize: 20, color: colors.brandWhite }} />
+          </Button>
+        );
+      },
     },
   ];
 
@@ -882,6 +963,305 @@ const FixturesPage = () => {
         onRowClick={(row) => navigate(`/fixtures/details/${row.id}`)}
         emptyMessage="No fixtures found"
       />
+    </Box>
+  );
+};
+
+  return (
+    <Box sx={{ width: '100%', maxWidth: '100%' }}>
+      {/* ... existing code ... */}
+      
+      {/* Enter Match Results Modal */}
+      <Dialog
+        open={resultsModalOpen}
+        onClose={handleCloseResultsModal}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: '16px',
+            boxShadow: `0 8px 24px ${colors.shadow}33`,
+          },
+        }}
+      >
+        <DialogTitle sx={{ pb: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Box
+              sx={{
+                width: 40,
+                height: 40,
+                borderRadius: '10px',
+                backgroundColor: colors.brandRed,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Stadium sx={{ fontSize: 24, color: colors.brandWhite }} />
+            </Box>
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: colors.brandBlack }}>
+                Enter Match Results
+              </Typography>
+              {selectedFixture && (
+                <Typography variant="caption" sx={{ color: colors.textSecondary, fontSize: 12 }}>
+                  {selectedFixture.id?.substring(0, 10) || 'MATCH_ID'}
+                </Typography>
+              )}
+            </Box>
+          </Box>
+        </DialogTitle>
+        
+        <DialogContent sx={{ pt: 2 }}>
+          {/* Match Information */}
+          {selectedFixture && (
+            <Box
+              sx={{
+                backgroundColor: colors.brandRed,
+                borderRadius: '12px',
+                padding: 1.5,
+                mb: 2.5,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+              }}
+            >
+              <CalendarToday sx={{ fontSize: 20, color: colors.brandWhite }} />
+              <Typography sx={{ fontWeight: 600, color: colors.brandWhite, fontSize: 14 }}>
+                {selectedFixture.homeTeam || 'TBD'} vs {selectedFixture.awayTeam || 'TBD'}
+              </Typography>
+            </Box>
+          )}
+
+          {/* Prediction Requirements Info */}
+          <Alert
+            icon={<Info sx={{ fontSize: 18 }} />}
+            severity="info"
+            sx={{
+              mb: 2.5,
+              borderRadius: '12px',
+              backgroundColor: `${colors.info}0D`,
+              border: `1px solid ${colors.info}26`,
+              '& .MuiAlert-icon': {
+                color: colors.info,
+              },
+            }}
+          >
+            <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5, color: colors.brandBlack }}>
+              All 4 prediction outcomes require results:
+            </Typography>
+            <Box component="ul" sx={{ m: 0, pl: 2, fontSize: 12, color: colors.textSecondary }}>
+              <li>Correct Scoreline</li>
+              <li>Total Goal Range</li>
+              <li>First Player to Score</li>
+              <li>First Goal Minute</li>
+            </Box>
+          </Alert>
+
+          {/* 1. Final Score */}
+          <Box sx={{ mb: 2.5 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+              <Box
+                sx={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: '8px',
+                  backgroundColor: colors.brandRed,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Stadium sx={{ fontSize: 18, color: colors.brandWhite }} />
+              </Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, color: colors.brandBlack }}>
+                1. Final Score
+              </Typography>
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <TextField
+                fullWidth
+                label={selectedFixture?.homeTeam || 'Home Team'}
+                value={resultsForm.homeScore}
+                onChange={(e) => setResultsForm({ ...resultsForm, homeScore: e.target.value })}
+                type="number"
+                inputProps={{ min: 0, max: 99 }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '12px',
+                  },
+                }}
+              />
+              <Typography variant="h6" sx={{ fontWeight: 700, color: colors.brandBlack, px: 1 }}>
+                -
+              </Typography>
+              <TextField
+                fullWidth
+                label={selectedFixture?.awayTeam || 'Away Team'}
+                value={resultsForm.awayScore}
+                onChange={(e) => setResultsForm({ ...resultsForm, awayScore: e.target.value })}
+                type="number"
+                inputProps={{ min: 0, max: 99 }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '12px',
+                  },
+                }}
+              />
+            </Box>
+            <Typography variant="caption" sx={{ color: colors.textSecondary, fontSize: 11, mt: 0.5, display: 'block' }}>
+              This also determines Total Goal Range outcome
+            </Typography>
+          </Box>
+
+          {/* 2. First Goal Scorer */}
+          <Box sx={{ mb: 2.5 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+              <Box
+                sx={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: '8px',
+                  backgroundColor: colors.brandRed,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Person sx={{ fontSize: 18, color: colors.brandWhite }} />
+              </Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, color: colors.brandBlack }}>
+                2. First Goal Scorer (Featured Team)
+              </Typography>
+            </Box>
+            <TextField
+              fullWidth
+              placeholder="Enter player name..."
+              value={resultsForm.firstGoalScorer}
+              onChange={(e) => setResultsForm({ ...resultsForm, firstGoalScorer: e.target.value })}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Person sx={{ fontSize: 18, color: colors.brandRed }} />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: '12px',
+                },
+              }}
+            />
+          </Box>
+
+          {/* 3. First Goal Minute */}
+          <Box sx={{ mb: 2.5 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+              <Box
+                sx={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: '8px',
+                  backgroundColor: colors.brandRed,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <AccessTime sx={{ fontSize: 18, color: colors.brandWhite }} />
+              </Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, color: colors.brandBlack }}>
+                3. First Goal Minute
+              </Typography>
+            </Box>
+            <TextField
+              fullWidth
+              placeholder="Enter minute (1-120)..."
+              value={resultsForm.firstGoalMinute}
+              onChange={(e) => setResultsForm({ ...resultsForm, firstGoalMinute: e.target.value })}
+              type="number"
+              inputProps={{ min: 1, max: 120 }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <AccessTime sx={{ fontSize: 18, color: colors.brandRed }} />
+                  </InputAdornment>
+                ),
+              }}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: '12px',
+                },
+              }}
+            />
+          </Box>
+
+          {/* Mark as Completed Checkbox */}
+          <Box sx={{ mb: 1 }}>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={resultsForm.markAsCompleted}
+                  onChange={(e) => setResultsForm({ ...resultsForm, markAsCompleted: e.target.checked })}
+                  disabled={!isFormValid}
+                  sx={{
+                    color: colors.brandRed,
+                    '&.Mui-checked': {
+                      color: colors.brandRed,
+                    },
+                    '&.Mui-disabled': {
+                      color: colors.textSecondary,
+                    },
+                  }}
+                />
+              }
+              label={
+                <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack }}>
+                  Mark as Completed
+                </Typography>
+              }
+            />
+            {!isFormValid && (
+              <Typography variant="caption" sx={{ color: colors.warning, fontSize: 11, display: 'block', mt: 0.5, ml: 4.5 }}>
+                Fill all outcome fields to enable completion
+              </Typography>
+            )}
+          </Box>
+        </DialogContent>
+
+        <DialogActions sx={{ px: 3, pb: 2.5, pt: 1 }}>
+          <Button
+            onClick={handleCloseResultsModal}
+            sx={{
+              color: colors.brandBlack,
+              textTransform: 'none',
+              fontWeight: 600,
+              '&:hover': {
+                backgroundColor: `${colors.brandBlack}0A`,
+              },
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleUpdateResults}
+            variant="contained"
+            startIcon={<Check sx={{ fontSize: 18 }} />}
+            sx={{
+              background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
+              borderRadius: '8px',
+              textTransform: 'none',
+              fontWeight: 600,
+              px: 2,
+              '&:hover': {
+                background: `linear-gradient(135deg, ${colors.brandDarkRed} 0%, ${colors.brandRed} 100%)`,
+              },
+            }}
+          >
+            Update Results
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
