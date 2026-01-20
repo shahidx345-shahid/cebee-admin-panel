@@ -35,7 +35,6 @@ import {
   AccessTime,
   PlayArrow,
   ArrowUpward,
-  List,
   ArrowDownward,
   ArrowUpward as ArrowUp,
   Sort,
