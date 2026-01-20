@@ -463,7 +463,7 @@ const PollsPage = () => {
       </Grid>
 
       {/* Filter Buttons */}
-      <Box sx={{ mb: 3, display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', gap: 1.5, flexWrap: 'wrap' }}>
         <Button
           variant={statusFilter === 'all' ? 'contained' : 'outlined'}
           onClick={() => setStatusFilter('all')}
