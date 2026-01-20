@@ -694,7 +694,7 @@ const PredictionsPage = () => {
       {/* Status Toggle Buttons */}
       <Box sx={{ mb: 3, display: 'flex', gap: 1.5 }}>
         <Button
-          variant={selectedStatus === 'ongoing' ? 'contained' : 'outlined'}
+          variant="outlined"
           onClick={() => setSelectedStatus('ongoing')}
           startIcon={
             <Box
@@ -702,7 +702,7 @@ const PredictionsPage = () => {
                 width: 24,
                 height: 24,
                 borderRadius: '50%',
-                backgroundColor: selectedStatus === 'ongoing' ? colors.brandWhite : colors.brandRed,
+                backgroundColor: colors.brandRed,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -711,7 +711,7 @@ const PredictionsPage = () => {
               <PlayArrow 
                 sx={{ 
                   fontSize: 14, 
-                  color: selectedStatus === 'ongoing' ? colors.brandRed : colors.brandWhite 
+                  color: colors.brandWhite 
                 }} 
               />
             </Box>
@@ -722,11 +722,13 @@ const PredictionsPage = () => {
             fontWeight: 600,
             px: 3,
             py: 1.5,
-            backgroundColor: selectedStatus === 'ongoing' ? colors.brandRed : colors.brandWhite,
-            color: selectedStatus === 'ongoing' ? colors.brandWhite : colors.textSecondary,
-            border: `1.5px solid ${selectedStatus === 'ongoing' ? colors.brandRed : colors.divider}66`,
+            backgroundColor: colors.brandWhite,
+            color: colors.textSecondary,
+            border: `1.5px solid ${colors.divider}66`,
+            boxShadow: selectedStatus === 'ongoing' ? `0 2px 8px ${colors.brandRed}33` : 'none',
             '&:hover': {
-              backgroundColor: selectedStatus === 'ongoing' ? colors.brandRed : `${colors.divider}0D`,
+              backgroundColor: `${colors.divider}0D`,
+              boxShadow: `0 2px 8px ${colors.brandRed}33`,
             },
           }}
         >
@@ -761,11 +763,11 @@ const PredictionsPage = () => {
             fontWeight: 600,
             px: 3,
             py: 1.5,
-            backgroundColor: selectedStatus === 'completed' ? colors.brandRed : colors.brandWhite,
+            backgroundColor: selectedStatus === 'completed' ? colors.success : colors.brandWhite,
             color: selectedStatus === 'completed' ? colors.brandWhite : colors.textSecondary,
-            border: `1.5px solid ${selectedStatus === 'completed' ? colors.brandRed : colors.divider}66`,
+            border: `1.5px solid ${selectedStatus === 'completed' ? colors.success : colors.divider}66`,
             '&:hover': {
-              backgroundColor: selectedStatus === 'completed' ? colors.brandRed : `${colors.divider}0D`,
+              backgroundColor: selectedStatus === 'completed' ? colors.success : `${colors.divider}0D`,
             },
           }}
         >
