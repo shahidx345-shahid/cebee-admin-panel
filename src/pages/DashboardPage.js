@@ -137,10 +137,10 @@ const StatCard = ({ title, value, subtitle, icon: Icon, color, isPrimary = false
 
 const DashboardPage = () => {
   const [dashboardStats, setDashboardStats] = useState({
-    totalUsers: 0,
-    activeUsers: 0,
-    totalSPIssued: 0,
-    estimatedRewardsValue: 0,
+    totalUsers: 12345,
+    activeUsers: 8932,
+    totalSPIssued: 2458920,
+    estimatedRewardsValue: 45678,
   });
 
   useEffect(() => {
