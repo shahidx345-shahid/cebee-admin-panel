@@ -5,6 +5,7 @@ import {
   Typography,
   Button,
   Card,
+  CardContent,
   Grid,
   Chip,
   Tabs,
@@ -22,6 +23,9 @@ import {
   Edit,
   Schedule,
   CheckCircle,
+  AccessTime,
+  PlayArrow,
+  ArrowUpward,
 } from '@mui/icons-material';
 import { colors, constants } from '../config/theme';
 import SearchBar from '../components/common/SearchBar';
@@ -140,6 +144,115 @@ const FixturesPage = () => {
     );
   };
 
+  // Dashboard-style StatCard component
+  const StatCard = ({ title, value, subtitle, icon: Icon, color, isPrimary = false }) => {
+    return (
+      <Card
+        sx={{
+          padding: { xs: 2, md: 2.5 },
+          borderRadius: '20px',
+          background: isPrimary
+            ? `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`
+            : colors.brandWhite,
+          border: isPrimary
+            ? 'none'
+            : `1.5px solid ${color}26`,
+          boxShadow: isPrimary
+            ? `0 6px 18px ${colors.brandRed}40`
+            : `0 6px 14px ${color}1F`,
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+        }}
+      >
+        <CardContent sx={{ padding: 0, '&:last-child': { paddingBottom: 0 }, position: 'relative' }}>
+          {/* Status Tag at Top Right */}
+          <Box
+            sx={{
+              position: 'absolute',
+              top: 0,
+              right: 0,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 0.5,
+            }}
+          >
+            <Chip
+              label={subtitle}
+              icon={<ArrowUpward sx={{ fontSize: 12 }} />}
+              size="small"
+              sx={{
+                backgroundColor: `${colors.success}1A`,
+                color: colors.success,
+                fontWeight: 500,
+                fontSize: { xs: 10.5, md: 11.5 },
+                height: 24,
+                '& .MuiChip-icon': {
+                  color: colors.success,
+                  fontSize: 12,
+                },
+              }}
+            />
+          </Box>
+
+          {/* Icon at Top Left */}
+          <Box
+            sx={{
+              padding: { xs: 1.25, md: 1.5 },
+              width: 'fit-content',
+              background: isPrimary
+                ? `${colors.brandWhite}33`
+                : `${color}1F`,
+              borderRadius: '14px',
+              boxShadow: isPrimary
+                ? '0 3px 8px rgba(0, 0, 0, 0.12)'
+                : 'none',
+              mb: 2,
+            }}
+          >
+            <Icon
+              sx={{
+                fontSize: { xs: 24, md: 28 },
+                color: isPrimary ? colors.brandWhite : color,
+              }}
+            />
+          </Box>
+
+          {/* Large Count Number */}
+          <Box>
+            <Typography
+              variant="h4"
+              sx={{
+                fontWeight: 700,
+                color: isPrimary ? colors.brandWhite : colors.brandBlack,
+                letterSpacing: -0.8,
+                fontSize: { xs: 24, md: 30 },
+                mb: 0.75,
+              }}
+            >
+              {value}
+            </Typography>
+            <Typography
+              variant="body2"
+              sx={{
+                fontWeight: 600,
+                color: isPrimary ? `${colors.brandWhite}F0` : colors.brandBlack,
+                fontSize: { xs: 13, md: 14 },
+                mb: 0.5,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {title}
+            </Typography>
+          </Box>
+        </CardContent>
+      </Card>
+    );
+  };
+
   const columns = [
     {
       id: 'match',
@@ -217,44 +330,58 @@ const FixturesPage = () => {
         </Button>
       </Box>
 
-      {/* Stats Cards */}
+      {/* Stats Cards - Dashboard Style */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
-        {[
-          { label: 'Total Fixtures', value: fixtures.length, color: colors.brandRed },
-          {
-            label: 'Scheduled',
-            value: fixtures.filter((f) => (f.matchStatus || f.status) === 'scheduled').length,
-            color: colors.textSecondary,
-          },
-          {
-            label: 'Live',
-            value: fixtures.filter((f) => (f.matchStatus || f.status) === 'live').length,
-            color: colors.error,
-          },
-          {
-            label: 'Completed',
-            value: fixtures.filter((f) => (f.matchStatus || f.status) === 'completed').length,
-            color: colors.success,
-          },
-        ].map((stat, index) => (
-          <Grid item xs={6} md={3} key={index}>
-            <Card
-              sx={{
-                padding: 2,
-                background: `linear-gradient(135deg, ${stat.color}1A 0%, ${stat.color}0D 100%)`,
-                border: `1.5px solid ${stat.color}33`,
-                borderRadius: '16px',
-              }}
-            >
-              <Typography variant="h4" sx={{ fontWeight: 700, color: stat.color, mb: 0.5 }}>
-                {stat.value}
-              </Typography>
-              <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13 }}>
-                {stat.label}
-              </Typography>
-            </Card>
-          </Grid>
-        ))}
+        <Grid item xs={6} md={3}>
+          <StatCard
+            title="Scheduled"
+            value={fixtures.filter((f) => (f.matchStatus || f.status) === 'scheduled').length.toString()}
+            subtitle="Draft"
+            icon={AccessTime}
+            color="#1976d2"
+            isPrimary={false}
+          />
+        </Grid>
+        <Grid item xs={6} md={3}>
+          <StatCard
+            title="Published"
+            value={fixtures.filter((f) => (f.matchStatus || f.status) === 'published').length.toString()}
+            subtitle="Predictions Open"
+            icon={Visibility}
+            color="#1976d2"
+            isPrimary={false}
+          />
+        </Grid>
+        <Grid item xs={6} md={3}>
+          <StatCard
+            title="Live Matches"
+            value={fixtures.filter((f) => (f.matchStatus || f.status) === 'live').length.toString()}
+            subtitle="Now"
+            icon={PlayArrow}
+            color={colors.brandRed}
+            isPrimary={true}
+          />
+        </Grid>
+        <Grid item xs={6} md={3}>
+          <StatCard
+            title="Result Pending"
+            value={fixtures.filter((f) => (f.matchStatus || f.status) === 'resultsProcessing').length.toString()}
+            subtitle="Action Required"
+            icon={Edit}
+            color="#ed6c02"
+            isPrimary={false}
+          />
+        </Grid>
+        <Grid item xs={6} md={3}>
+          <StatCard
+            title="Completed"
+            value={fixtures.filter((f) => (f.matchStatus || f.status) === 'completed').length.toString()}
+            subtitle="SP Distributed"
+            icon={CheckCircle}
+            color={colors.success}
+            isPrimary={false}
+          />
+        </Grid>
       </Grid>
 
       {/* Status Tabs */}
