@@ -5,13 +5,14 @@ import {
   Typography,
   Button,
   Card,
+  CardContent,
   Grid,
   Chip,
   CircularProgress,
   Stepper,
   Step,
   StepLabel,
-  Alert,
+  Divider,
 } from '@mui/material';
 import {
   ArrowBack,
@@ -22,6 +23,10 @@ import {
   SportsSoccer,
   AccessTime,
   HourglassEmpty,
+  LocationOn,
+  CalendarToday,
+  People,
+  ArrowUpward,
 } from '@mui/icons-material';
 import { colors, constants } from '../config/theme';
 import SearchBar from '../components/common/SearchBar';
@@ -268,8 +273,70 @@ const FixtureDetailsPage = () => {
     page * rowsPerPage + rowsPerPage
   );
 
+  const getStatusInfo = () => {
+    const status = fixture.matchStatus || fixture.status;
+    const statusMap = {
+      scheduled: 'predictionOpen',
+      published: 'predictionOpen',
+      predictionOpen: 'predictionOpen',
+      predictionLocked: 'predictionLocked',
+      locked: 'predictionLocked',
+      live: 'live',
+      fullTime: 'fullTimeProcessing',
+      resultsProcessing: 'fullTimeProcessing',
+      fullTimeProcessing: 'fullTimeProcessing',
+      completed: 'fullTimeCompleted',
+      fullTimeCompleted: 'fullTimeCompleted',
+    };
+    return statusMap[status] || 'predictionOpen';
+  };
+
+  const getStatusCardConfig = () => {
+    const status = getStatusInfo();
+    const configs = {
+      predictionOpen: {
+        title: 'Prediction Open',
+        subtitle: 'Users can predict',
+        icon: AccessTime,
+        color: colors.info,
+        isPrimary: false,
+      },
+      predictionLocked: {
+        title: 'Prediction Locked',
+        subtitle: 'Predictions closed',
+        icon: Lock,
+        color: colors.warning,
+        isPrimary: false,
+      },
+      live: {
+        title: 'Live Match',
+        subtitle: 'Match in progress',
+        icon: PlayCircle,
+        color: colors.brandRed,
+        isPrimary: true,
+      },
+      fullTimeProcessing: {
+        title: 'Full Time',
+        subtitle: 'Results Processing',
+        icon: HourglassEmpty,
+        color: colors.warning,
+        isPrimary: false,
+      },
+      fullTimeCompleted: {
+        title: 'Full Time',
+        subtitle: 'Match Completed',
+        icon: CheckCircle,
+        color: colors.success,
+        isPrimary: false,
+      },
+    };
+    return configs[status];
+  };
+
+  const statusConfig = getStatusCardConfig();
+
   return (
-    <Box sx={{ width: '100%', maxWidth: '100%' }}>
+    <Box sx={{ width: '100%', maxWidth: '100%', pb: 4 }}>
       {/* Back Button */}
       <Button
         startIcon={<ArrowBack />}
@@ -279,121 +346,310 @@ const FixtureDetailsPage = () => {
           color: colors.brandRed,
           textTransform: 'none',
           fontWeight: 600,
+          '&:hover': {
+            backgroundColor: `${colors.brandRed}0A`,
+          },
         }}
       >
         Back to Fixtures
       </Button>
 
-      {/* Match Flow Indicator */}
-      <Card sx={{ padding: 3, mb: 3, borderRadius: '16px' }}>
-        <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
-          Match Flow Status
-        </Typography>
-        <Stepper activeStep={getActiveStep()} alternativeLabel>
-          {steps.map((label) => (
-            <Step key={label}>
-              <StepLabel>{label}</StepLabel>
-            </Step>
-          ))}
-        </Stepper>
-      </Card>
-
-      {/* Fixture Info */}
-      <Card sx={{ padding: 3, mb: 3, borderRadius: '16px' }}>
-        <Grid container spacing={3}>
-          <Grid item xs={12} md={8}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+      {/* Match Flow Status Card */}
+      <Card
+        sx={{
+          padding: { xs: 2.5, md: 3 },
+          mb: 3,
+          borderRadius: '20px',
+          background: statusConfig.isPrimary
+            ? `linear-gradient(135deg, ${statusConfig.color} 0%, ${colors.brandDarkRed} 100%)`
+            : colors.brandWhite,
+          border: statusConfig.isPrimary
+            ? 'none'
+            : `1.5px solid ${statusConfig.color}26`,
+          boxShadow: statusConfig.isPrimary
+            ? `0 6px 18px ${statusConfig.color}40`
+            : `0 6px 14px ${statusConfig.color}1F`,
+        }}
+      >
+        <CardContent sx={{ padding: 0, '&:last-child': { paddingBottom: 0 } }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               <Box
                 sx={{
-                  padding: 2,
-                  background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
-                  borderRadius: '16px',
+                  padding: { xs: 1.25, md: 1.5 },
+                  background: statusConfig.isPrimary
+                    ? `${colors.brandWhite}33`
+                    : `${statusConfig.color}1F`,
+                  borderRadius: '14px',
+                  boxShadow: statusConfig.isPrimary
+                    ? '0 3px 8px rgba(0, 0, 0, 0.12)'
+                    : 'none',
                 }}
               >
-                <SportsSoccer sx={{ fontSize: 32, color: colors.brandWhite }} />
+                <statusConfig.icon
+                  sx={{
+                    fontSize: { xs: 28, md: 32 },
+                    color: statusConfig.isPrimary ? colors.brandWhite : statusConfig.color,
+                  }}
+                />
               </Box>
               <Box>
-                <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>
-                  {fixture.homeTeam || 'TBD'} vs {fixture.awayTeam || 'TBD'}
+                <Typography
+                  variant="h5"
+                  sx={{
+                    fontWeight: 700,
+                    color: statusConfig.isPrimary ? colors.brandWhite : colors.brandBlack,
+                    mb: 0.5,
+                  }}
+                >
+                  {statusConfig.title}
                 </Typography>
-                <Typography variant="body2" sx={{ color: colors.textSecondary }}>
-                  {fixture.league || 'N/A'} • {fixture.venue || 'TBD'}
-                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <Typography
+                    variant="body2"
+                    sx={{
+                      fontWeight: 500,
+                      color: statusConfig.isPrimary ? `${colors.brandWhite}F0` : statusConfig.color,
+                      fontSize: 13,
+                    }}
+                  >
+                    {statusConfig.subtitle}
+                  </Typography>
+                  <ArrowUpward
+                    sx={{
+                      fontSize: 12,
+                      color: statusConfig.isPrimary ? `${colors.brandWhite}B3` : statusConfig.color,
+                    }}
+                  />
+                </Box>
               </Box>
             </Box>
-            <Grid container spacing={2}>
-              <Grid item xs={6} md={3}>
-                <Typography variant="caption" sx={{ color: colors.textSecondary }}>
+            <Box>
+              <Stepper activeStep={getActiveStep()} sx={{ minWidth: { xs: '100%', md: 500 } }}>
+                {steps.map((label, index) => (
+                  <Step key={label} completed={index < getActiveStep()}>
+                    <StepLabel
+                      sx={{
+                        '& .MuiStepLabel-label': {
+                          fontSize: 11,
+                          fontWeight: index === getActiveStep() ? 600 : 400,
+                        },
+                      }}
+                    >
+                      {label}
+                    </StepLabel>
+                  </Step>
+                ))}
+              </Stepper>
+            </Box>
+          </Box>
+        </CardContent>
+      </Card>
+
+      {/* Match Information Card */}
+      <Card
+        sx={{
+          padding: { xs: 2.5, md: 3 },
+          mb: 3,
+          borderRadius: '20px',
+          background: colors.brandWhite,
+          border: `1.5px solid ${colors.divider}26`,
+          boxShadow: `0 6px 14px ${colors.shadow}1F`,
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
+          <Box
+            sx={{
+              padding: 2,
+              background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
+              borderRadius: '16px',
+              boxShadow: `0 4px 12px ${colors.brandRed}40`,
+            }}
+          >
+            <SportsSoccer sx={{ fontSize: 36, color: colors.brandWhite }} />
+          </Box>
+          <Box sx={{ flex: 1 }}>
+            <Typography variant="h4" sx={{ fontWeight: 700, mb: 0.5 }}>
+              {fixture.homeTeam || 'TBD'} vs {fixture.awayTeam || 'TBD'}
+            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+              <Chip
+                icon={<SportsSoccer sx={{ fontSize: 16 }} />}
+                label={fixture.league || 'N/A'}
+                size="small"
+                sx={{
+                  backgroundColor: `${colors.info}1A`,
+                  color: colors.info,
+                  fontWeight: 600,
+                  height: 24,
+                }}
+              />
+              <Chip
+                icon={<LocationOn sx={{ fontSize: 16 }} />}
+                label={fixture.venue || 'TBD'}
+                size="small"
+                sx={{
+                  backgroundColor: `${colors.textSecondary}1A`,
+                  color: colors.textSecondary,
+                  fontWeight: 500,
+                  height: 24,
+                }}
+              />
+            </Box>
+          </Box>
+          {fixture.homeScore !== undefined && fixture.awayScore !== undefined && (
+            <Box
+              sx={{
+                padding: 2.5,
+                background: `linear-gradient(135deg, ${colors.success}1A 0%, ${colors.success}0D 100%)`,
+                borderRadius: '16px',
+                border: `1.5px solid ${colors.success}33`,
+                textAlign: 'center',
+                minWidth: 120,
+              }}
+            >
+              <Typography variant="caption" sx={{ color: colors.textSecondary, mb: 0.5, display: 'block' }}>
+                Final Score
+              </Typography>
+              <Typography variant="h4" sx={{ fontWeight: 700, color: colors.success }}>
+                {fixture.homeScore} - {fixture.awayScore}
+              </Typography>
+            </Box>
+          )}
+        </Box>
+
+        <Divider sx={{ my: 2.5 }} />
+
+        <Grid container spacing={3}>
+          <Grid item xs={6} md={3}>
+            <Box
+              sx={{
+                padding: 1.5,
+                background: `${colors.info}0D`,
+                borderRadius: '12px',
+                border: `1px solid ${colors.info}26`,
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                <CalendarToday sx={{ fontSize: 18, color: colors.info }} />
+                <Typography variant="caption" sx={{ color: colors.textSecondary, fontWeight: 600 }}>
                   Kickoff Time
                 </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                  {fixture.kickoffTime
-                    ? format(
-                        fixture.kickoffTime?.toDate
-                          ? fixture.kickoffTime.toDate()
-                          : new Date(fixture.kickoffTime),
-                        'MMM dd, yyyy • HH:mm'
-                      )
-                    : 'TBD'}
-                </Typography>
-              </Grid>
-              <Grid item xs={6} md={3}>
-                <Typography variant="caption" sx={{ color: colors.textSecondary }}>
-                  Status
-                </Typography>
-                <Box sx={{ mt: 0.5 }}>{getStatusChip(fixture.matchStatus || fixture.status)}</Box>
-              </Grid>
-              <Grid item xs={6} md={3}>
-                <Typography variant="caption" sx={{ color: colors.textSecondary }}>
-                  Total Predictions
-                </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                  {predictions.length}
-                </Typography>
-              </Grid>
-              <Grid item xs={6} md={3}>
-                <Typography variant="caption" sx={{ color: colors.textSecondary }}>
-                  Match ID
-                </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                  {fixture.id}
-                </Typography>
-              </Grid>
-            </Grid>
+              </Box>
+              <Typography variant="body1" sx={{ fontWeight: 600, color: colors.brandBlack }}>
+                {fixture.kickoffTime
+                  ? format(
+                      fixture.kickoffTime?.toDate
+                        ? fixture.kickoffTime.toDate()
+                        : new Date(fixture.kickoffTime),
+                      'MMM dd, yyyy'
+                    )
+                  : 'TBD'}
+              </Typography>
+              <Typography variant="body2" sx={{ color: colors.textSecondary, mt: 0.5 }}>
+                {fixture.kickoffTime
+                  ? format(
+                      fixture.kickoffTime?.toDate
+                        ? fixture.kickoffTime.toDate()
+                        : new Date(fixture.kickoffTime),
+                      'HH:mm'
+                    )
+                  : ''}
+              </Typography>
+            </Box>
           </Grid>
-          {fixture.homeScore !== undefined && fixture.awayScore !== undefined && (
-            <Grid item xs={12} md={4}>
-              <Box
-                sx={{
-                  padding: 3,
-                  background: `linear-gradient(135deg, ${colors.success}1A 0%, ${colors.success}0D 100%)`,
-                  borderRadius: '16px',
-                  border: `1.5px solid ${colors.success}33`,
-                  textAlign: 'center',
-                }}
-              >
-                <Typography variant="caption" sx={{ color: colors.textSecondary, mb: 1 }}>
-                  Final Score
-                </Typography>
-                <Typography variant="h3" sx={{ fontWeight: 700, color: colors.success }}>
-                  {fixture.homeScore} - {fixture.awayScore}
+          <Grid item xs={6} md={3}>
+            <Box
+              sx={{
+                padding: 1.5,
+                background: `${statusConfig.color}0D`,
+                borderRadius: '12px',
+                border: `1px solid ${statusConfig.color}26`,
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                <statusConfig.icon sx={{ fontSize: 18, color: statusConfig.color }} />
+                <Typography variant="caption" sx={{ color: colors.textSecondary, fontWeight: 600 }}>
+                  Match Status
                 </Typography>
               </Box>
-            </Grid>
-          )}
+              <Box sx={{ mt: 0.5 }}>{getStatusChip(fixture.matchStatus || fixture.status)}</Box>
+            </Box>
+          </Grid>
+          <Grid item xs={6} md={3}>
+            <Box
+              sx={{
+                padding: 1.5,
+                background: `${colors.success}0D`,
+                borderRadius: '12px',
+                border: `1px solid ${colors.success}26`,
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                <People sx={{ fontSize: 18, color: colors.success }} />
+                <Typography variant="caption" sx={{ color: colors.textSecondary, fontWeight: 600 }}>
+                  Predictions
+                </Typography>
+              </Box>
+              <Typography variant="h5" sx={{ fontWeight: 700, color: colors.success }}>
+                {predictions.length}
+              </Typography>
+              <Typography variant="caption" sx={{ color: colors.textSecondary, mt: 0.5, display: 'block' }}>
+                Total predictions
+              </Typography>
+            </Box>
+          </Grid>
+          <Grid item xs={6} md={3}>
+            <Box
+              sx={{
+                padding: 1.5,
+                background: `${colors.textSecondary}0D`,
+                borderRadius: '12px',
+                border: `1px solid ${colors.textSecondary}26`,
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                <Schedule sx={{ fontSize: 18, color: colors.textSecondary }} />
+                <Typography variant="caption" sx={{ color: colors.textSecondary, fontWeight: 600 }}>
+                  Match ID
+                </Typography>
+              </Box>
+              <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack, fontFamily: 'monospace' }}>
+                {fixture.id?.substring(0, 8)}...
+              </Typography>
+            </Box>
+          </Grid>
         </Grid>
       </Card>
 
-      {/* Predictions */}
-      <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
-        User Predictions ({predictions.length})
-      </Typography>
-      <Card sx={{ padding: 2.5, mb: 3, borderRadius: '16px' }}>
+      {/* Predictions Section */}
+      <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+        <Typography variant="h5" sx={{ fontWeight: 700 }}>
+          User Predictions
+        </Typography>
+        <Chip
+          label={`${predictions.length} Total`}
+          sx={{
+            backgroundColor: `${colors.info}1A`,
+            color: colors.info,
+            fontWeight: 600,
+          }}
+        />
+      </Box>
+      <Card
+        sx={{
+          padding: { xs: 2, md: 2.5 },
+          borderRadius: '20px',
+          background: colors.brandWhite,
+          border: `1.5px solid ${colors.divider}26`,
+          boxShadow: `0 6px 14px ${colors.shadow}1F`,
+        }}
+      >
         <SearchBar
           value={searchQuery}
           onChange={setSearchQuery}
           placeholder="Search by username or user ID..."
-          sx={{ mb: 2 }}
+          sx={{ mb: 2.5 }}
         />
         <DataTable
           columns={columns}
