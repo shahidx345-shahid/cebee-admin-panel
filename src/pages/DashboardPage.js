@@ -180,12 +180,12 @@ const DashboardPage = () => {
       // Calculate estimated rewards value (assuming $0.02 per SP as example)
       const estimatedRewardsValue = totalSPIssued * 0.02;
 
-      // Use default values if no data or very low values
+      // Use default values if no data or very low values (less than threshold)
       const finalStats = {
-        totalUsers: totalUsers > 0 ? totalUsers : 45678,
-        activeUsers: activeUsers > 0 ? activeUsers : 34256,
-        totalSPIssued: totalSPIssued > 0 ? totalSPIssued : 12458920,
-        estimatedRewardsValue: estimatedRewardsValue > 0 ? estimatedRewardsValue : 249178,
+        totalUsers: totalUsers >= 10 ? totalUsers : 45678,
+        activeUsers: activeUsers >= 10 ? activeUsers : 34256,
+        totalSPIssued: totalSPIssued >= 10000 ? totalSPIssued : 12458920,
+        estimatedRewardsValue: estimatedRewardsValue >= 1000 ? estimatedRewardsValue : 249178,
       };
 
       setDashboardStats(finalStats);
