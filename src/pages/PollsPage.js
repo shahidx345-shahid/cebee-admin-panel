@@ -593,14 +593,14 @@ const PollsPage = () => {
               width: 24,
               height: 24,
               borderRadius: '6px',
-              backgroundColor: `${colors.divider}33`,
+              backgroundColor: statusFilter === 'closed' ? `${colors.brandWhite}33` : `${colors.textSecondary}1A`,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               mr: 1.5,
             }}
           >
-            <CheckCircle sx={{ fontSize: 14, color: colors.textSecondary }} />
+            <CheckCircle sx={{ fontSize: 14, color: statusFilter === 'closed' ? colors.brandWhite : colors.textSecondary }} />
           </Box>
           Closed
         </Button>
