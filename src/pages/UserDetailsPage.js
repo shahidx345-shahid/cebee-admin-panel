@@ -45,6 +45,7 @@ const UserDetailsPage = () => {
   }, [id]);
 
   const generateDummyUserData = (userId) => {
+    const countries = ['United States', 'United Kingdom', 'Canada', 'Australia', 'Germany', 'France', 'Spain', 'Italy', 'Brazil', 'India', 'Nigeria', 'South Africa', 'Kenya', 'Ghana'];
     return {
       id: userId,
       username: 'john_doe_0',
@@ -52,6 +53,7 @@ const UserDetailsPage = () => {
       fullName: 'John Doe',
       firstName: 'John',
       lastName: 'Doe',
+      country: countries[Math.floor(Math.random() * countries.length)],
       isActive: true,
       isVerified: true,
       isBlocked: false,
@@ -286,7 +288,7 @@ const UserDetailsPage = () => {
               </Box>
             </Box>
             <Grid container spacing={2}>
-              <Grid item xs={6} md={3}>
+              <Grid item xs={6} md={2.4}>
                 <Typography variant="caption" sx={{ color: colors.textSecondary }}>
                   User ID
                 </Typography>
@@ -294,7 +296,7 @@ const UserDetailsPage = () => {
                   {user.id}
                 </Typography>
               </Grid>
-              <Grid item xs={6} md={3}>
+              <Grid item xs={6} md={2.4}>
                 <Typography variant="caption" sx={{ color: colors.textSecondary }}>
                   Account Status
                 </Typography>
@@ -302,7 +304,15 @@ const UserDetailsPage = () => {
                   {getAccountStatusChip()}
                 </Box>
               </Grid>
-              <Grid item xs={6} md={3}>
+              <Grid item xs={6} md={2.4}>
+                <Typography variant="caption" sx={{ color: colors.textSecondary }}>
+                  Country
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                  {user.country || 'N/A'}
+                </Typography>
+              </Grid>
+              <Grid item xs={6} md={2.4}>
                 <Typography variant="caption" sx={{ color: colors.textSecondary }}>
                   Registration Date
                 </Typography>
@@ -312,7 +322,7 @@ const UserDetailsPage = () => {
                     : 'N/A'}
                 </Typography>
               </Grid>
-              <Grid item xs={6} md={3}>
+              <Grid item xs={6} md={2.4}>
                 <Typography variant="caption" sx={{ color: colors.textSecondary }}>
                   Last Login Date
                 </Typography>

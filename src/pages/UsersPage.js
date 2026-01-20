@@ -64,6 +64,7 @@ const UsersPage = () => {
   const generateDummyUsers = () => {
     const firstNames = ['John', 'Jane', 'Mike', 'Sarah', 'David', 'Emily', 'Chris', 'Lisa', 'Tom', 'Amy'];
     const lastNames = ['Doe', 'Smith', 'Wilson', 'Jones', 'Brown', 'Davis', 'Miller', 'Garcia', 'Martinez', 'Anderson'];
+    const countries = ['United States', 'United Kingdom', 'Canada', 'Australia', 'Germany', 'France', 'Spain', 'Italy', 'Brazil', 'India', 'Nigeria', 'South Africa', 'Kenya', 'Ghana'];
     const users = [];
     
     // Generate 1000 users for better statistics
@@ -85,6 +86,7 @@ const UsersPage = () => {
         fullName: `${firstName} ${lastName}`,
         firstName: firstName,
         lastName: lastName,
+        country: countries[Math.floor(Math.random() * countries.length)],
         isActive: isActive && !isBlocked && !isDeleted,
         isVerified: isVerified && !isBlocked && !isDeleted,
         isBlocked: isBlocked,
