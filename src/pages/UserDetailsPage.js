@@ -279,11 +279,8 @@ const UserDetailsPage = () => {
                 <Typography variant="body2" sx={{ color: colors.textSecondary, mb: 0.5 }}>
                   @{user.username || 'N/A'}
                 </Typography>
-                <Typography variant="body2" sx={{ color: colors.textSecondary, mb: 0.5 }}>
-                  {user.email || 'No email'}
-                </Typography>
                 <Typography variant="body2" sx={{ color: colors.textSecondary }}>
-                  {user.country || 'N/A'}
+                  {user.email || 'No email'}
                 </Typography>
               </Box>
             </Box>
