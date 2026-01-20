@@ -523,14 +523,14 @@ const PollsPage = () => {
               width: 24,
               height: 24,
               borderRadius: '6px',
-              backgroundColor: `${colors.success}1A`,
+              backgroundColor: statusFilter === 'active' ? `${colors.brandWhite}33` : `${colors.success}1A`,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               mr: 1.5,
             }}
           >
-            <PieChart sx={{ fontSize: 14, color: colors.success }} />
+            <PieChart sx={{ fontSize: 14, color: statusFilter === 'active' ? colors.brandWhite : colors.success }} />
           </Box>
           Active
         </Button>
