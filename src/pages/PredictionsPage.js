@@ -97,7 +97,7 @@ const PredictionsPage = () => {
     const groupedMap = new Map();
     
     predictions.forEach((pred) => {
-      const userId = pred.userId || pred.userId || 'unknown';
+      const userId = pred.userId || pred.userEmail || 'unknown';
       const matchId = pred.fixtureId || pred.matchId || 'unknown';
       const key = `${userId}_${matchId}`;
       
