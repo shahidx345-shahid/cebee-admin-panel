@@ -405,13 +405,13 @@ const FixtureFormPage = () => {
                       borderRadius: '12px',
                     },
                   }}
-                  startAdornment={
-                    <Box sx={{ display: 'flex', alignItems: 'center', ml: 1 }}>
-                      <Send sx={{ fontSize: 18, color: colors.brandRed, mr: 1 }} />
-                    </Box>
-                  }
                 >
-                  <MenuItem value="other">Other</MenuItem>
+                  <MenuItem value="other">
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Send sx={{ fontSize: 18, color: colors.brandRed }} />
+                      Other
+                    </Box>
+                  </MenuItem>
                   <MenuItem value="wembley">Wembley Stadium</MenuItem>
                   <MenuItem value="old_trafford">Old Trafford</MenuItem>
                   <MenuItem value="anfield">Anfield</MenuItem>
