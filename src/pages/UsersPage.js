@@ -786,12 +786,88 @@ const UsersPage = () => {
 
       {/* Search and Filter Bar */}
       <Box sx={{ display: 'flex', gap: 1.5, mb: 3, alignItems: 'center' }}>
-        <Box sx={{ flex: 2, minWidth: 0 }}>
+        <Box sx={{ flex: 2, minWidth: 0, position: 'relative' }}>
           <SearchBar
             value={searchQuery}
-            onChange={setSearchQuery}
+            onChange={(value) => {
+              setSearchQuery(value);
+            }}
+            onFocus={() => {
+              if (searchSuggestions.length > 0) setShowSuggestions(true);
+            }}
             placeholder="Search by username, email or user ID..."
           />
+          {/* Search Suggestions Dropdown */}
+          {showSuggestions && searchSuggestions.length > 0 && (
+            <Paper
+              sx={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                right: 0,
+                zIndex: 1000,
+                mt: 1,
+                borderRadius: '12px',
+                boxShadow: `0 4px 12px ${colors.shadow}33`,
+                maxHeight: 300,
+                overflow: 'auto',
+                border: `1.5px solid ${colors.brandRed}26`,
+              }}
+            >
+              {searchSuggestions.map((user) => (
+                <Box
+                  key={user.id}
+                  onClick={() => {
+                    setSearchQuery(user.username || user.email || user.id || '');
+                    setShowSuggestions(false);
+                  }}
+                  sx={{
+                    padding: 2,
+                    cursor: 'pointer',
+                    borderBottom: `1px solid ${colors.divider}26`,
+                    '&:hover': {
+                      backgroundColor: `${colors.brandRed}0D`,
+                    },
+                    '&:last-child': {
+                      borderBottom: 'none',
+                    },
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
+                    <Box
+                      sx={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: '50%',
+                        background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Person sx={{ fontSize: 20, color: colors.brandWhite }} />
+                    </Box>
+                    <Box sx={{ flex: 1 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 700, color: colors.brandBlack }}>
+                        {user.fullName || `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username || 'N/A'}
+                      </Typography>
+                      <Typography variant="caption" sx={{ color: colors.textSecondary }}>
+                        @{user.username || 'N/A'}
+                      </Typography>
+                    </Box>
+                  </Box>
+                  <Box sx={{ ml: 7.5, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                    <Typography variant="caption" sx={{ color: colors.textSecondary, fontSize: 11 }}>
+                      {user.email || 'No email'}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: colors.textSecondary, fontSize: 11 }}>
+                      {user.id || 'N/A'}
+                    </Typography>
+                  </Box>
+                </Box>
+              ))}
+            </Paper>
+          )}
         </Box>
         <Button
           variant="outlined"
