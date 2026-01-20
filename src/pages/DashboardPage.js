@@ -24,8 +24,8 @@ const StatCard = ({ title, value, subtitle, icon: Icon, color, isPrimary = false
   return (
     <Card
       sx={{
-        padding: { xs: 2, md: 2.5 },
-        borderRadius: '20px',
+        padding: { xs: 1.5, md: 2 },
+        borderRadius: '16px',
         background: isPrimary
           ? `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`
           : colors.brandWhite,
@@ -33,8 +33,8 @@ const StatCard = ({ title, value, subtitle, icon: Icon, color, isPrimary = false
           ? 'none'
           : `1.5px solid ${color}26`,
         boxShadow: isPrimary
-          ? `0 6px 18px ${colors.brandRed}40`
-          : `0 6px 14px ${color}1F`,
+          ? `0 4px 12px ${colors.brandRed}40`
+          : `0 4px 10px ${color}1F`,
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
@@ -42,10 +42,10 @@ const StatCard = ({ title, value, subtitle, icon: Icon, color, isPrimary = false
         animation: `fadeInUp 0.6s ease-out ${delay}ms both`,
         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
         '&:hover': {
-          transform: 'translateY(-4px)',
+          transform: 'translateY(-3px)',
           boxShadow: isPrimary
-            ? `0 8px 24px ${colors.brandRed}50`
-            : `0 8px 20px ${color}2F`,
+            ? `0 6px 16px ${colors.brandRed}50`
+            : `0 6px 14px ${color}2F`,
         },
         '@keyframes fadeInUp': {
           from: {
@@ -62,21 +62,21 @@ const StatCard = ({ title, value, subtitle, icon: Icon, color, isPrimary = false
       <CardContent sx={{ padding: 0, '&:last-child': { paddingBottom: 0 } }}>
         <Box
           sx={{
-            padding: { xs: 1.25, md: 1.5 },
+            padding: { xs: 1, md: 1.25 },
             width: 'fit-content',
             background: isPrimary
               ? `${colors.brandWhite}33`
               : `${color}1F`,
-            borderRadius: '14px',
+            borderRadius: '12px',
             boxShadow: isPrimary
-              ? '0 3px 8px rgba(0, 0, 0, 0.12)'
+              ? '0 2px 6px rgba(0, 0, 0, 0.12)'
               : 'none',
-            mb: 2,
+            mb: 1.5,
           }}
         >
           <Icon
             sx={{
-              fontSize: { xs: 24, md: 28 },
+              fontSize: { xs: 20, md: 24 },
               color: isPrimary ? colors.brandWhite : color,
             }}
           />
@@ -88,8 +88,9 @@ const StatCard = ({ title, value, subtitle, icon: Icon, color, isPrimary = false
               fontWeight: 700,
               color: isPrimary ? colors.brandWhite : colors.brandBlack,
               letterSpacing: -0.8,
-              fontSize: { xs: 24, md: 30 },
-              mb: 0.75,
+              fontSize: { xs: 20, md: 26 },
+              mb: 0.5,
+              lineHeight: 1.2,
             }}
           >
             {value}
@@ -99,8 +100,8 @@ const StatCard = ({ title, value, subtitle, icon: Icon, color, isPrimary = false
             sx={{
               fontWeight: 600,
               color: isPrimary ? `${colors.brandWhite}F0` : colors.brandBlack,
-              fontSize: { xs: 13, md: 14 },
-              mb: 0.5,
+              fontSize: { xs: 12, md: 13 },
+              mb: 0.25,
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
@@ -114,7 +115,7 @@ const StatCard = ({ title, value, subtitle, icon: Icon, color, isPrimary = false
               sx={{
                 fontWeight: 500,
                 color: isPrimary ? `${colors.brandWhite}B3` : colors.success,
-                fontSize: { xs: 10.5, md: 11.5 },
+                fontSize: { xs: 10, md: 11 },
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
@@ -124,7 +125,7 @@ const StatCard = ({ title, value, subtitle, icon: Icon, color, isPrimary = false
             </Typography>
             <ArrowUpward
               sx={{
-                fontSize: 12,
+                fontSize: 11,
                 color: isPrimary ? `${colors.brandWhite}B3` : colors.success,
               }}
             />
