@@ -126,18 +126,24 @@ const FixturesPage = () => {
   const loadFixtures = async () => {
     try {
       setLoading(true);
-      const fixturesRef = collection(db, 'fixtures');
-      const q = query(fixturesRef, orderBy('kickoffTime', 'desc'));
-      const snapshot = await getDocs(q);
-      let fixturesData = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-
-      // If no fixtures exist, add sample data
-      if (fixturesData.length === 0) {
-        fixturesData = getSampleFixtures();
+      let fixturesData = [];
+      
+      // Try to load from Firebase
+      try {
+        const fixturesRef = collection(db, 'fixtures');
+        const q = query(fixturesRef, orderBy('kickoffTime', 'desc'));
+        const snapshot = await getDocs(q);
+        fixturesData = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+      } catch (error) {
+        console.log('Using dummy data:', error);
       }
+
+      // Always use sample data (for demo purposes)
+      // You can change this to only use sample data if fixturesData.length === 0
+      fixturesData = getSampleFixtures();
 
       setFixtures(fixturesData);
       setFilteredFixtures(fixturesData);
