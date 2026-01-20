@@ -1,17 +1,26 @@
-import React, { useState } from 'react';
-import { Box, Drawer, AppBar, Toolbar, IconButton, Badge } from '@mui/material';
+import React, { useState, useEffect } from 'react';
+import { Box, Drawer, AppBar, Toolbar, IconButton, Badge, Fade } from '@mui/material';
 import { Menu as MenuIcon, Notifications as NotificationsIcon } from '@mui/icons-material';
+import { useLocation } from 'react-router-dom';
 import SideMenu from './SideMenu';
 import TopBar from './TopBar';
 import { constants, colors } from '../../config/theme';
 
 const MainLayout = ({ children }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [fadeIn, setFadeIn] = useState(false);
+  const location = useLocation();
   const isDesktop = window.innerWidth >= constants.breakpoints.tablet;
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
   };
+
+  useEffect(() => {
+    setFadeIn(false);
+    const timer = setTimeout(() => setFadeIn(true), 100);
+    return () => clearTimeout(timer);
+  }, [location.pathname]);
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', backgroundColor: colors.backgroundLight }}>
@@ -69,9 +78,27 @@ const MainLayout = ({ children }) => {
             overflow: 'auto',
           }}
         >
-          <Box sx={{ width: '100%', maxWidth: '100%' }}>
-            {children}
-          </Box>
+          <Fade in={fadeIn} timeout={600}>
+            <Box 
+              sx={{ 
+                width: '100%', 
+                maxWidth: '100%',
+                animation: fadeIn ? 'fadeInUp 0.6s ease-out' : 'none',
+                '@keyframes fadeInUp': {
+                  from: {
+                    opacity: 0,
+                    transform: 'translateY(20px)',
+                  },
+                  to: {
+                    opacity: 1,
+                    transform: 'translateY(0)',
+                  },
+                },
+              }}
+            >
+              {children}
+            </Box>
+          </Fade>
         </Box>
       </Box>
     </Box>

@@ -19,7 +19,7 @@ import { colors } from '../config/theme';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
-const StatCard = ({ title, value, subtitle, icon: Icon, color, isPrimary = false }) => {
+const StatCard = ({ title, value, subtitle, icon: Icon, color, isPrimary = false, delay = 0 }) => {
   return (
     <Card
       sx={{
@@ -38,6 +38,24 @@ const StatCard = ({ title, value, subtitle, icon: Icon, color, isPrimary = false
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',
+        animation: `fadeInUp 0.6s ease-out ${delay}ms both`,
+        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+        '&:hover': {
+          transform: 'translateY(-4px)',
+          boxShadow: isPrimary
+            ? `0 8px 24px ${colors.brandRed}50`
+            : `0 8px 20px ${color}2F`,
+        },
+        '@keyframes fadeInUp': {
+          from: {
+            opacity: 0,
+            transform: 'translateY(20px)',
+          },
+          to: {
+            opacity: 1,
+            transform: 'translateY(0)',
+          },
+        },
       }}
     >
       <CardContent sx={{ padding: 0, '&:last-child': { paddingBottom: 0 } }}>
@@ -256,20 +274,20 @@ const DashboardPage = () => {
       <Grid container spacing={{ xs: 2, md: 2 }} sx={{ mb: { xs: 2, md: 2.5 } }}>
         {/* Row 1: Scheduled, Published, Live */}
         <Grid item xs={4} md={4}>
-          <StatCard {...stats[0]} />
+          <StatCard {...stats[0]} delay={0} />
         </Grid>
         <Grid item xs={4} md={4}>
-          <StatCard {...stats[1]} />
+          <StatCard {...stats[1]} delay={100} />
         </Grid>
         <Grid item xs={4} md={4}>
-          <StatCard {...stats[2]} />
+          <StatCard {...stats[2]} delay={200} />
         </Grid>
         {/* Row 2: Result Pending, Completed */}
         <Grid item xs={6} md={6}>
-          <StatCard {...stats[3]} />
+          <StatCard {...stats[3]} delay={300} />
         </Grid>
         <Grid item xs={6} md={6}>
-          <StatCard {...stats[4]} />
+          <StatCard {...stats[4]} delay={400} />
         </Grid>
       </Grid>
 

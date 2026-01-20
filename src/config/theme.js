@@ -120,14 +120,21 @@ export const theme = createTheme({
           fontWeight: 600,
           textTransform: 'none',
           boxShadow: 'none',
+          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
           '&:hover': {
             boxShadow: 'none',
+            transform: 'translateY(-2px)',
+          },
+          '&:active': {
+            transform: 'translateY(0)',
           },
         },
         containedPrimary: {
           background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
           '&:hover': {
             background: `linear-gradient(135deg, ${colors.brandDarkRed} 0%, ${colors.brandRed} 100%)`,
+            transform: 'translateY(-2px)',
+            boxShadow: `0 6px 12px ${colors.brandRed}40`,
           },
         },
       },
@@ -138,9 +145,11 @@ export const theme = createTheme({
           '& .MuiOutlinedInput-root': {
             borderRadius: 12,
             backgroundColor: `${colors.backgroundLight}4D`,
+            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
             '& fieldset': {
               borderColor: `${colors.divider}26`,
               borderWidth: 1.5,
+              transition: 'border-color 0.3s ease',
             },
             '&:hover fieldset': {
               borderColor: colors.brandRed,
@@ -158,8 +167,40 @@ export const theme = createTheme({
         root: {
           borderRadius: 12,
           boxShadow: `0 4px 6px ${colors.shadow}`,
+          transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          '&:hover': {
+            boxShadow: `0 8px 16px ${colors.shadow}33`,
+            transform: 'translateY(-2px)',
+          },
         },
       },
+    },
+    MuiChip: {
+      styleOverrides: {
+        root: {
+          transition: 'all 0.2s ease',
+          '&:hover': {
+            transform: 'scale(1.05)',
+          },
+        },
+      },
+    },
+  },
+  transitions: {
+    duration: {
+      shortest: 150,
+      shorter: 200,
+      short: 250,
+      standard: 300,
+      complex: 375,
+      enteringScreen: 225,
+      leavingScreen: 195,
+    },
+    easing: {
+      easeInOut: 'cubic-bezier(0.4, 0, 0.2, 1)',
+      easeOut: 'cubic-bezier(0.0, 0, 0.2, 1)',
+      easeIn: 'cubic-bezier(0.4, 0, 1, 1)',
+      sharp: 'cubic-bezier(0.4, 0, 0.6, 1)',
     },
   },
 });

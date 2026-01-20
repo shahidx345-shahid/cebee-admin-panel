@@ -431,6 +431,12 @@ const UsersPage = () => {
               background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
               borderRadius: '20px',
               boxShadow: `0 6px 18px ${colors.brandRed}40`,
+              animation: 'fadeInUp 0.6s ease-out 0ms both',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: `0 8px 24px ${colors.brandRed}50`,
+              },
             }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
@@ -527,6 +533,12 @@ const UsersPage = () => {
               border: `1.5px solid ${colors.warning}26`,
               borderRadius: '20px',
               boxShadow: `0 6px 14px ${colors.warning}1F`,
+              animation: 'fadeInUp 0.6s ease-out 200ms both',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: `0 8px 20px ${colors.warning}2F`,
+              },
             }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
@@ -559,6 +571,12 @@ const UsersPage = () => {
               border: `1.5px solid ${colors.error}26`,
               borderRadius: '20px',
               boxShadow: `0 6px 14px ${colors.error}1F`,
+              animation: 'fadeInUp 0.6s ease-out 300ms both',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: `0 8px 20px ${colors.error}2F`,
+              },
             }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
@@ -591,6 +609,12 @@ const UsersPage = () => {
               border: `1.5px solid ${colors.textSecondary}26`,
               borderRadius: '20px',
               boxShadow: `0 6px 14px ${colors.textSecondary}1F`,
+              animation: 'fadeInUp 0.6s ease-out 400ms both',
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+              '&:hover': {
+                transform: 'translateY(-4px)',
+                boxShadow: `0 8px 20px ${colors.textSecondary}2F`,
+              },
             }}
           >
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
