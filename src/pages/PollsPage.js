@@ -469,8 +469,8 @@ const PollsPage = () => {
           onClick={() => setStatusFilter('all')}
           sx={{
             flex: 1,
-            minWidth: { xs: 'calc(50% - 8px)', sm: 'auto' },
-            borderRadius: '20px',
+            minWidth: { xs: 'calc(50% - 1px)', sm: 'auto' },
+            borderRadius: 0,
             textTransform: 'none',
             fontWeight: 600,
             px: 3,
@@ -479,6 +479,11 @@ const PollsPage = () => {
             backgroundColor: statusFilter === 'all' ? colors.brandRed : colors.brandWhite,
             color: statusFilter === 'all' ? colors.brandWhite : colors.textSecondary,
             border: `1.5px solid ${statusFilter === 'all' ? colors.brandRed : colors.divider}66`,
+            borderRight: 'none',
+            '&:first-of-type': {
+              borderTopLeftRadius: '20px',
+              borderBottomLeftRadius: '20px',
+            },
             boxShadow: statusFilter === 'all' ? `0 4px 12px ${colors.brandRed}40, 0 2px 4px ${colors.brandRed}20` : 'none',
             '&:hover': {
               backgroundColor: statusFilter === 'all' ? colors.brandRed : `${colors.divider}0D`,
@@ -598,7 +603,6 @@ const PollsPage = () => {
             '&:last-of-type': {
               borderTopRightRadius: '20px',
               borderBottomRightRadius: '20px',
-              borderRight: `1.5px solid ${statusFilter === 'closed' ? colors.textSecondary : colors.divider}66`,
             },
             boxShadow: statusFilter === 'closed' ? `0 4px 12px ${colors.textSecondary}40, 0 2px 4px ${colors.textSecondary}20` : 'none',
             '&:hover': {
