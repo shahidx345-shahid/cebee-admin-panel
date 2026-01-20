@@ -760,7 +760,21 @@ const UsersPage = () => {
                 justifyContent: 'center',
               }}
             >
-              <ArrowUpward sx={{ fontSize: 12, color: colors.brandWhite }} />
+              {selectedSort === 'spHigh' ? (
+                <ArrowUpward sx={{ fontSize: 12, color: colors.brandWhite }} />
+              ) : selectedSort === 'spLow' ? (
+                <ArrowDownward sx={{ fontSize: 12, color: colors.brandWhite }} />
+              ) : selectedSort === 'predictionsHigh' || selectedSort === 'predictionsLow' ? (
+                <BarChart sx={{ fontSize: 12, color: colors.brandWhite }} />
+              ) : selectedSort === 'dateNewest' ? (
+                <ArrowDownward sx={{ fontSize: 12, color: colors.brandWhite }} />
+              ) : selectedSort === 'dateOldest' ? (
+                <ArrowUpward sx={{ fontSize: 12, color: colors.brandWhite }} />
+              ) : selectedSort === 'nameAZ' || selectedSort === 'nameZA' ? (
+                <Sort sx={{ fontSize: 12, color: colors.brandWhite }} />
+              ) : (
+                <ArrowUpward sx={{ fontSize: 12, color: colors.brandWhite }} />
+              )}
             </Box>
           }
           endIcon={<ArrowDropDown sx={{ color: colors.brandRed, fontSize: 20 }} />}
