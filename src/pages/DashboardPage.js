@@ -138,10 +138,10 @@ const StatCard = ({ title, value, subtitle, icon: Icon, color, isPrimary = false
 
 const DashboardPage = () => {
   const [dashboardStats, setDashboardStats] = useState({
-    totalUsers: 12345,
-    activeUsers: 8932,
-    totalSPIssued: 2458920,
-    estimatedRewardsValue: 45678,
+    totalUsers: 45678,
+    activeUsers: 34256,
+    totalSPIssued: 12458920,
+    estimatedRewardsValue: 249178,
   });
 
   useEffect(() => {
@@ -182,10 +182,10 @@ const DashboardPage = () => {
 
       // Use default values if no data or very low values
       const finalStats = {
-        totalUsers: totalUsers > 0 ? totalUsers : 12345,
-        activeUsers: activeUsers > 0 ? activeUsers : 8932,
-        totalSPIssued: totalSPIssued > 0 ? totalSPIssued : 2458920,
-        estimatedRewardsValue: estimatedRewardsValue > 0 ? estimatedRewardsValue : 45678,
+        totalUsers: totalUsers > 0 ? totalUsers : 45678,
+        activeUsers: activeUsers > 0 ? activeUsers : 34256,
+        totalSPIssued: totalSPIssued > 0 ? totalSPIssued : 12458920,
+        estimatedRewardsValue: estimatedRewardsValue > 0 ? estimatedRewardsValue : 249178,
       };
 
       setDashboardStats(finalStats);
@@ -193,10 +193,10 @@ const DashboardPage = () => {
       console.error('Error loading dashboard stats:', error);
       // Set default values for demo
       setDashboardStats({
-        totalUsers: 12345,
-        activeUsers: 8932,
-        totalSPIssued: 2458920,
-        estimatedRewardsValue: 45678,
+        totalUsers: 45678,
+        activeUsers: 34256,
+        totalSPIssued: 12458920,
+        estimatedRewardsValue: 249178,
       });
     }
   };
