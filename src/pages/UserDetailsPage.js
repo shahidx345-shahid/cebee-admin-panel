@@ -279,12 +279,9 @@ const UserDetailsPage = () => {
                 <Typography variant="body2" sx={{ color: colors.textSecondary, mb: 0.5 }}>
                   @{user.username || 'N/A'}
                 </Typography>
-                <Typography variant="body2" sx={{ color: colors.textSecondary, mb: 1 }}>
+                <Typography variant="body2" sx={{ color: colors.textSecondary }}>
                   {user.email || 'No email'}
                 </Typography>
-                <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-                  {getAccountStatusChip()}
-                </Box>
               </Box>
             </Box>
             <Grid container spacing={2}>
