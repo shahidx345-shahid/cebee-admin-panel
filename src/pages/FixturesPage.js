@@ -30,6 +30,7 @@ import {
   TrendingUp,
   TrendingDown,
   Check,
+  Stadium,
 } from '@mui/icons-material';
 import { colors, constants } from '../config/theme';
 import SearchBar from '../components/common/SearchBar';
@@ -142,27 +143,56 @@ const FixturesPage = () => {
   };
 
   const getStatusChip = (status) => {
-    const statusConfig = {
-      scheduled: { label: 'Scheduled', color: colors.textSecondary, icon: Schedule },
-      published: { label: 'Published', color: colors.info, icon: Visibility },
-      live: { label: 'Live', color: colors.brandRed, icon: PlayCircle },
-      completed: { label: 'Completed', color: colors.success, icon: CheckCircle },
-      resultsProcessing: { label: 'Result Pending', color: colors.warning, icon: Edit },
+    const statusMap = {
+      scheduled: 'SCHEDULED',
+      published: 'SCHEDULED',
+      live: 'LIVE',
+      completed: 'COMPLETED',
+      resultsProcessing: 'RESULT PENDING',
     };
 
+    const statusConfig = {
+      scheduled: { 
+        label: 'SCHEDULED', 
+        backgroundColor: '#E3F2FD', 
+        color: '#1976D2',
+        textColor: '#1976D2'
+      },
+      live: { 
+        label: 'LIVE', 
+        backgroundColor: colors.brandRed, 
+        color: colors.brandWhite,
+        textColor: colors.brandWhite
+      },
+      completed: { 
+        label: 'COMPLETED', 
+        backgroundColor: '#E8F5E9', 
+        color: '#2E7D32',
+        textColor: '#2E7D32'
+      },
+      resultsProcessing: { 
+        label: 'RESULT PENDING', 
+        backgroundColor: colors.warning, 
+        color: colors.brandWhite,
+        textColor: colors.brandWhite
+      },
+    };
+
+    const mappedStatus = statusMap[status] || 'SCHEDULED';
     const config = statusConfig[status] || statusConfig.scheduled;
-    const Icon = config.icon;
 
     return (
       <Chip
-        icon={<Icon />}
         label={config.label}
         size="small"
         sx={{
-          backgroundColor: `${config.color}1A`,
-          color: config.color,
-          fontWeight: 600,
+          backgroundColor: config.backgroundColor,
+          color: config.textColor,
+          fontWeight: 700,
           fontSize: 11,
+          height: 28,
+          borderRadius: '20px',
+          border: 'none',
         }}
       />
     );
@@ -279,26 +309,57 @@ const FixturesPage = () => {
 
   const columns = [
     {
-      id: 'match',
-      label: 'Match',
+      id: 'matchId',
+      label: 'Match ID',
       render: (_, row) => (
-        <Box>
+        <Chip
+          label={row.id?.substring(0, 10) || row.matchId || 'N/A'}
+          sx={{
+            backgroundColor: colors.brandRed,
+            color: colors.brandWhite,
+            fontWeight: 600,
+            fontSize: 11,
+            height: 28,
+            borderRadius: '20px',
+            border: 'none',
+          }}
+        />
+      ),
+    },
+    {
+      id: 'teams',
+      label: 'Teams',
+      render: (_, row) => (
           <Typography variant="body2" sx={{ fontWeight: 600 }}>
             {row.homeTeam || 'TBD'} vs {row.awayTeam || 'TBD'}
           </Typography>
-          <Typography variant="caption" sx={{ color: colors.textSecondary, fontSize: 11 }}>
-            {row.league || 'N/A'} • {row.venue || 'TBD'}
-          </Typography>
-        </Box>
+      ),
+    },
+    {
+      id: 'league',
+      label: 'League',
+      render: (_, row) => (
+        <Chip
+          label={row.league || 'N/A'}
+          sx={{
+            backgroundColor: colors.brandRed,
+            color: colors.brandWhite,
+            fontWeight: 600,
+            fontSize: 11,
+            height: 28,
+            borderRadius: '20px',
+            border: 'none',
+          }}
+        />
       ),
     },
     {
       id: 'kickoffTime',
       label: 'Kickoff Time',
-      render: (value) => {
-        if (!value) return 'TBD';
-        const date = value?.toDate ? value.toDate() : new Date(value);
-        return format(date, 'MMM dd, yyyy • HH:mm');
+      render: (value, row) => {
+        if (!row.kickoffTime) return '-';
+        const date = row.kickoffTime?.toDate ? row.kickoffTime.toDate() : new Date(row.kickoffTime);
+        return format(date, 'MMM dd, yyyy HH:mm');
       },
     },
     {
@@ -307,9 +368,52 @@ const FixturesPage = () => {
       render: (_, row) => getStatusChip(row.matchStatus || row.status),
     },
     {
-      id: 'predictions',
-      label: 'Predictions',
-      render: (value) => value || 0,
+      id: 'score',
+      label: 'Score',
+      render: (_, row) => {
+        if (row.homeScore !== undefined && row.awayScore !== undefined) {
+          return (
+            <Chip
+              label={`${row.homeScore}-${row.awayScore}`}
+              sx={{
+                backgroundColor: 'transparent',
+                color: colors.brandRed,
+                fontWeight: 600,
+                fontSize: 11,
+                height: 28,
+                borderRadius: '20px',
+                border: `1.5px solid ${colors.brandRed}`,
+              }}
+            />
+          );
+        }
+        return '-';
+      },
+    },
+    {
+      id: 'action',
+      label: 'Action',
+      render: (_, row) => (
+        <Button
+          onClick={(e) => {
+            e.stopPropagation();
+            navigate(`/fixtures/details/${row.id}`);
+          }}
+          sx={{
+            minWidth: 40,
+            width: 40,
+            height: 40,
+            padding: 0,
+            backgroundColor: colors.brandRed,
+            borderRadius: '8px',
+            '&:hover': {
+              backgroundColor: colors.brandDarkRed,
+            },
+          }}
+        >
+          <Stadium sx={{ fontSize: 20, color: colors.brandWhite }} />
+        </Button>
+      ),
     },
   ];
 
