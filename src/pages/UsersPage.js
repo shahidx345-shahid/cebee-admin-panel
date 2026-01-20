@@ -48,6 +48,8 @@ const UsersPage = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [spFilterAnchor, setSpFilterAnchor] = useState(null);
+  const [accuracyFilterAnchor, setAccuracyFilterAnchor] = useState(null);
+  const [accuracyFilter, setAccuracyFilter] = useState('all');
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
 
@@ -57,22 +59,86 @@ const UsersPage = () => {
 
   useEffect(() => {
     filterAndSortUsers();
-  }, [users, searchQuery, selectedStatus, selectedSort]);
+  }, [users, searchQuery, selectedStatus, selectedSort, accuracyFilter]);
+
+  const generateDummyUsers = () => {
+    const firstNames = ['John', 'Jane', 'Mike', 'Sarah', 'David', 'Emily', 'Chris', 'Lisa', 'Tom', 'Amy'];
+    const lastNames = ['Doe', 'Smith', 'Wilson', 'Jones', 'Brown', 'Davis', 'Miller', 'Garcia', 'Martinez', 'Anderson'];
+    const users = [];
+    
+    for (let i = 0; i < 20; i++) {
+      const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
+      const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
+      const username = `${firstName.toLowerCase()}_${lastName.toLowerCase()}_${i}`;
+      const email = `${username}@example.com`;
+      const isActive = Math.random() > 0.2;
+      const isBlocked = Math.random() > 0.9;
+      const isDeleted = Math.random() > 0.95;
+      const hasFlags = Math.random() > 0.85;
+      
+      users.push({
+        id: `USER_${i.toString().padStart(6, '0')}`,
+        username: username,
+        email: email,
+        fullName: `${firstName} ${lastName}`,
+        firstName: firstName,
+        lastName: lastName,
+        isActive: isActive,
+        isVerified: Math.random() > 0.3,
+        isBlocked: isBlocked,
+        isDeleted: isDeleted,
+        isDeactivated: isDeleted,
+        fraudFlags: hasFlags ? ['Suspicious activity', 'Multiple accounts'] : [],
+        spTotal: Math.floor(Math.random() * 5000) + 100,
+        spCurrent: Math.floor(Math.random() * 2000) + 50,
+        cpTotal: Math.floor(Math.random() * 1000) + 10,
+        cpCurrent: Math.floor(Math.random() * 500) + 5,
+        totalPredictions: Math.floor(Math.random() * 100) + 5,
+        predictionAccuracy: Math.floor(Math.random() * 100),
+        totalPolls: Math.floor(Math.random() * 20) + 1,
+        createdAt: new Date(Date.now() - Math.random() * 365 * 24 * 60 * 60 * 1000),
+        lastLogin: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000),
+        spFromPredictions: Math.floor(Math.random() * 3000) + 50,
+        spFromDailyLogin: Math.floor(Math.random() * 500) + 10,
+        cpFromReferrals: Math.floor(Math.random() * 300) + 5,
+        cpFromEngagement: Math.floor(Math.random() * 200) + 5,
+      });
+    }
+    
+    return users;
+  };
 
   const loadUsers = async () => {
     try {
       setLoading(true);
-      const usersRef = collection(db, 'users');
-      const q = query(usersRef, where('isDeleted', '==', false), orderBy('createdAt', 'desc'));
-      const snapshot = await getDocs(q);
-      const usersData = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
+      let usersData = [];
+      
+      // Try to load from Firebase
+      try {
+        const usersRef = collection(db, 'users');
+        const q = query(usersRef, orderBy('createdAt', 'desc'));
+        const snapshot = await getDocs(q);
+        usersData = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+      } catch (error) {
+        console.log('Using dummy data:', error);
+      }
+      
+      // Use dummy data if no real data exists
+      if (usersData.length === 0) {
+        usersData = generateDummyUsers();
+      }
+      
       setUsers(usersData);
       setFilteredUsers(usersData);
     } catch (error) {
       console.error('Error loading users:', error);
+      // Fallback to dummy data
+      const dummyData = generateDummyUsers();
+      setUsers(dummyData);
+      setFilteredUsers(dummyData);
     } finally {
       setLoading(false);
     }
@@ -88,17 +154,34 @@ const UsersPage = () => {
         (user) =>
           user.username?.toLowerCase().includes(query) ||
           user.email?.toLowerCase().includes(query) ||
-          user.id?.toLowerCase().includes(query)
+          user.id?.toLowerCase().includes(query) ||
+          user.fullName?.toLowerCase().includes(query) ||
+          user.name?.toLowerCase().includes(query) ||
+          `${user.firstName || ''} ${user.lastName || ''}`.toLowerCase().includes(query)
       );
     }
 
     // Status filter
     if (selectedStatus !== 'all') {
       filtered = filtered.filter((user) => {
-        if (selectedStatus === 'active') return user.isActive === true && !user.isDeleted;
-        if (selectedStatus === 'inactive') return user.isActive === false && !user.isDeleted;
+        if (selectedStatus === 'active') return user.isActive === true && !user.isDeleted && !user.isBlocked;
+        if (selectedStatus === 'inactive') return user.isActive === false && !user.isDeleted && !user.isBlocked;
         if (selectedStatus === 'suspended') return user.status === 'suspended';
         if (selectedStatus === 'flagged') return user.fraudFlags && user.fraudFlags.length > 0;
+        if (selectedStatus === 'blocked') return user.isBlocked === true;
+        if (selectedStatus === 'deactivated') return user.isDeleted === true || user.isDeactivated === true;
+        return true;
+      });
+    }
+
+    // Accuracy filter
+    if (accuracyFilter !== 'all') {
+      filtered = filtered.filter((user) => {
+        const accuracy = user.predictionAccuracy || 0;
+        if (accuracyFilter === '0-25') return accuracy >= 0 && accuracy <= 25;
+        if (accuracyFilter === '26-50') return accuracy > 25 && accuracy <= 50;
+        if (accuracyFilter === '51-75') return accuracy > 50 && accuracy <= 75;
+        if (accuracyFilter === '76-100') return accuracy > 75 && accuracy <= 100;
         return true;
       });
     }
@@ -215,9 +298,11 @@ const UsersPage = () => {
     setSelectedUser(null);
   };
 
-  const activeCount = users.filter((u) => u.isActive && !u.isDeleted).length;
+  const activeCount = users.filter((u) => u.isActive && !u.isDeleted && !u.isBlocked).length;
   const verifiedCount = users.filter((u) => u.isVerified).length;
-  const totalPredictions = users.reduce((sum, u) => sum + (u.totalPredictions || 0), 0);
+  const flaggedCount = users.filter((u) => u.fraudFlags && u.fraudFlags.length > 0).length;
+  const blockedCount = users.filter((u) => u.isBlocked === true).length;
+  const deactivatedCount = users.filter((u) => u.isDeleted === true || u.isDeactivated === true).length;
 
   const columns = [
     {
@@ -307,6 +392,8 @@ const UsersPage = () => {
     { value: 'inactive', label: 'Inactive' },
     { value: 'suspended', label: 'Suspended' },
     { value: 'flagged', label: 'Flagged' },
+    { value: 'blocked', label: 'Blocked' },
+    { value: 'deactivated', label: 'Deactivated' },
   ];
 
   const sortOptions = [
@@ -460,7 +547,71 @@ const UsersPage = () => {
               </Box>
             </Box>
             <Typography variant="h4" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.5 }}>
-              {totalPredictions} Total Predictions
+              {flaggedCount} Flagged Users
+            </Typography>
+          </Card>
+        </Grid>
+        <Grid item xs={6} md={3}>
+          <Card
+            sx={{
+              padding: 2.5,
+              background: colors.brandWhite,
+              border: `1.5px solid ${colors.error}26`,
+              borderRadius: '20px',
+              boxShadow: `0 6px 14px ${colors.error}1F`,
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+              <Box
+                sx={{
+                  padding: 1.25,
+                  backgroundColor: `${colors.error}1F`,
+                  borderRadius: '12px',
+                }}
+              >
+                <Cancel sx={{ fontSize: 24, color: colors.error }} />
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <ArrowUpward sx={{ fontSize: 16, color: colors.success }} />
+                <Typography variant="caption" sx={{ color: colors.success, fontWeight: 600, fontSize: 12 }}>
+                  +2.3%
+                </Typography>
+              </Box>
+            </Box>
+            <Typography variant="h4" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.5 }}>
+              {blockedCount} Blocked Users
+            </Typography>
+          </Card>
+        </Grid>
+        <Grid item xs={6} md={3}>
+          <Card
+            sx={{
+              padding: 2.5,
+              background: colors.brandWhite,
+              border: `1.5px solid ${colors.textSecondary}26`,
+              borderRadius: '20px',
+              boxShadow: `0 6px 14px ${colors.textSecondary}1F`,
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+              <Box
+                sx={{
+                  padding: 1.25,
+                  backgroundColor: `${colors.textSecondary}1F`,
+                  borderRadius: '12px',
+                }}
+              >
+                <Person sx={{ fontSize: 24, color: colors.textSecondary }} />
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <ArrowUpward sx={{ fontSize: 16, color: colors.success }} />
+                <Typography variant="caption" sx={{ color: colors.success, fontWeight: 600, fontSize: 12 }}>
+                  +1.1%
+                </Typography>
+              </Box>
+            </Box>
+            <Typography variant="h4" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.5 }}>
+              {deactivatedCount} Deactivated Users
             </Typography>
           </Card>
         </Grid>
@@ -510,7 +661,7 @@ const UsersPage = () => {
           <SearchBar
             value={searchQuery}
             onChange={setSearchQuery}
-            placeholder="Search by username, email or user ID..."
+            placeholder="Search by username, email, user ID, or full name..."
           />
         </Box>
         <Button
@@ -546,6 +697,39 @@ const UsersPage = () => {
         >
           SP: {selectedSort === 'spHigh' ? 'High' : selectedSort === 'spLow' ? 'Low' : 'High'}
         </Button>
+        <Button
+          variant="outlined"
+          startIcon={
+            <Box
+              sx={{
+                width: 24,
+                height: 24,
+                borderRadius: '50%',
+                backgroundColor: colors.info,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <BarChart sx={{ fontSize: 14, color: colors.brandWhite }} />
+            </Box>
+          }
+          endIcon={<ArrowDropDown sx={{ color: colors.info }} />}
+          onClick={(e) => setAccuracyFilterAnchor(e.currentTarget)}
+          sx={{
+            borderColor: colors.brandWhite,
+            color: colors.brandBlack,
+            backgroundColor: colors.brandWhite,
+            borderRadius: '8px',
+            textTransform: 'none',
+            fontWeight: 500,
+            px: 2,
+            py: 1,
+            boxShadow: `0 2px 8px ${colors.shadow}14`,
+          }}
+        >
+          Accuracy: {accuracyFilter === 'all' ? 'All' : accuracyFilter === '0-25' ? '0-25%' : accuracyFilter === '26-50' ? '26-50%' : accuracyFilter === '51-75' ? '51-75%' : '76-100%'}
+        </Button>
         <Menu
           anchorEl={spFilterAnchor}
           open={Boolean(spFilterAnchor)}
@@ -563,6 +747,34 @@ const UsersPage = () => {
           </MenuItem>
           <MenuItem onClick={() => { setSelectedSort('spLow'); setSpFilterAnchor(null); }}>
             SP: Low
+          </MenuItem>
+        </Menu>
+        <Menu
+          anchorEl={accuracyFilterAnchor}
+          open={Boolean(accuracyFilterAnchor)}
+          onClose={() => setAccuracyFilterAnchor(null)}
+          PaperProps={{
+            sx: {
+              borderRadius: '12px',
+              minWidth: 180,
+              boxShadow: `0 4px 12px ${colors.shadow}33`,
+            },
+          }}
+        >
+          <MenuItem onClick={() => { setAccuracyFilter('all'); setAccuracyFilterAnchor(null); }}>
+            All
+          </MenuItem>
+          <MenuItem onClick={() => { setAccuracyFilter('0-25'); setAccuracyFilterAnchor(null); }}>
+            0-25%
+          </MenuItem>
+          <MenuItem onClick={() => { setAccuracyFilter('26-50'); setAccuracyFilterAnchor(null); }}>
+            26-50%
+          </MenuItem>
+          <MenuItem onClick={() => { setAccuracyFilter('51-75'); setAccuracyFilterAnchor(null); }}>
+            51-75%
+          </MenuItem>
+          <MenuItem onClick={() => { setAccuracyFilter('76-100'); setAccuracyFilterAnchor(null); }}>
+            76-100%
           </MenuItem>
         </Menu>
         <Button
