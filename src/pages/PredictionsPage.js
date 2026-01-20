@@ -70,16 +70,100 @@ const PredictionsPage = () => {
     filterAndSortPredictions();
   }, [predictions, searchQuery, selectedStatus, selectedSort]);
 
+  const generateDummyPredictions = () => {
+    const users = ['john_doe', 'jane_smith', 'mike_wilson', 'sarah_jones', 'david_brown'];
+    const usernames = ['John Doe', 'Jane Smith', 'Mike Wilson', 'Sarah Jones', 'David Brown'];
+    const emails = ['john@example.com', 'jane@example.com', 'mike@example.com', 'sarah@example.com', 'david@example.com'];
+    const matches = [
+      { homeTeam: 'Arsenal', awayTeam: 'Chelsea', fixtureId: 'FIX_001' },
+      { homeTeam: 'Liverpool', awayTeam: 'Manchester United', fixtureId: 'FIX_002' },
+      { homeTeam: 'Manchester City', awayTeam: 'Tottenham', fixtureId: 'FIX_003' },
+      { homeTeam: 'Newcastle', awayTeam: 'Brighton', fixtureId: 'FIX_004' },
+    ];
+    const predictionTypes = ['correct_score', 'match_result', 'both_teams_score', 'goal_range'];
+    const predictions = [];
+
+    // Generate Ongoing predictions
+    users.forEach((userId, userIdx) => {
+      matches.forEach((match, matchIdx) => {
+        const numPredictions = Math.floor(Math.random() * 3) + 1; // 1-3 predictions per user-match
+        for (let i = 0; i < numPredictions; i++) {
+          predictions.push({
+            id: `PRED_${userId}_${match.fixtureId}_${i}`,
+            userId: userId,
+            username: usernames[userIdx],
+            userEmail: emails[userIdx],
+            fixtureId: match.fixtureId,
+            matchId: match.fixtureId,
+            matchName: `${match.homeTeam} vs ${match.awayTeam}`,
+            homeTeam: match.homeTeam,
+            awayTeam: match.awayTeam,
+            predictionType: predictionTypes[Math.floor(Math.random() * predictionTypes.length)],
+            prediction: match.homeTeam, // Simplified
+            predictionTime: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000), // Last 7 days
+            status: 'ongoing',
+            predictionStatus: 'ongoing',
+          });
+        }
+      });
+    });
+
+    // Generate Completed predictions
+    users.slice(0, 3).forEach((userId, userIdx) => {
+      matches.slice(0, 2).forEach((match, matchIdx) => {
+        const numPredictions = Math.floor(Math.random() * 2) + 1; // 1-2 predictions per user-match
+        for (let i = 0; i < numPredictions; i++) {
+          const isCorrect = Math.random() > 0.5;
+          predictions.push({
+            id: `PRED_COMP_${userId}_${match.fixtureId}_${i}`,
+            userId: userId,
+            username: usernames[userIdx],
+            userEmail: emails[userIdx],
+            fixtureId: match.fixtureId,
+            matchId: match.fixtureId,
+            matchName: `${match.homeTeam} vs ${match.awayTeam}`,
+            homeTeam: match.homeTeam,
+            awayTeam: match.awayTeam,
+            predictionType: predictionTypes[Math.floor(Math.random() * predictionTypes.length)],
+            prediction: match.homeTeam,
+            predictionTime: new Date(Date.now() - (14 + Math.random() * 7) * 24 * 60 * 60 * 1000), // 14-21 days ago
+            status: isCorrect ? 'correct' : 'incorrect',
+            predictionStatus: isCorrect ? 'correct' : 'incorrect',
+            actualResult: `${Math.floor(Math.random() * 3)} - ${Math.floor(Math.random() * 3)}`,
+            spAwarded: isCorrect ? Math.floor(Math.random() * 100) + 10 : 0,
+          });
+        }
+      });
+    });
+
+    return predictions;
+  };
+
   const loadPredictions = async () => {
     try {
       setLoading(true);
-      const predictionsRef = collection(db, 'predictions');
-      const q = query(predictionsRef, orderBy('predictionTime', 'desc'));
-      const snapshot = await getDocs(q);
-      const predictionsData = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
+      // Add dummy data for demonstration
+      const dummyData = generateDummyPredictions();
+      
+      // Try to load from Firebase, but use dummy data if empty
+      let predictionsData = [];
+      try {
+        const predictionsRef = collection(db, 'predictions');
+        const q = query(predictionsRef, orderBy('predictionTime', 'desc'));
+        const snapshot = await getDocs(q);
+        predictionsData = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+      } catch (error) {
+        console.log('Using dummy data:', error);
+      }
+      
+      // Use dummy data if no real data exists
+      if (predictionsData.length === 0) {
+        predictionsData = dummyData;
+      }
+      
       setPredictions(predictionsData);
       
       // Group predictions by user + match combination
@@ -87,6 +171,11 @@ const PredictionsPage = () => {
       setFilteredPredictions(grouped);
     } catch (error) {
       console.error('Error loading predictions:', error);
+      // Fallback to dummy data
+      const dummyData = generateDummyPredictions();
+      setPredictions(dummyData);
+      const grouped = groupPredictionsByUserMatch(dummyData);
+      setFilteredPredictions(grouped);
     } finally {
       setLoading(false);
     }
