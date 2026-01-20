@@ -1,7 +1,7 @@
-const { override, webpack } = require('customize-cra');
+const { override } = require('customize-cra');
 
 module.exports = override(
-  webpack((config) => {
+  (config) => {
     // Fix source-map-loader issues with date-fns and other packages
     const sourceMapLoader = config.module.rules.find(
       (rule) => rule.enforce === 'pre' && rule.loader && rule.loader.includes('source-map-loader')
@@ -12,5 +12,5 @@ module.exports = override(
     }
     
     return config;
-  })
+  }
 );
