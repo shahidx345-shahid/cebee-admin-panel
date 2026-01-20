@@ -132,6 +132,9 @@ const UsersPage = () => {
         usersData = generateDummyUsers();
       }
       
+      // For demo: always use dummy data
+      usersData = generateDummyUsers();
+      
       setUsers(usersData);
       setFilteredUsers(usersData);
     } catch (error) {
