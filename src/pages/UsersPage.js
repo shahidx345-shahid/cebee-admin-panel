@@ -64,7 +64,7 @@ const UsersPage = () => {
   const [accuracyRange, setAccuracyRange] = useState('all');
   const [searchSuggestions, setSearchSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [searchInputRef, setSearchInputRef] = useState(null);
+  const searchBoxRef = useRef(null);
 
   useEffect(() => {
     loadUsers();
