@@ -1,24 +1,19 @@
-import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
-import { getStorage } from 'firebase/storage';
+/**
+ * Mock Firebase Configuration
+ * 
+ * This file provides empty mock objects for Firebase services.
+ * All Firebase functionality has been removed from the project.
+ * These exports prevent import errors in files that still reference Firebase.
+ * 
+ * The application now uses static data instead of Firebase.
+ */
 
-const firebaseConfig = {
-  apiKey: 'AIzaSyD_Vp2tCOYqzSYH9cfgLujjiXdEEAPaeIc',
-  appId: '1:949985428005:web:f3a4b0dea1cff6394575cc',
-  messagingSenderId: '949985428005',
-  projectId: 'ceebee-prediction',
-  authDomain: 'ceebee-prediction.firebaseapp.com',
-  storageBucket: 'ceebee-prediction.firebasestorage.app',
-  measurementId: 'G-1JN76ZK2P7',
-};
+// Empty mock objects - no actual Firebase functionality
+const app = {};
+const auth = {};
+const db = {};
+const storage = {};
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-
-// Initialize Firebase services
-export const auth = getAuth(app);
-export const db = getFirestore(app);
-export const storage = getStorage(app);
-
+// Export mocks to prevent import errors
+export { auth, db, storage };
 export default app;

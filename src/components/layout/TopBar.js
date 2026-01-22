@@ -7,7 +7,6 @@ import { getPageIcon, getPageTitle } from '../../utils/pageUtils';
 
 const TopBar = ({ onMenuClick, isMobile }) => {
   const location = useLocation();
-  const navigate = useNavigate();
 
   const pageIcon = getPageIcon(location.pathname);
   const pageTitle = getPageTitle(location.pathname);

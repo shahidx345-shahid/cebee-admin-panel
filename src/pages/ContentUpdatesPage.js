@@ -2,9 +2,6 @@ import React, { useState } from 'react';
 import {
   Box,
   Typography,
-  Card,
-  Tabs,
-  Tab,
   Button,
 } from '@mui/material';
 import {
@@ -14,7 +11,7 @@ import {
   Description,
   Shield,
 } from '@mui/icons-material';
-import { colors, constants } from '../config/theme';
+import { colors } from '../config/theme';
 import FaqManagementPage from './content/FaqManagementPage';
 import GameRulesEditorPage from './content/GameRulesEditorPage';
 import AppFeaturesEditorPage from './content/AppFeaturesEditorPage';
@@ -70,31 +67,44 @@ const ContentUpdatesPage = () => {
       </Box>
 
       {/* Section Tabs */}
-      <Box sx={{ mb: 3, display: 'flex', gap: 1.5, flexWrap: 'wrap', width: '100%' }}>
-        {sections.map((section) => {
+      <Box 
+        sx={{ 
+          mb: 4, 
+          display: 'flex', 
+          width: '100%',
+          backgroundColor: colors.brandWhite,
+          borderRadius: '20px',
+          padding: '6px',
+          gap: '6px',
+        }}
+      >
+        {sections.map((section, index) => {
           const isSelected = selectedSection === section.value;
           const Icon = section.icon;
           return (
             <Button
               key={section.value}
-              startIcon={<Icon sx={{ fontSize: 18 }} />}
+              startIcon={<Icon sx={{ fontSize: 22 }} />}
               onClick={() => setSelectedSection(section.value)}
               sx={{
-                borderRadius: '20px',
+                flex: 1,
+                borderRadius: '16px',
                 textTransform: 'none',
                 fontWeight: 600,
-                fontSize: 14,
-                px: 3,
-                py: 1.5,
-                backgroundColor: isSelected ? colors.brandRed : colors.brandWhite,
-                color: isSelected ? colors.brandWhite : colors.textSecondary,
-                border: `1.5px solid ${isSelected ? colors.brandRed : colors.divider}66`,
+                fontSize: 16,
+                px: 2.5,
+                py: 2,
+                backgroundColor: isSelected ? section.color : 'transparent',
+                color: isSelected ? colors.brandWhite : '#6B7280',
+                border: 'none',
+                boxShadow: isSelected ? `0 4px 12px ${section.color}40` : 'none',
+                minWidth: 0,
                 '&:hover': {
-                  backgroundColor: isSelected ? colors.brandRed : `${colors.divider}0D`,
-                  borderColor: isSelected ? colors.brandRed : colors.brandRed,
+                  backgroundColor: isSelected ? section.color : '#F5F5F5',
                 },
                 '& .MuiSvgIcon-root': {
                   color: isSelected ? colors.brandWhite : section.color,
+                  fontSize: '22px',
                 },
               }}
             >

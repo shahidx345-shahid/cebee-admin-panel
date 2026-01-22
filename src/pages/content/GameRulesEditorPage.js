@@ -5,7 +5,6 @@ import {
   Button,
   Card,
   Chip,
-  Grid,
   CircularProgress,
   Dialog,
   DialogContent,
@@ -13,44 +12,102 @@ import {
   TextField,
   IconButton,
 } from '@mui/material';
-import { Info, Book, Edit as EditIcon, CheckCircle, Close, Description, Tag } from '@mui/icons-material';
+import { Book, Edit as EditIcon, CheckCircle, Close, Description, Tag, Info } from '@mui/icons-material';
 import { colors } from '../../config/theme';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
-import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../../config/firebase';
 import { format } from 'date-fns';
 
+// Static default content
+const defaultContent = `<h1>CeBee Predict Rules & Fair Play</h1>
+
+<h2>100% Skill-Based. 0% Betting.</h2>
+
+<p>CeBee Predict is a skill-based prediction platform. There is no betting or gambling involved.</p>
+
+<h2>SP (Skill Points) Rules</h2>
+
+<ul>
+  <li>Users earn SP by making accurate predictions</li>
+  <li>SP is virtual and has no monetary value</li>
+  <li>SP can be redeemed for rewards at month-end</li>
+  <li>SP cannot be transferred or sold</li>
+</ul>
+
+<h2>Prediction Structure</h2>
+
+<ul>
+  <li><strong>Match Selection:</strong> Choose from available football matches</li>
+  <li><strong>Make Prediction:</strong> Predict the outcome (Home Win, Draw, Away Win)</li>
+  <li><strong>Submit Before Deadline:</strong> All predictions must be submitted before match kickoff</li>
+  <li><strong>Earn SP:</strong> Correct predictions earn SP based on match difficulty</li>
+</ul>
+
+<h2>Fair Play Principles</h2>
+
+<ul>
+  <li>One account per user</li>
+  <li>No bots or automated predictions allowed</li>
+  <li>Manipulating predictions is strictly prohibited</li>
+  <li>All predictions are final once submitted</li>
+</ul>
+
+<h2>Monthly Leaderboard</h2>
+
+<ul>
+  <li>Leaderboard ranks users by total SP earned</li>
+  <li>Top performers win rewards</li>
+  <li>Rewards are non-monetary (merchandise, vouchers, etc.)</li>
+  <li>Winners are announced on the first day of next month</li>
+</ul>
+
+<h2>Account Suspension</h2>
+
+<p>Accounts may be suspended for:</p>
+
+<ul>
+  <li>Multiple accounts</li>
+  <li>Using bots or automation</li>
+  <li>Attempting to manipulate the system</li>
+  <li>Violating fair play principles</li>
+</ul>
+
+<p>For questions, contact <strong>support@ceebeepredict.com</strong></p>`;
+
 const GameRulesEditorPage = () => {
-  const [content, setContent] = useState('');
+  const [content, setContent] = useState(defaultContent);
   const [title, setTitle] = useState('Rules & Fair Play');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [version, setVersion] = useState('1.0');
-  const [updatedAt, setUpdatedAt] = useState(null);
+  const [updatedAt, setUpdatedAt] = useState(new Date('2026-01-12'));
   const [status, setStatus] = useState('published');
 
   useEffect(() => {
     loadContent();
   }, []);
 
-  const loadContent = async () => {
+  const loadContent = () => {
     try {
       setLoading(true);
-      const contentRef = doc(db, 'content', 'gameRules');
-      const contentDoc = await getDoc(contentRef);
-      if (contentDoc.exists()) {
-        const data = contentDoc.data();
-        setContent(data.content || '');
-        setTitle(data.title || 'Rules & Fair Play');
-        setVersion(data.version || '1.0');
-        setStatus(data.status || 'published');
-        if (data.updatedAt) {
-          const date = data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date(data.updatedAt);
-          setUpdatedAt(date);
-        }
+      // Load from localStorage if available
+      const savedContent = localStorage.getItem('gameRulesContent');
+      const savedTitle = localStorage.getItem('gameRulesTitle');
+      const savedVersion = localStorage.getItem('gameRulesVersion');
+      const savedDate = localStorage.getItem('gameRulesUpdatedAt');
+      
+      if (savedContent) {
+        setContent(savedContent);
+        setTitle(savedTitle || 'Rules & Fair Play');
+        setVersion(savedVersion || '1.0');
+        setUpdatedAt(savedDate ? new Date(savedDate) : new Date('2026-01-12'));
+      } else {
+        // Use default content
+        setContent(defaultContent);
+        setTitle('Rules & Fair Play');
+        setVersion('1.0');
+        setUpdatedAt(new Date('2026-01-12'));
       }
     } catch (error) {
       console.error('Error loading content:', error);
@@ -59,24 +116,19 @@ const GameRulesEditorPage = () => {
     }
   };
 
-  const handleSave = async () => {
+  const handleSave = () => {
     try {
       setSaving(true);
-      const contentRef = doc(db, 'content', 'gameRules');
-      const newVersion = parseFloat(version) + 0.1;
-      await updateDoc(contentRef, {
-        content,
-        title,
-        version: newVersion.toFixed(1),
-        status: 'published',
-        updatedAt: serverTimestamp(),
-      });
-      setVersion(newVersion.toFixed(1));
+      // Save to localStorage
+      localStorage.setItem('gameRulesContent', content);
+      localStorage.setItem('gameRulesTitle', title);
+      localStorage.setItem('gameRulesVersion', version);
+      const newDate = new Date();
+      localStorage.setItem('gameRulesUpdatedAt', newDate.toISOString());
+      
+      setUpdatedAt(newDate);
       setStatus('published');
-      setUpdatedAt(new Date());
-      setIsEditing(false);
       setIsModalOpen(false);
-      await loadContent();
       alert('Content saved successfully!');
     } catch (error) {
       console.error('Error saving content:', error);
@@ -104,166 +156,209 @@ const GameRulesEditorPage = () => {
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%' }}>
-      <Grid container spacing={3}>
-        {/* Game Rules Document Section */}
-        <Grid item xs={12} md={6}>
-          <Card
+      {/* Game Rules Document Section */}
+      <Card
+        sx={{
+          padding: 3,
+          borderRadius: '20px',
+          backgroundColor: '#E3F2FD',
+          border: `1px solid #90CAF9`,
+          boxShadow: 'none',
+          mb: 3,
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2.5, mb: 2 }}>
+          <Box
             sx={{
-              padding: 3,
-              borderRadius: '20px',
-              backgroundColor: `${colors.info}0D`,
-              border: `1.5px solid ${colors.info}26`,
-              boxShadow: `0 4px 12px ${colors.info}14`,
+              width: 56,
+              height: 56,
+              borderRadius: '14px',
+              backgroundColor: '#BBDEFB',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
           >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-              <Box
-                sx={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: '50%',
-                  backgroundColor: colors.info,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Info sx={{ fontSize: 24, color: colors.brandWhite }} />
-              </Box>
-              <Box>
-                <Typography variant="h6" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.5 }}>
-                  Game Rules Document
-                </Typography>
-                <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13 }}>
-                  Single live document covering SP rules, prediction structure, and fair play principles. Only one
-                  version can be published at a time.
-                </Typography>
-              </Box>
-            </Box>
+            <Info sx={{ fontSize: 28, color: '#2196F3' }} />
+          </Box>
+          <Box sx={{ flex: 1 }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.75, fontSize: 18 }}>
+              Game Rules Document
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#737373', fontSize: 14, lineHeight: 1.5 }}>
+              Single live document covering SP rules, prediction structure, and fair play principles. Only one
+              version can be published at a time.
+            </Typography>
+          </Box>
+        </Box>
 
-            <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mt: 3 }}>
-              <Chip
-                label={`Version: ${version}`}
-                size="small"
-                sx={{
-                  backgroundColor: colors.info,
-                  color: colors.brandWhite,
-                  fontWeight: 600,
-                  fontSize: 12,
-                  borderRadius: '20px',
-                }}
-              />
-              <Chip
-                label={
-                  updatedAt ? `Updated: ${format(updatedAt, 'MMM dd, yyyy')}` : 'Updated: Not yet'
-                }
-                size="small"
-                sx={{
-                  backgroundColor: colors.success,
-                  color: colors.brandWhite,
-                  fontWeight: 600,
-                  fontSize: 12,
-                  borderRadius: '20px',
-                }}
-              />
-              <Chip
-                label={status.toUpperCase()}
-                size="small"
-                sx={{
-                  backgroundColor: colors.brandRed,
-                  color: colors.brandWhite,
-                  fontWeight: 600,
-                  fontSize: 12,
-                  borderRadius: '20px',
-                }}
-              />
-            </Box>
-          </Card>
-        </Grid>
-
-        {/* Game Rules Preview Section */}
-        <Grid item xs={12} md={6}>
-          <Card
+        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mt: 2.5 }}>
+          <Chip
+            label={`Version: ${version}`}
+            size="small"
             sx={{
-              padding: 3,
+              backgroundColor: '#2196F3',
+              color: colors.brandWhite,
+              fontWeight: 600,
+              fontSize: 13,
+              height: 34,
               borderRadius: '20px',
-              backgroundColor: `${colors.brandRed}0D`,
-              border: `1.5px solid ${colors.brandRed}26`,
-              boxShadow: `0 4px 12px ${colors.brandRed}14`,
-              position: 'relative',
+              px: 0.5,
             }}
-          >
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Box
-                  sx={{
-                    width: 48,
-                    height: 48,
-                    borderRadius: '12px',
-                    backgroundColor: colors.brandRed,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Book sx={{ fontSize: 24, color: colors.brandWhite }} />
-                </Box>
-                <Box>
-                  <Typography variant="h6" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.5 }}>
-                    Game Rules Preview
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13 }}>
-                    Review the current game rules
-                  </Typography>
-                </Box>
-              </Box>
-              <Button
-                variant="contained"
-                startIcon={<EditIcon />}
-                onClick={handleEditClick}
-                sx={{
-                  background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
-                  borderRadius: '20px',
-                  textTransform: 'none',
-                  fontWeight: 600,
-                  px: 2.5,
-                  py: 1,
-                }}
-              >
-                Edit
-              </Button>
-            </Box>
+          />
+          <Chip
+            label={updatedAt ? `Updated: ${format(updatedAt, 'MMM dd, yyyy')}` : 'Updated: Not yet'}
+            size="small"
+            sx={{
+              backgroundColor: '#4CAF50',
+              color: colors.brandWhite,
+              fontWeight: 600,
+              fontSize: 13,
+              height: 34,
+              borderRadius: '20px',
+              px: 0.5,
+            }}
+          />
+          <Chip
+            label={status.toUpperCase()}
+            size="small"
+            sx={{
+              backgroundColor: '#F44336',
+              color: colors.brandWhite,
+              fontWeight: 600,
+              fontSize: 13,
+              height: 34,
+              borderRadius: '20px',
+              px: 0.5,
+            }}
+          />
+        </Box>
+      </Card>
 
+      {/* Game Rules Preview Section */}
+      <Card
+        sx={{
+          padding: 3,
+          borderRadius: '20px',
+          backgroundColor: '#FFF5F5',
+          border: `1px solid #FFCDD2`,
+          boxShadow: 'none',
+          position: 'relative',
+        }}
+      >
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2.5 }}>
             <Box
               sx={{
-                mt: 3,
-                padding: 3,
-                borderRadius: '16px',
-                backgroundColor: colors.brandWhite,
-                border: `1px solid ${colors.divider}33`,
-                minHeight: '400px',
+                width: 56,
+                height: 56,
+                borderRadius: '12px',
+                backgroundColor: colors.brandRed,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
               }}
             >
-              <Typography variant="h5" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 2 }}>
-                {title}
-              </Typography>
-              {updatedAt && (
-                <Typography variant="body2" sx={{ color: colors.textSecondary, mb: 3, fontSize: 14 }}>
-                  Version {version} • Updated {format(updatedAt, 'MMM dd, yyyy')}
-                </Typography>
-              )}
-              <Box
-                sx={{
-                  '& .ql-editor': {
-                    padding: 0,
-                  },
-                }}
-                dangerouslySetInnerHTML={{ __html: content || '<p>No content available. Click Edit to add content.</p>' }}
-              />
+              <Book sx={{ fontSize: 24, color: colors.brandWhite }} />
             </Box>
-          </Card>
-        </Grid>
-      </Grid>
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.5, fontSize: 18 }}>
+                Game Rules Preview
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#737373', fontSize: 14 }}>
+                Review the current game rules
+              </Typography>
+            </Box>
+          </Box>
+          <Button
+            variant="contained"
+            startIcon={<EditIcon sx={{ fontSize: 18 }} />}
+            onClick={handleEditClick}
+            sx={{
+              backgroundColor: colors.brandRed,
+              borderRadius: '12px',
+              textTransform: 'none',
+              fontWeight: 600,
+              fontSize: 15,
+              px: 3,
+              py: 1.25,
+              boxShadow: 'none',
+              '&:hover': {
+                backgroundColor: colors.brandDarkRed,
+                boxShadow: 'none',
+              },
+            }}
+          >
+            Edit
+          </Button>
+        </Box>
+
+        <Box
+          sx={{
+            mt: 3,
+            padding: 4,
+            borderRadius: '20px',
+            backgroundColor: colors.brandWhite,
+            border: `1px solid ${colors.divider}26`,
+            minHeight: '500px',
+            maxWidth: '900px',
+            margin: '24px auto 0',
+          }}
+        >
+          <Box sx={{ textAlign: 'center', mb: 3 }}>
+            <Typography variant="h4" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 1.5, fontSize: 26 }}>
+              {title}
+            </Typography>
+            {updatedAt && (
+              <Typography variant="body2" sx={{ color: '#9CA3AF', fontSize: 14 }}>
+                Version {version} • Updated {format(updatedAt, 'MMM dd, yyyy')}
+              </Typography>
+            )}
+          </Box>
+          <Box
+            sx={{
+              '& .ql-editor': {
+                padding: 0,
+              },
+              '& h1': {
+                fontSize: '24px',
+                fontWeight: 700,
+                color: colors.brandBlack,
+                marginBottom: '16px',
+                marginTop: '0',
+              },
+              '& h2': {
+                fontSize: '18px',
+                fontWeight: 600,
+                color: colors.brandBlack,
+                marginTop: '24px',
+                marginBottom: '12px',
+              },
+              '& p': {
+                lineHeight: 1.7,
+                color: '#4A4A4A',
+                fontSize: '15px',
+                marginBottom: '12px',
+              },
+              '& ul': {
+                paddingLeft: '24px',
+                marginBottom: '16px',
+              },
+              '& li': {
+                lineHeight: 1.8,
+                color: '#4A4A4A',
+                fontSize: '15px',
+                marginBottom: '8px',
+              },
+              '& strong': {
+                fontWeight: 600,
+                color: colors.brandBlack,
+              },
+            }}
+            dangerouslySetInnerHTML={{ __html: content || '<p>No content available. Click Edit to add content.</p>' }}
+          />
+        </Box>
+      </Card>
 
       {/* Edit Game Rules Modal */}
       <Dialog

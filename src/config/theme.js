@@ -28,7 +28,7 @@ export const colors = {
   // UI Colors
   divider: '#E0E0E0',
   border: '#CCCCCC',
-  shadow: '#1A000000',
+  shadow: 'rgba(0, 0, 0, 0.1)',
 };
 
 // Create Material-UI theme with Poppins font

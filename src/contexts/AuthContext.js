@@ -1,12 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { 
-  signInWithEmailAndPassword,
-  signOut as firebaseSignOut,
-  onAuthStateChanged 
-} from 'firebase/auth';
-import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db } from '../config/firebase';
 
+// Mock Auth Context - No Firebase dependencies
 const AuthContext = createContext({});
 
 export const useAuth = () => {
@@ -23,92 +17,67 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        // Check if user is admin
-        try {
-          const adminDoc = await getDoc(doc(db, 'admins', user.uid));
-          if (adminDoc.exists()) {
-            const adminData = { id: adminDoc.id, ...adminDoc.data() };
-            if (adminData.isActive) {
-              setCurrentUser(user);
-              setAdmin(adminData);
-            } else {
-              await firebaseSignOut(auth);
-              setCurrentUser(null);
-              setAdmin(null);
-            }
-          } else {
-            // Not an admin, sign out
-            await firebaseSignOut(auth);
-            setCurrentUser(null);
-            setAdmin(null);
-          }
-        } catch (error) {
-          console.error('Error checking admin status:', error);
-          setCurrentUser(null);
-          setAdmin(null);
+    // Check for existing session in localStorage
+    const checkSession = () => {
+      try {
+        const storedUser = localStorage.getItem('mock_user_session');
+        if (storedUser) {
+          const user = JSON.parse(storedUser);
+          setCurrentUser(user);
+          setAdmin({
+            id: user.uid,
+            email: user.email,
+            role: 'admin',
+            isActive: true
+          });
         }
-      } else {
-        setCurrentUser(null);
-        setAdmin(null);
+      } catch (error) {
+        console.error('Error restoring session:', error);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
-    });
+    };
 
-    return unsubscribe;
+    checkSession();
   }, []);
 
   const login = async (email, password) => {
-    try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-      
-      // Verify admin status
-      const adminDoc = await getDoc(doc(db, 'admins', user.uid));
-      if (!adminDoc.exists()) {
-        await firebaseSignOut(auth);
-        throw new Error('Access denied. This account is not an admin.');
-      }
+    // Simulating API call
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        if (email && password) {
+          const mockUser = {
+            uid: 'mock-admin-123',
+            email: email,
+            displayName: 'Admin User',
+            emailVerified: true,
+          };
 
-      const adminData = adminDoc.data();
-      if (!adminData.isActive) {
-        await firebaseSignOut(auth);
-        throw new Error('Account is inactive. Please contact support.');
-      }
+          const mockAdmin = {
+            id: 'mock-admin-123',
+            email: email,
+            role: 'admin',
+            isActive: true,
+            lastLoginAt: new Date(),
+          };
 
-      // Update last login
-      await updateDoc(doc(db, 'admins', user.uid), {
-        lastLoginAt: serverTimestamp(),
-      });
+          setCurrentUser(mockUser);
+          setAdmin(mockAdmin);
+          localStorage.setItem('mock_user_session', JSON.stringify(mockUser));
 
-      return { success: true };
-    } catch (error) {
-      let errorMessage = 'Authentication failed. Please try again.';
-      if (error.code === 'auth/user-not-found') {
-        errorMessage = 'No user found with this email.';
-      } else if (error.code === 'auth/wrong-password') {
-        errorMessage = 'Incorrect password.';
-      } else if (error.code === 'auth/invalid-email') {
-        errorMessage = 'Invalid email address.';
-      } else if (error.code === 'auth/user-disabled') {
-        errorMessage = 'This account has been disabled.';
-      } else if (error.code === 'auth/too-many-requests') {
-        errorMessage = 'Too many failed attempts. Please try again later.';
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-      return { success: false, error: errorMessage };
-    }
+          resolve({ success: true });
+        } else {
+          resolve({ success: false, error: 'Invalid credentials' });
+        }
+      }, 500); // Fake delay
+    });
   };
 
   const logout = async () => {
-    try {
-      await firebaseSignOut(auth);
-      return { success: true };
-    } catch (error) {
-      return { success: false, error: error.message };
-    }
+    setCurrentUser(null);
+    setAdmin(null);
+    localStorage.removeItem('mock_user_session');
+    return { success: true };
   };
 
   const value = {

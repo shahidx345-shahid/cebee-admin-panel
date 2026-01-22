@@ -3,13 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { constants } from '../config/theme';
 import { colors } from '../config/theme';
-import { 
-  Box, 
-  Container, 
-  TextField, 
-  Button, 
-  Typography, 
-  Checkbox, 
+import {
+  Box,
+  Container,
+  TextField,
+  Button,
+  Typography,
+  Checkbox,
   FormControlLabel,
   IconButton,
   InputAdornment,
@@ -60,7 +60,7 @@ const LoginPage = () => {
     }
   };
 
-  const isMobile = window.innerWidth < 768;
+
 
   return (
     <Box

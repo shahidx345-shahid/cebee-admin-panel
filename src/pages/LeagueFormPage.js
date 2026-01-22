@@ -23,7 +23,6 @@ import {
 import {
   ArrowBack,
   Save,
-  SportsSoccer,
   Add,
   Info,
   Image as ImageIcon,
@@ -58,37 +57,37 @@ const LeagueFormPage = () => {
   });
 
   useEffect(() => {
+    const loadLeagueData = async () => {
+      try {
+        setLoading(true);
+        const leagueRef = doc(db, 'leagues', id);
+        const leagueDoc = await getDoc(leagueRef);
+        if (leagueDoc.exists()) {
+          const data = leagueDoc.data();
+          setFormData({
+            name: data.name || '',
+            type: data.type || 'domestic',
+            logoUrl: data.logoUrl || '',
+            isActive: data.isActive || false,
+            priority: data.priority || '',
+          });
+          if (data.logoUrl) {
+            setLogoPreview(data.logoUrl);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading league:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     if (isEditMode) {
       loadLeagueData();
     } else {
       setLoading(false);
     }
   }, [id]);
-
-  const loadLeagueData = async () => {
-    try {
-      setLoading(true);
-      const leagueRef = doc(db, 'leagues', id);
-      const leagueDoc = await getDoc(leagueRef);
-      if (leagueDoc.exists()) {
-        const data = leagueDoc.data();
-        setFormData({
-          name: data.name || '',
-          type: data.type || 'domestic',
-          logoUrl: data.logoUrl || '',
-          isActive: data.isActive || false,
-          priority: data.priority || '',
-        });
-        if (data.logoUrl) {
-          setLogoPreview(data.logoUrl);
-        }
-      }
-    } catch (error) {
-      console.error('Error loading league:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleChange = (field, value) => {
     setFormData({ ...formData, [field]: value });
@@ -441,8 +440,8 @@ const LeagueFormPage = () => {
                 sx={{ color: colors.textSecondary, fontSize: 12 }}
               >
                 • {formData.type === 'domestic' ? 'National leagues (e.g., Premier League)' :
-                   formData.type === 'international' ? 'International competitions (e.g., UEFA Champions League)' :
-                   'Cup competitions (e.g., FA Cup)'}
+                  formData.type === 'international' ? 'International competitions (e.g., UEFA Champions League)' :
+                    'Cup competitions (e.g., FA Cup)'}
               </Typography>
               <IconButton size="small" sx={{ ml: 'auto' }}>
                 <ArrowDownward sx={{ fontSize: 16, color: colors.brandRed }} />

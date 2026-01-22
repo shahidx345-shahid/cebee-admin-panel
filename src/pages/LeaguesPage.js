@@ -20,7 +20,6 @@ import {
   Add,
   SportsSoccer,
   CheckCircle,
-  Cancel,
   Stadium,
   AccessTime,
   List as ListIcon,
@@ -36,7 +35,7 @@ import {
 import { colors, constants } from '../config/theme';
 import SearchBar from '../components/common/SearchBar';
 import DataTable from '../components/common/DataTable';
-import { collection, getDocs, query, orderBy, doc, updateDoc } from 'firebase/firestore';
+// Firebase imports removed
 import { db } from '../config/firebase';
 import { format } from 'date-fns';
 
@@ -55,11 +54,72 @@ const LeaguesPage = () => {
   const [dateFilterAnchor, setDateFilterAnchor] = useState(null);
   const [typeFilterAnchor, setTypeFilterAnchor] = useState(null);
 
+  const loadLeagues = async () => {
+    setLoading(true);
+    // Directly use sample data
+    const leaguesData = getSampleLeagues();
+    setLeagues(leaguesData);
+    setFilteredLeagues(leaguesData);
+    setLoading(false);
+  };
+
   useEffect(() => {
     loadLeagues();
   }, []);
 
   useEffect(() => {
+    const filterAndSortLeagues = () => {
+      let filtered = [...leagues];
+
+      // Search filter
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        filtered = filtered.filter(
+          (league) =>
+            league.name?.toLowerCase().includes(query) ||
+            league.id?.toLowerCase().includes(query)
+        );
+      }
+
+      // Type filter
+      if (typeFilter !== 'all') {
+        filtered = filtered.filter((league) => league.type === typeFilter);
+      }
+
+      // Sort
+      switch (selectedSort) {
+        case 'nameAZ':
+          filtered.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+          break;
+        case 'nameZA':
+          filtered.sort((a, b) => (b.name || '').localeCompare(a.name || ''));
+          break;
+        case 'typeAZ':
+          filtered.sort((a, b) => (a.type || '').localeCompare(b.type || ''));
+          break;
+        case 'typeZA':
+          filtered.sort((a, b) => (b.type || '').localeCompare(a.type || ''));
+          break;
+        case 'dateNewest':
+          filtered.sort((a, b) => {
+            const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
+            const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+            return dateB - dateA;
+          });
+          break;
+        case 'dateOldest':
+          filtered.sort((a, b) => {
+            const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
+            const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+            return dateA - dateB;
+          });
+          break;
+        default:
+          break;
+      }
+
+      setFilteredLeagues(filtered);
+    };
     filterAndSortLeagues();
   }, [leagues, searchQuery, typeFilter, selectedSort]);
 
@@ -124,97 +184,7 @@ const LeaguesPage = () => {
     ];
   };
 
-  const loadLeagues = async () => {
-    try {
-      setLoading(true);
-      let leaguesData = [];
-      
-      // Try to load from Firebase
-      try {
-        const leaguesRef = collection(db, 'leagues');
-        const q = query(leaguesRef, orderBy('createdAt', 'desc'));
-        const snapshot = await getDocs(q);
-        leaguesData = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-      } catch (error) {
-        console.log('Using sample data:', error);
-      }
 
-      // If no leagues exist, use sample data
-      if (leaguesData.length === 0) {
-        leaguesData = getSampleLeagues();
-      }
-
-      // For demo: always use sample data
-      leaguesData = getSampleLeagues();
-
-      setLeagues(leaguesData);
-      setFilteredLeagues(leaguesData);
-    } catch (error) {
-      console.error('Error loading leagues:', error);
-      // On error, use sample data
-      const sampleData = getSampleLeagues();
-      setLeagues(sampleData);
-      setFilteredLeagues(sampleData);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const filterAndSortLeagues = () => {
-    let filtered = [...leagues];
-
-    // Search filter
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (league) =>
-          league.name?.toLowerCase().includes(query) ||
-          league.id?.toLowerCase().includes(query)
-      );
-    }
-
-    // Type filter
-    if (typeFilter !== 'all') {
-      filtered = filtered.filter((league) => league.type === typeFilter);
-    }
-
-    // Sort
-    switch (selectedSort) {
-      case 'nameAZ':
-        filtered.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-        break;
-      case 'nameZA':
-        filtered.sort((a, b) => (b.name || '').localeCompare(a.name || ''));
-        break;
-      case 'typeAZ':
-        filtered.sort((a, b) => (a.type || '').localeCompare(b.type || ''));
-        break;
-      case 'typeZA':
-        filtered.sort((a, b) => (b.type || '').localeCompare(a.type || ''));
-        break;
-      case 'dateNewest':
-        filtered.sort((a, b) => {
-          const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
-          const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
-          return dateB - dateA;
-        });
-        break;
-      case 'dateOldest':
-        filtered.sort((a, b) => {
-          const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
-          const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
-          return dateA - dateB;
-        });
-        break;
-      default:
-        break;
-    }
-
-    setFilteredLeagues(filtered);
-  };
 
   const toggleLeagueStatus = async (league) => {
     try {
@@ -225,11 +195,14 @@ const LeaguesPage = () => {
         return;
       }
 
-      const leagueRef = doc(db, 'leagues', league.id);
-      await updateDoc(leagueRef, {
-        isActive: !league.isActive,
-      });
-      await loadLeagues();
+      // Mock update - Update local state
+      const updatedLeagues = leagues.map(l =>
+        l.id === league.id ? { ...l, isActive: !l.isActive } : l
+      );
+      setLeagues(updatedLeagues);
+      setFilteredLeagues(updatedLeagues);
+
+      console.log('Mock: Toggled league status for', league.name);
     } catch (error) {
       console.error('Error toggling league status:', error);
     }
@@ -450,11 +423,11 @@ const LeaguesPage = () => {
           }}
         >
           {selectedSort === 'nameAZ' ? 'Name: A-Z' :
-           selectedSort === 'nameZA' ? 'Name: Z-A' :
-           selectedSort === 'typeAZ' ? 'Type: A-Z' :
-           selectedSort === 'typeZA' ? 'Type: Z-A' :
-           selectedSort === 'dateNewest' ? 'Date: Newest' :
-           selectedSort === 'dateOldest' ? 'Date: Oldest' : 'Date: Newest'}
+            selectedSort === 'nameZA' ? 'Name: Z-A' :
+              selectedSort === 'typeAZ' ? 'Type: A-Z' :
+                selectedSort === 'typeZA' ? 'Type: Z-A' :
+                  selectedSort === 'dateNewest' ? 'Date: Newest' :
+                    selectedSort === 'dateOldest' ? 'Date: Oldest' : 'Date: Newest'}
         </Button>
         <Menu
           anchorEl={dateFilterAnchor}

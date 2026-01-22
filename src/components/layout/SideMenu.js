@@ -10,8 +10,6 @@ import {
   Typography,
   Avatar,
   Button,
-  Divider,
-  Chip,
 } from '@mui/material';
 import {
   Dashboard,

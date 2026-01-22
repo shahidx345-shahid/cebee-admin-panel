@@ -13,13 +13,10 @@ import {
   InputLabel,
   IconButton,
   Menu,
-  ToggleButton,
-  ToggleButtonGroup,
   Badge,
   Paper,
 } from '@mui/material';
 import {
-  Add,
   Person,
   People,
   CheckCircle,
@@ -38,7 +35,7 @@ import {
 import { colors, constants } from '../config/theme';
 import SearchBar from '../components/common/SearchBar';
 import DataTable from '../components/common/DataTable';
-import { collection, getDocs, query, where, orderBy } from 'firebase/firestore';
+// Firebase imports removed
 import { db } from '../config/firebase';
 import { format } from 'date-fns';
 
@@ -53,8 +50,6 @@ const UsersPage = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [spFilterAnchor, setSpFilterAnchor] = useState(null);
-  const [accuracyFilterAnchor, setAccuracyFilterAnchor] = useState(null);
-  const [accuracyFilter, setAccuracyFilter] = useState('all');
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
@@ -64,8 +59,10 @@ const UsersPage = () => {
   const [accuracyRange, setAccuracyRange] = useState('all');
   const [searchSuggestions, setSearchSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+
+
   const searchBoxRef = useRef(null);
-  
+
   // Click outside handler for search suggestions
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -84,19 +81,132 @@ const UsersPage = () => {
   }, [showSuggestions]);
 
   useEffect(() => {
+    const loadUsers = async () => {
+      setLoading(true);
+      // Use dummy data directly
+      const usersData = generateDummyUsers();
+      setUsers(usersData);
+      setFilteredUsers(usersData);
+      setLoading(false);
+    };
     loadUsers();
   }, []);
 
   useEffect(() => {
+    const filterAndSortUsers = () => {
+      let filtered = [...users];
+
+      // Search filter
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        filtered = filtered.filter(
+          (user) =>
+            user.username?.toLowerCase().includes(query) ||
+            user.email?.toLowerCase().includes(query) ||
+            user.id?.toLowerCase().includes(query) ||
+            user.fullName?.toLowerCase().includes(query) ||
+            user.name?.toLowerCase().includes(query) ||
+            `${user.firstName || ''} ${user.lastName || ''}`.toLowerCase().includes(query)
+        );
+      }
+
+      // Status filter
+      if (selectedStatus !== 'all') {
+        filtered = filtered.filter((user) => {
+          if (selectedStatus === 'active') return user.isActive === true && !user.isDeleted && !user.isBlocked;
+          if (selectedStatus === 'inactive') return user.isActive === false && !user.isDeleted && !user.isBlocked;
+          if (selectedStatus === 'suspended') return user.status === 'suspended';
+          if (selectedStatus === 'flagged') return user.fraudFlags && user.fraudFlags.length > 0;
+          if (selectedStatus === 'blocked') return user.isBlocked === true;
+          if (selectedStatus === 'deactivated') return user.isDeleted === true || user.isDeactivated === true;
+          return true;
+        });
+      }
+
+      // Accuracy filter (from advanced filters)
+      if (accuracyRange !== 'all') {
+        filtered = filtered.filter((user) => {
+          const accuracy = user.predictionAccuracy || 0;
+          if (accuracyRange === '0-25') return accuracy >= 0 && accuracy <= 25;
+          if (accuracyRange === '26-50') return accuracy > 25 && accuracy <= 50;
+          if (accuracyRange === '51-75') return accuracy > 50 && accuracy <= 75;
+          if (accuracyRange === '76-100') return accuracy > 75 && accuracy <= 100;
+          return true;
+        });
+      }
+
+      // League Preference filter
+      if (leaguePreference !== 'all') {
+        filtered = filtered.filter((user) => {
+          // Assuming user has a preferredLeague field, or we can add it to dummy data
+          return user.preferredLeague === leaguePreference;
+        });
+      }
+
+      // Club Preference filter
+      if (clubPreference !== 'all') {
+        filtered = filtered.filter((user) => {
+          // Assuming user has a preferredClub field, or we can add it to dummy data
+          return user.preferredClub === clubPreference;
+        });
+      }
+
+      // Country filter
+      if (countryFilter !== 'all') {
+        filtered = filtered.filter((user) => {
+          return user.country === countryFilter;
+        });
+      }
+
+      // Sort
+      switch (selectedSort) {
+        case 'spHigh':
+          filtered.sort((a, b) => (b.spTotal || 0) - (a.spTotal || 0));
+          break;
+        case 'spLow':
+          filtered.sort((a, b) => (a.spTotal || 0) - (b.spTotal || 0));
+          break;
+        case 'predictionsHigh':
+          filtered.sort((a, b) => (b.totalPredictions || 0) - (a.totalPredictions || 0));
+          break;
+        case 'predictionsLow':
+          filtered.sort((a, b) => (a.totalPredictions || 0) - (b.totalPredictions || 0));
+          break;
+        case 'dateNewest':
+          filtered.sort((a, b) => {
+            const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
+            const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+            return dateB - dateA;
+          });
+          break;
+        case 'dateOldest':
+          filtered.sort((a, b) => {
+            const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
+            const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+            return dateA - dateB;
+          });
+          break;
+        case 'nameAZ':
+          filtered.sort((a, b) => (a.username || '').localeCompare(b.username || ''));
+          break;
+        case 'nameZA':
+          filtered.sort((a, b) => (b.username || '').localeCompare(a.username || ''));
+          break;
+        default:
+          break;
+      }
+
+      setFilteredUsers(filtered);
+    };
     filterAndSortUsers();
-  }, [users, searchQuery, selectedStatus, selectedSort, accuracyFilter, leaguePreference, clubPreference, countryFilter, accuracyRange]);
+  }, [users, searchQuery, selectedStatus, selectedSort, leaguePreference, clubPreference, countryFilter, accuracyRange]);
 
   const generateDummyUsers = () => {
     const firstNames = ['John', 'Jane', 'Mike', 'Sarah', 'David', 'Emily', 'Chris', 'Lisa', 'Tom', 'Amy'];
     const lastNames = ['Doe', 'Smith', 'Wilson', 'Jones', 'Brown', 'Davis', 'Miller', 'Garcia', 'Martinez', 'Anderson'];
     const countries = ['United States', 'United Kingdom', 'Canada', 'Australia', 'Germany', 'France', 'Spain', 'Italy', 'Brazil', 'India', 'Nigeria', 'South Africa', 'Kenya', 'Ghana'];
     const users = [];
-    
+
     // Generate 1000 users for better statistics
     for (let i = 0; i < 1000; i++) {
       const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
@@ -108,7 +218,7 @@ const UsersPage = () => {
       const isDeleted = Math.random() > 0.98; // ~2% deleted/deactivated
       const hasFlags = Math.random() > 0.94; // ~6% flagged
       const isVerified = Math.random() > 0.20; // ~80% verified
-      
+
       users.push({
         id: `USER_${i.toString().padStart(6, '0')}`,
         username: username,
@@ -140,166 +250,11 @@ const UsersPage = () => {
         cpFromEngagement: Math.floor(Math.random() * 200) + 5,
       });
     }
-    
+
     return users;
   };
 
-  const loadUsers = async () => {
-    try {
-      setLoading(true);
-      let usersData = [];
-      
-      // Try to load from Firebase
-      try {
-      const usersRef = collection(db, 'users');
-        const q = query(usersRef, orderBy('createdAt', 'desc'));
-      const snapshot = await getDocs(q);
-        usersData = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      } catch (error) {
-        console.log('Using dummy data:', error);
-      }
-      
-      // Use dummy data if no real data exists
-      if (usersData.length === 0) {
-        usersData = generateDummyUsers();
-      }
-      
-      // For demo: always use dummy data
-      usersData = generateDummyUsers();
-      
-      setUsers(usersData);
-      setFilteredUsers(usersData);
-    } catch (error) {
-      console.error('Error loading users:', error);
-      // Fallback to dummy data
-      const dummyData = generateDummyUsers();
-      setUsers(dummyData);
-      setFilteredUsers(dummyData);
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  const filterAndSortUsers = () => {
-    let filtered = [...users];
-
-    // Search filter
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (user) =>
-          user.username?.toLowerCase().includes(query) ||
-          user.email?.toLowerCase().includes(query) ||
-          user.id?.toLowerCase().includes(query) ||
-          user.fullName?.toLowerCase().includes(query) ||
-          user.name?.toLowerCase().includes(query) ||
-          `${user.firstName || ''} ${user.lastName || ''}`.toLowerCase().includes(query)
-      );
-    }
-
-    // Status filter
-    if (selectedStatus !== 'all') {
-      filtered = filtered.filter((user) => {
-        if (selectedStatus === 'active') return user.isActive === true && !user.isDeleted && !user.isBlocked;
-        if (selectedStatus === 'inactive') return user.isActive === false && !user.isDeleted && !user.isBlocked;
-        if (selectedStatus === 'suspended') return user.status === 'suspended';
-        if (selectedStatus === 'flagged') return user.fraudFlags && user.fraudFlags.length > 0;
-        if (selectedStatus === 'blocked') return user.isBlocked === true;
-        if (selectedStatus === 'deactivated') return user.isDeleted === true || user.isDeactivated === true;
-        return true;
-      });
-    }
-
-    // Accuracy filter (from advanced filters)
-    if (accuracyRange !== 'all') {
-      filtered = filtered.filter((user) => {
-        const accuracy = user.predictionAccuracy || 0;
-        if (accuracyRange === '0-25') return accuracy >= 0 && accuracy <= 25;
-        if (accuracyRange === '26-50') return accuracy > 25 && accuracy <= 50;
-        if (accuracyRange === '51-75') return accuracy > 50 && accuracy <= 75;
-        if (accuracyRange === '76-100') return accuracy > 75 && accuracy <= 100;
-        return true;
-      });
-    }
-
-    // Legacy accuracy filter (keep for backward compatibility)
-    if (accuracyFilter !== 'all') {
-      filtered = filtered.filter((user) => {
-        const accuracy = user.predictionAccuracy || 0;
-        if (accuracyFilter === '0-25') return accuracy >= 0 && accuracy <= 25;
-        if (accuracyFilter === '26-50') return accuracy > 25 && accuracy <= 50;
-        if (accuracyFilter === '51-75') return accuracy > 50 && accuracy <= 75;
-        if (accuracyFilter === '76-100') return accuracy > 75 && accuracy <= 100;
-        return true;
-      });
-    }
-
-    // League Preference filter
-    if (leaguePreference !== 'all') {
-      filtered = filtered.filter((user) => {
-        // Assuming user has a preferredLeague field, or we can add it to dummy data
-        return user.preferredLeague === leaguePreference;
-      });
-    }
-
-    // Club Preference filter
-    if (clubPreference !== 'all') {
-      filtered = filtered.filter((user) => {
-        // Assuming user has a preferredClub field, or we can add it to dummy data
-        return user.preferredClub === clubPreference;
-      });
-    }
-
-    // Country filter
-    if (countryFilter !== 'all') {
-      filtered = filtered.filter((user) => {
-        return user.country === countryFilter;
-      });
-    }
-
-    // Sort
-    switch (selectedSort) {
-      case 'spHigh':
-        filtered.sort((a, b) => (b.spTotal || 0) - (a.spTotal || 0));
-        break;
-      case 'spLow':
-        filtered.sort((a, b) => (a.spTotal || 0) - (b.spTotal || 0));
-        break;
-      case 'predictionsHigh':
-        filtered.sort((a, b) => (b.totalPredictions || 0) - (a.totalPredictions || 0));
-        break;
-      case 'predictionsLow':
-        filtered.sort((a, b) => (a.totalPredictions || 0) - (b.totalPredictions || 0));
-        break;
-      case 'dateNewest':
-        filtered.sort((a, b) => {
-          const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
-          const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
-          return dateB - dateA;
-        });
-        break;
-      case 'dateOldest':
-        filtered.sort((a, b) => {
-          const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
-          const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
-          return dateA - dateB;
-        });
-        break;
-      case 'nameAZ':
-        filtered.sort((a, b) => (a.username || '').localeCompare(b.username || ''));
-        break;
-      case 'nameZA':
-        filtered.sort((a, b) => (b.username || '').localeCompare(a.username || ''));
-        break;
-      default:
-        break;
-    }
-
-    setFilteredUsers(filtered);
-  };
 
   const getStatusChip = (user) => {
     if (user.fraudFlags && user.fraudFlags.length > 0) {
@@ -460,26 +415,9 @@ const UsersPage = () => {
     page * rowsPerPage + rowsPerPage
   );
 
-  const statusOptions = [
-    { value: 'all', label: 'All' },
-    { value: 'active', label: 'Active' },
-    { value: 'inactive', label: 'Inactive' },
-    { value: 'suspended', label: 'Suspended' },
-    { value: 'flagged', label: 'Flagged' },
-    { value: 'blocked', label: 'Blocked' },
-    { value: 'deactivated', label: 'Deactivated' },
-  ];
 
-  const sortOptions = [
-    { value: 'spHigh', label: 'SP (High)' },
-    { value: 'spLow', label: 'SP (Low)' },
-    { value: 'predictionsHigh', label: 'Predictions (Most)' },
-    { value: 'predictionsLow', label: 'Predictions (Least)' },
-    { value: 'dateNewest', label: 'Join Date (Newest)' },
-    { value: 'dateOldest', label: 'Join Date (Oldest)' },
-    { value: 'nameAZ', label: 'Name (A-Z)' },
-    { value: 'nameZA', label: 'Name (Z-A)' },
-  ];
+
+
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%' }}>
@@ -732,31 +670,31 @@ const UsersPage = () => {
                 justifyContent: 'center',
               }}
             >
-              <CheckCircle 
-          sx={{
-                  fontSize: 14, 
-                  color: selectedStatus === 'active' ? colors.success : colors.brandWhite 
-                }} 
+              <CheckCircle
+                sx={{
+                  fontSize: 14,
+                  color: selectedStatus === 'active' ? colors.success : colors.brandWhite
+                }}
               />
             </Box>
           }
           sx={{
             flex: 1,
-              borderRadius: '20px',
-              textTransform: 'none',
-              fontWeight: 600,
-              px: 3,
+            borderRadius: '20px',
+            textTransform: 'none',
+            fontWeight: 600,
+            px: 3,
             py: 1.5,
             backgroundColor: selectedStatus === 'active' ? colors.success : colors.brandWhite,
             color: selectedStatus === 'active' ? colors.brandWhite : colors.brandBlack,
             border: `1.5px solid ${selectedStatus === 'active' ? colors.success : colors.divider}66`,
-                '&:hover': {
+            '&:hover': {
               backgroundColor: selectedStatus === 'active' ? colors.success : colors.brandWhite,
               borderColor: selectedStatus === 'active' ? colors.success : colors.divider,
             },
           }}
         >
-            Active Users
+          Active Users
         </Button>
         <Button
           variant={selectedStatus === 'inactive' ? 'contained' : 'outlined'}
@@ -773,31 +711,31 @@ const UsersPage = () => {
                 justifyContent: 'center',
               }}
             >
-              <Cancel 
-                sx={{ 
-                  fontSize: 14, 
-                  color: selectedStatus === 'inactive' ? colors.error : colors.brandWhite 
-                }} 
+              <Cancel
+                sx={{
+                  fontSize: 14,
+                  color: selectedStatus === 'inactive' ? colors.error : colors.brandWhite
+                }}
               />
             </Box>
           }
           sx={{
             flex: 1,
-              borderRadius: '20px',
-              textTransform: 'none',
-              fontWeight: 600,
-              px: 3,
+            borderRadius: '20px',
+            textTransform: 'none',
+            fontWeight: 600,
+            px: 3,
             py: 1.5,
             backgroundColor: selectedStatus === 'inactive' ? colors.success : colors.brandWhite,
             color: selectedStatus === 'inactive' ? colors.brandWhite : colors.brandBlack,
             border: `1.5px solid ${selectedStatus === 'inactive' ? colors.success : colors.divider}66`,
-                '&:hover': {
+            '&:hover': {
               backgroundColor: selectedStatus === 'inactive' ? colors.success : colors.brandWhite,
               borderColor: selectedStatus === 'inactive' ? colors.success : colors.divider,
             },
           }}
         >
-            Inactive Users
+          Inactive Users
         </Button>
       </Box>
 
@@ -936,14 +874,14 @@ const UsersPage = () => {
             },
           }}
         >
-          {selectedSort === 'spHigh' ? 'SP: High' : 
-           selectedSort === 'spLow' ? 'SP: Low' :
-           selectedSort === 'predictionsHigh' ? 'Predictions: Most' :
-           selectedSort === 'predictionsLow' ? 'Predictions: Least' :
-           selectedSort === 'dateNewest' ? 'Join Date: Newest' :
-           selectedSort === 'dateOldest' ? 'Join Date: Oldest' :
-           selectedSort === 'nameAZ' ? 'Name: A-Z' :
-           selectedSort === 'nameZA' ? 'Name: Z-A' : 'SP: High'}
+          {selectedSort === 'spHigh' ? 'SP: High' :
+            selectedSort === 'spLow' ? 'SP: Low' :
+              selectedSort === 'predictionsHigh' ? 'Predictions: Most' :
+                selectedSort === 'predictionsLow' ? 'Predictions: Least' :
+                  selectedSort === 'dateNewest' ? 'Join Date: Newest' :
+                    selectedSort === 'dateOldest' ? 'Join Date: Oldest' :
+                      selectedSort === 'nameAZ' ? 'Name: A-Z' :
+                        selectedSort === 'nameZA' ? 'Name: Z-A' : 'SP: High'}
         </Button>
         <Menu
           anchorEl={spFilterAnchor}
@@ -958,7 +896,7 @@ const UsersPage = () => {
             },
           }}
         >
-          <MenuItem 
+          <MenuItem
             onClick={() => { setSelectedSort('spHigh'); setSpFilterAnchor(null); }}
             selected={selectedSort === 'spHigh'}
             sx={{
@@ -993,13 +931,13 @@ const UsersPage = () => {
               <ArrowUpward sx={{ fontSize: 14, color: colors.brandWhite }} />
             </Box>
             <Typography variant="body2" sx={{ flex: 1, fontWeight: selectedSort === 'spHigh' ? 700 : 500 }}>
-            SP: High
+              SP: High
             </Typography>
             {selectedSort === 'spHigh' && (
               <Check sx={{ fontSize: 18, color: colors.brandRed }} />
             )}
           </MenuItem>
-          <MenuItem 
+          <MenuItem
             onClick={() => { setSelectedSort('spLow'); setSpFilterAnchor(null); }}
             selected={selectedSort === 'spLow'}
             sx={{
@@ -1034,13 +972,13 @@ const UsersPage = () => {
               <ArrowDownward sx={{ fontSize: 14, color: colors.brandWhite }} />
             </Box>
             <Typography variant="body2" sx={{ flex: 1, fontWeight: selectedSort === 'spLow' ? 700 : 500 }}>
-            SP: Low
+              SP: Low
             </Typography>
             {selectedSort === 'spLow' && (
               <Check sx={{ fontSize: 18, color: colors.brandRed }} />
             )}
           </MenuItem>
-          <MenuItem 
+          <MenuItem
             onClick={() => { setSelectedSort('predictionsHigh'); setSpFilterAnchor(null); }}
             selected={selectedSort === 'predictionsHigh'}
             sx={{
@@ -1081,7 +1019,7 @@ const UsersPage = () => {
               <Check sx={{ fontSize: 18, color: colors.brandRed }} />
             )}
           </MenuItem>
-          <MenuItem 
+          <MenuItem
             onClick={() => { setSelectedSort('predictionsLow'); setSpFilterAnchor(null); }}
             selected={selectedSort === 'predictionsLow'}
             sx={{
@@ -1122,7 +1060,7 @@ const UsersPage = () => {
               <Check sx={{ fontSize: 18, color: colors.brandRed }} />
             )}
           </MenuItem>
-          <MenuItem 
+          <MenuItem
             onClick={() => { setSelectedSort('dateNewest'); setSpFilterAnchor(null); }}
             selected={selectedSort === 'dateNewest'}
             sx={{
@@ -1151,7 +1089,7 @@ const UsersPage = () => {
               <Check sx={{ fontSize: 18, color: colors.brandRed }} />
             )}
           </MenuItem>
-          <MenuItem 
+          <MenuItem
             onClick={() => { setSelectedSort('dateOldest'); setSpFilterAnchor(null); }}
             selected={selectedSort === 'dateOldest'}
             sx={{
@@ -1180,7 +1118,7 @@ const UsersPage = () => {
               <Check sx={{ fontSize: 18, color: colors.brandRed }} />
             )}
           </MenuItem>
-          <MenuItem 
+          <MenuItem
             onClick={() => { setSelectedSort('nameAZ'); setSpFilterAnchor(null); }}
             selected={selectedSort === 'nameAZ'}
             sx={{
@@ -1209,7 +1147,7 @@ const UsersPage = () => {
               <Check sx={{ fontSize: 18, color: colors.brandRed }} />
             )}
           </MenuItem>
-          <MenuItem 
+          <MenuItem
             onClick={() => { setSelectedSort('nameZA'); setSpFilterAnchor(null); }}
             selected={selectedSort === 'nameZA'}
             sx={{

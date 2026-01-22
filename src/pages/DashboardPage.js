@@ -6,15 +6,10 @@ import {
   Star,
   AttachMoney,
   SportsSoccer,
-  Warning,
   TrendingUp,
   Description,
   AccessTime,
-  Visibility,
-  PlayArrow,
-  Edit,
   ArrowUpward,
-  EmojiEvents,
   ErrorOutline,
   PersonAdd,
   Lock,
@@ -22,8 +17,6 @@ import {
   KeyboardArrowRight,
 } from '@mui/icons-material';
 import { colors } from '../config/theme';
-import { collection, getDocs, query, where } from 'firebase/firestore';
-import { db } from '../config/firebase';
 
 const StatCard = ({ title, value, subtitle, icon: Icon, color, isPrimary = false, delay = 0 }) => {
   return (
@@ -142,69 +135,13 @@ const StatCard = ({ title, value, subtitle, icon: Icon, color, isPrimary = false
 };
 
 const DashboardPage = () => {
-  const [dashboardStats, setDashboardStats] = useState({
+  // Static dashboard stats - no Firebase
+  const [dashboardStats] = useState({
     totalUsers: 45678,
     activeUsers: 34256,
     totalSPIssued: 12458920,
     estimatedRewardsValue: 249178,
   });
-
-  useEffect(() => {
-    loadDashboardStats();
-  }, []);
-
-  const loadDashboardStats = async () => {
-    try {
-      // Load users
-      const usersRef = collection(db, 'users');
-      const usersSnapshot = await getDocs(usersRef);
-      
-      const now = new Date();
-      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      
-      let totalUsers = 0;
-      let activeUsers = 0;
-      let totalSPIssued = 0;
-
-      usersSnapshot.docs.forEach((doc) => {
-        const userData = doc.data();
-        totalUsers++;
-        
-        // Check if user is active (logged in last 30 days)
-        if (userData.lastLogin) {
-          const lastLogin = userData.lastLogin?.toDate ? userData.lastLogin.toDate() : new Date(userData.lastLogin);
-          if (lastLogin >= thirtyDaysAgo) {
-            activeUsers++;
-          }
-        }
-        
-        // Sum up SP from predictions
-        totalSPIssued += userData.spFromPredictions || 0;
-      });
-
-      // Calculate estimated rewards value (assuming $0.02 per SP as example)
-      const estimatedRewardsValue = totalSPIssued * 0.02;
-
-      // Use default values if no data or very low values (less than threshold)
-      const finalStats = {
-        totalUsers: totalUsers >= 10 ? totalUsers : 45678,
-        activeUsers: activeUsers >= 10 ? activeUsers : 34256,
-        totalSPIssued: totalSPIssued >= 10000 ? totalSPIssued : 12458920,
-        estimatedRewardsValue: estimatedRewardsValue >= 1000 ? estimatedRewardsValue : 249178,
-      };
-
-      setDashboardStats(finalStats);
-    } catch (error) {
-      console.error('Error loading dashboard stats:', error);
-      // Set default values for demo
-      setDashboardStats({
-        totalUsers: 45678,
-        activeUsers: 34256,
-        totalSPIssued: 12458920,
-        estimatedRewardsValue: 249178,
-      });
-    }
-  };
 
   const stats = [
     {

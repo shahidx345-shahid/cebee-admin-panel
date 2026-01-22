@@ -12,7 +12,6 @@ import {
   Grid,
   CircularProgress,
   IconButton,
-  Chip,
   List,
   ListItem,
   ListItemIcon,
@@ -47,6 +46,7 @@ const PollFormPage = () => {
   const [saving, setSaving] = useState(false);
   const [leagues, setLeagues] = useState([]);
   const [leagueFixtures, setLeagueFixtures] = useState([]);
+  const [polls, setPolls] = useState([]);
 
   const [formData, setFormData] = useState({
     leagueId: '',
@@ -55,116 +55,90 @@ const PollFormPage = () => {
   });
 
   useEffect(() => {
+    const loadLeagues = async () => {
+      try {
+        const leaguesRef = collection(db, 'leagues');
+        const snapshot = await getDocs(leaguesRef);
+        const leaguesData = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setLeagues(leaguesData.filter((l) => l.isActive));
+      } catch (error) {
+        console.error('Error loading leagues:', error);
+      }
+    };
+
+    const loadPolls = async () => {
+      try {
+        const pollsRef = collection(db, 'polls');
+        const snapshot = await getDocs(pollsRef);
+        const pollsData = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setPolls(pollsData);
+      } catch (error) {
+        console.error('Error loading polls:', error);
+      }
+    };
+
+    const loadPollData = async () => {
+      try {
+        setLoading(true);
+        const pollRef = doc(db, 'polls', id);
+        const pollDoc = await getDoc(pollRef);
+        if (pollDoc.exists()) {
+          const data = pollDoc.data();
+          setFormData({
+            leagueId: data.leagueId || '',
+            startTime: data.startTime?.toDate ? data.startTime.toDate() : new Date(data.startTime),
+            closeTime: data.closeTime?.toDate ? data.closeTime.toDate() : new Date(data.closeTime),
+          });
+        }
+      } catch (error) {
+        console.error('Error loading poll:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     loadLeagues();
+    loadPolls();
     if (isEditMode) {
       loadPollData();
     } else {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, isEditMode]);
 
   useEffect(() => {
+    const loadLeagueFixtures = async (leagueId) => {
+      if (!leagueId) {
+        setLeagueFixtures([]);
+        return;
+      }
+      try {
+        const fixturesRef = collection(db, 'fixtures');
+        const q = query(fixturesRef, where('leagueId', '==', leagueId));
+        const snapshot = await getDocs(q);
+        const fixturesData = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setLeagueFixtures(fixturesData);
+      } catch (error) {
+        console.error('Error loading fixtures:', error);
+        setLeagueFixtures([]);
+      }
+    };
+
     if (formData.leagueId) {
       loadLeagueFixtures(formData.leagueId);
     } else {
       setLeagueFixtures([]);
     }
   }, [formData.leagueId]);
-
-  const loadLeagues = async () => {
-    try {
-      const leaguesRef = collection(db, 'leagues');
-      const snapshot = await getDocs(leaguesRef);
-      const leaguesData = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setLeagues(leaguesData.filter((l) => l.isActive));
-    } catch (error) {
-      console.error('Error loading leagues:', error);
-    }
-  };
-
-  const loadLeagueFixtures = async (leagueId) => {
-    if (!leagueId) {
-      setLeagueFixtures([]);
-      return;
-    }
-    try {
-      const fixturesRef = collection(db, 'fixtures');
-      const q = query(fixturesRef, where('leagueId', '==', leagueId));
-      const snapshot = await getDocs(q);
-      const fixturesData = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setLeagueFixtures(fixturesData);
-    } catch (error) {
-      console.error('Error loading fixtures:', error);
-      setLeagueFixtures([]);
-    }
-  };
-
-  const checkPollRules = () => {
-    const selectedLeague = leagues.find((l) => l.id === formData.leagueId);
-    // Exclude current poll when in edit mode
-    const activePolls = polls.filter(
-      (p) => (p.status || p.pollStatus) === 'active' && (!isEditMode || p.id !== id)
-    );
-    const leaguePolls = activePolls.filter((p) => p.leagueId === formData.leagueId);
-    const activePollsCount = activePolls.length;
-    const durationHours = differenceInHours(formData.closeTime, formData.startTime);
-    const durationDays = differenceInDays(formData.closeTime, formData.startTime);
-
-    return {
-      onePollPerLeague: !selectedLeague || leaguePolls.length === 0,
-      maxFiveActive: activePollsCount < 5,
-      closeAfterStart: formData.closeTime > formData.startTime,
-      durationValid: durationHours >= 24 && durationHours <= 30 * 24,
-      durationHours,
-      durationDays,
-    };
-  };
-
-  const [polls, setPolls] = useState([]);
-
-  useEffect(() => {
-    loadPolls();
-  }, []);
-
-  const loadPolls = async () => {
-    try {
-      const pollsRef = collection(db, 'polls');
-      const snapshot = await getDocs(pollsRef);
-      const pollsData = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setPolls(pollsData);
-    } catch (error) {
-      console.error('Error loading polls:', error);
-    }
-  };
-
-  const loadPollData = async () => {
-    try {
-      setLoading(true);
-      const pollRef = doc(db, 'polls', id);
-      const pollDoc = await getDoc(pollRef);
-      if (pollDoc.exists()) {
-        const data = pollDoc.data();
-        setFormData({
-          leagueId: data.leagueId || '',
-          startTime: data.startTime?.toDate ? data.startTime.toDate() : new Date(data.startTime),
-          closeTime: data.closeTime?.toDate ? data.closeTime.toDate() : new Date(data.closeTime),
-        });
-      }
-    } catch (error) {
-      console.error('Error loading poll:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleChange = (field, value) => {
     setFormData({ ...formData, [field]: value });
@@ -174,7 +148,7 @@ const PollFormPage = () => {
     try {
       setSaving(true);
       const league = leagues.find((l) => l.id === formData.leagueId);
-      
+
       const pollData = {
         leagueId: formData.leagueId,
         leagueName: league?.name || '',
@@ -211,6 +185,27 @@ const PollFormPage = () => {
       </Box>
     );
   }
+
+  const checkPollRules = () => {
+    const selectedLeague = leagues.find((l) => l.id === formData.leagueId);
+    // Exclude current poll when in edit mode
+    const activePolls = polls.filter(
+      (p) => (p.status || p.pollStatus) === 'active' && (!isEditMode || p.id !== id)
+    );
+    const leaguePolls = activePolls.filter((p) => p.leagueId === formData.leagueId);
+    const activePollsCount = activePolls.length;
+    const durationHours = differenceInHours(formData.closeTime, formData.startTime);
+    const durationDays = differenceInDays(formData.closeTime, formData.startTime);
+
+    return {
+      onePollPerLeague: !selectedLeague || leaguePolls.length === 0,
+      maxFiveActive: activePollsCount < 5,
+      closeAfterStart: formData.closeTime > formData.startTime,
+      durationValid: durationHours >= 24 && durationHours <= 30 * 24,
+      durationHours,
+      durationDays,
+    };
+  };
 
   const rules = checkPollRules();
 

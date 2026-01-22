@@ -17,10 +17,9 @@ import {
   InputAdornment,
 } from '@mui/material';
 import {
-  ArrowBack,
   Save,
-  SportsSoccer,
   Add,
+  ArrowBack,
   Star,
   People,
   CheckCircle,
@@ -28,7 +27,6 @@ import {
   Stadium,
   CalendarToday,
   Send,
-  Check,
 } from '@mui/icons-material';
 import { colors, constants } from '../config/theme';
 import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, getDocs } from 'firebase/firestore';
@@ -55,6 +53,47 @@ const FixtureFormPage = () => {
   });
 
   useEffect(() => {
+    const loadLeagues = async () => {
+      try {
+        const leaguesRef = collection(db, 'leagues');
+        const snapshot = await getDocs(leaguesRef);
+        const leaguesData = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setLeagues(leaguesData.filter((l) => l.isActive));
+      } catch (error) {
+        console.error('Error loading leagues:', error);
+      } finally {
+        if (!isEditMode) {
+          setLoading(false);
+        }
+      }
+    };
+
+    const loadFixtureData = async () => {
+      try {
+        setLoading(true);
+        const fixtureRef = doc(db, 'fixtures', id);
+        const fixtureDoc = await getDoc(fixtureRef);
+        if (fixtureDoc.exists()) {
+          const data = fixtureDoc.data();
+          setFormData({
+            homeTeam: data.homeTeam || '',
+            awayTeam: data.awayTeam || '',
+            leagueId: data.leagueId || '',
+            venue: data.venue || '',
+            kickoffTime: data.kickoffTime?.toDate ? data.kickoffTime.toDate() : new Date(data.kickoffTime),
+            matchStatus: data.matchStatus || data.status || 'scheduled',
+          });
+        }
+      } catch (error) {
+        console.error('Error loading fixture:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     const initialize = async () => {
       setLoading(true);
       await loadLeagues();
@@ -66,47 +105,6 @@ const FixtureFormPage = () => {
     };
     initialize();
   }, [id, isEditMode]);
-
-  const loadLeagues = async () => {
-    try {
-      const leaguesRef = collection(db, 'leagues');
-      const snapshot = await getDocs(leaguesRef);
-      const leaguesData = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setLeagues(leaguesData.filter((l) => l.isActive));
-    } catch (error) {
-      console.error('Error loading leagues:', error);
-    } finally {
-      if (!isEditMode) {
-        setLoading(false);
-      }
-    }
-  };
-
-  const loadFixtureData = async () => {
-    try {
-      setLoading(true);
-      const fixtureRef = doc(db, 'fixtures', id);
-      const fixtureDoc = await getDoc(fixtureRef);
-      if (fixtureDoc.exists()) {
-        const data = fixtureDoc.data();
-        setFormData({
-          homeTeam: data.homeTeam || '',
-          awayTeam: data.awayTeam || '',
-          leagueId: data.leagueId || '',
-          venue: data.venue || '',
-          kickoffTime: data.kickoffTime?.toDate ? data.kickoffTime.toDate() : new Date(data.kickoffTime),
-          matchStatus: data.matchStatus || data.status || 'scheduled',
-        });
-      }
-    } catch (error) {
-      console.error('Error loading fixture:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleChange = (field, value) => {
     setFormData({ ...formData, [field]: value });

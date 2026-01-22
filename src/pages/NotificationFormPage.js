@@ -15,12 +15,8 @@ import {
 } from '@mui/material';
 import {
   ArrowBack,
-  Save,
-  Notifications,
   Announcement,
   EmojiEvents,
-  Timeline,
-  Settings,
   People,
   Person,
   Link as LinkIcon,
@@ -43,7 +39,6 @@ import {
   NotificationsActive,
   TrendingUp,
   Assessment,
-  BarChart,
   AttachMoney,
   Cancel,
   Refresh,
@@ -123,36 +118,36 @@ const NotificationFormPage = () => {
   });
 
   useEffect(() => {
+    const loadNotificationData = async () => {
+      try {
+        setLoading(true);
+        const notificationRef = doc(db, 'notifications', id);
+        const notificationDoc = await getDoc(notificationRef);
+        if (notificationDoc.exists()) {
+          const data = notificationDoc.data();
+          setFormData({
+            title: data.title || '',
+            body: data.body || '',
+            type: data.type || 'important-announcement',
+            audience: data.audience || 'all',
+            scheduleForLater: !!data.scheduledAt,
+            scheduledAt: data.scheduledAt?.toDate || null,
+            deepLink: data.deepLink || '',
+          });
+        }
+      } catch (error) {
+        console.error('Error loading notification:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     if (isEditMode) {
       loadNotificationData();
     } else {
       setLoading(false);
     }
-  }, [id]);
-
-  const loadNotificationData = async () => {
-    try {
-      setLoading(true);
-      const notificationRef = doc(db, 'notifications', id);
-      const notificationDoc = await getDoc(notificationRef);
-      if (notificationDoc.exists()) {
-        const data = notificationDoc.data();
-        setFormData({
-          title: data.title || '',
-          body: data.body || '',
-          type: data.type || 'important-announcement',
-          audience: data.audience || 'all',
-          scheduleForLater: !!data.scheduledAt,
-          scheduledAt: data.scheduledAt?.toDate || null,
-          deepLink: data.deepLink || '',
-        });
-      }
-    } catch (error) {
-      console.error('Error loading notification:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [id, isEditMode]);
 
   const handleChange = (field, value) => {
     setFormData({ ...formData, [field]: value });

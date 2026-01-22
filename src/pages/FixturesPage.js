@@ -30,32 +30,28 @@ import {
   Add,
   SportsSoccer,
   Visibility,
-  PlayCircle,
   Edit,
-  Schedule,
   CheckCircle,
   AccessTime,
-  PlayArrow,
   ArrowUpward,
   ArrowDownward,
-  ArrowUpward as ArrowUp,
+  CalendarToday,
+  Stadium,
+  MoreVert,
+  PlayArrow,
+  Check,
   Sort,
   TrendingUp,
   TrendingDown,
-  Check,
-  Stadium,
-  Lock,
-  Person,
-  Info,
-  CalendarToday,
   ListAlt,
-  MoreVert,
+  Info,
+  Person,
   KeyboardArrowRight,
 } from '@mui/icons-material';
 import { colors, constants } from '../config/theme';
 import SearchBar from '../components/common/SearchBar';
 import DataTable from '../components/common/DataTable';
-import { collection, getDocs, query, orderBy } from 'firebase/firestore';
+// Firebase imports removed
 import { db } from '../config/firebase';
 import { format } from 'date-fns';
 
@@ -81,11 +77,149 @@ const FixturesPage = () => {
   const [actionMenuAnchor, setActionMenuAnchor] = useState(null);
   const [menuFixture, setMenuFixture] = useState(null);
 
+  const getSampleFixtures = () => {
+    return [
+      {
+        id: 'FIX_001',
+        matchId: 'MATCH_123',
+        homeTeam: 'Arsenal',
+        awayTeam: 'Chelsea',
+        league: 'Premier League',
+        kickoffTime: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), // 2 days from now
+        status: 'scheduled',
+        predictions: 1543,
+        hot: true,
+      },
+      {
+        id: 'FIX_002',
+        matchId: 'MATCH_124',
+        homeTeam: 'Real Madrid',
+        awayTeam: 'Barcelona',
+        league: 'La Liga',
+        kickoffTime: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days from now
+        status: 'scheduled',
+        predictions: 2891,
+        hot: true,
+      },
+      {
+        id: 'FIX_003',
+        matchId: 'MATCH_125',
+        homeTeam: 'Manchester City',
+        awayTeam: 'Liverpool',
+        league: 'Premier League',
+        kickoffTime: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000), // 1 day from now
+        status: 'scheduled',
+        predictions: 1876,
+        hot: false,
+      },
+      {
+        id: 'FIX_004',
+        matchId: 'MATCH_126',
+        homeTeam: 'Bayern Munich',
+        awayTeam: 'Dortmund',
+        league: 'Bundesliga',
+        kickoffTime: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
+        status: 'resultsProcessing',
+        predictions: 1245,
+        hot: false,
+      },
+    ];
+  };
+
+  const loadFixtures = async () => {
+    setLoading(true);
+    // Use sample data immediately
+    const fixturesData = getSampleFixtures();
+    setFixtures(fixturesData);
+    setFilteredFixtures(fixturesData);
+    setLoading(false);
+  };
+
   useEffect(() => {
     loadFixtures();
   }, []);
 
   useEffect(() => {
+    const filterAndSortFixtures = () => {
+      let filtered = [...fixtures];
+
+      // Search filter
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        filtered = filtered.filter(
+          (fixture) =>
+            fixture.homeTeam?.toLowerCase().includes(query) ||
+            fixture.awayTeam?.toLowerCase().includes(query) ||
+            fixture.matchId?.toLowerCase().includes(query) ||
+            fixture.id?.toLowerCase().includes(query) ||
+            fixture.league?.toLowerCase().includes(query)
+        );
+      }
+
+      // Status filter - map match flow states to backend statuses
+      if (selectedStatus && selectedStatus !== 'all') {
+        filtered = filtered.filter((fixture) => {
+          const status = fixture.matchStatus || fixture.status;
+          // Map filter values to backend statuses
+          if (selectedStatus === 'scheduled') {
+            return status === 'scheduled' || status === 'draft';
+          }
+          if (selectedStatus === 'published') {
+            return status === 'published' || status === 'predictionOpen';
+          }
+          if (selectedStatus === 'predictionLocked') {
+            return status === 'predictionLocked' || status === 'locked';
+          }
+          if (selectedStatus === 'resultsProcessing') {
+            // Result Pending includes both resultsProcessing and pending statuses
+            return status === 'resultsProcessing' || status === 'pending' || status === 'fullTimeProcessing';
+          }
+          return status === selectedStatus;
+        });
+      }
+
+      // Sort
+      switch (selectedSort) {
+        case 'dateNewest':
+          filtered.sort((a, b) => {
+            const dateA = a.kickoffTime?.toDate ? a.kickoffTime.toDate() : new Date(a.kickoffTime);
+            const dateB = b.kickoffTime?.toDate ? b.kickoffTime.toDate() : new Date(b.kickoffTime);
+            return dateB - dateA;
+          });
+          break;
+        case 'dateOldest':
+          filtered.sort((a, b) => {
+            const dateA = a.kickoffTime?.toDate ? a.kickoffTime.toDate() : new Date(a.kickoffTime);
+            const dateB = b.kickoffTime?.toDate ? b.createdAt.toDate() : new Date(b.kickoffTime);
+            return dateA - dateB;
+          });
+          break;
+        case 'teamAZ':
+          filtered.sort((a, b) => {
+            const teamA = `${a.homeTeam || ''} vs ${a.awayTeam || ''}`.toLowerCase();
+            const teamB = `${b.homeTeam || ''} vs ${b.awayTeam || ''}`.toLowerCase();
+            return teamA.localeCompare(teamB);
+          });
+          break;
+        case 'teamZA':
+          filtered.sort((a, b) => {
+            const teamA = `${a.homeTeam || ''} vs ${a.awayTeam || ''}`.toLowerCase();
+            const teamB = `${b.homeTeam || ''} vs ${b.awayTeam || ''}`.toLowerCase();
+            return teamB.localeCompare(teamA);
+          });
+          break;
+        case 'predictionsHigh':
+          filtered.sort((a, b) => (b.predictions || 0) - (a.predictions || 0));
+          break;
+        case 'predictionsLow':
+          filtered.sort((a, b) => (a.predictions || 0) - (b.predictions || 0));
+          break;
+        default:
+          break;
+      }
+
+      setFilteredFixtures(filtered);
+    };
     filterAndSortFixtures();
   }, [fixtures, searchQuery, selectedStatus, selectedSort]);
 
@@ -103,22 +237,22 @@ const FixturesPage = () => {
 
   const handleUpdateResults = async () => {
     if (!selectedFixture) return;
-    
+
     // Validate form
     if (!resultsForm.homeScore || !resultsForm.awayScore) {
       alert('Please enter both home and away scores');
       return;
     }
-    
+
     if (resultsForm.markAsCompleted && (!resultsForm.firstGoalScorer || !resultsForm.firstGoalMinute)) {
       alert('Please fill all fields to mark as completed');
       return;
     }
-    
+
     try {
       // Here you would update the fixture in Firebase
       // await updateDoc(doc(db, 'fixtures', selectedFixture.id), { ... });
-      
+
       console.log('Updating results:', resultsForm);
       handleCloseResultsModal();
       // Reload fixtures
@@ -129,352 +263,10 @@ const FixturesPage = () => {
     }
   };
 
-  const isFormValid = resultsForm.homeScore && resultsForm.awayScore && 
-                      resultsForm.firstGoalScorer && resultsForm.firstGoalMinute;
+  const isFormValid = resultsForm.homeScore && resultsForm.awayScore &&
+    resultsForm.firstGoalScorer && resultsForm.firstGoalMinute;
 
-  const loadFixtures = async () => {
-    try {
-      setLoading(true);
-      let fixturesData = [];
-      
-      // Try to load from Firebase
-      try {
-      const fixturesRef = collection(db, 'fixtures');
-      const q = query(fixturesRef, orderBy('kickoffTime', 'desc'));
-      const snapshot = await getDocs(q);
-        fixturesData = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      } catch (error) {
-        console.log('Using dummy data:', error);
-      }
 
-      // Always use sample data (for demo purposes)
-      // Merge Firebase data with sample data, or use sample data if Firebase is empty
-      if (fixturesData.length === 0) {
-        fixturesData = getSampleFixtures();
-      } else {
-        // Merge: use Firebase data but add sample data if needed
-        const sampleData = getSampleFixtures();
-        const existingIds = new Set(fixturesData.map(f => f.id));
-        const newSamples = sampleData.filter(f => !existingIds.has(f.id));
-        fixturesData = [...fixturesData, ...newSamples];
-      }
-      
-      // For demo: always use sample data
-      fixturesData = getSampleFixtures();
-
-      setFixtures(fixturesData);
-      setFilteredFixtures(fixturesData);
-    } catch (error) {
-      console.error('Error loading fixtures:', error);
-      // On error, use sample data
-      const sampleData = getSampleFixtures();
-      setFixtures(sampleData);
-      setFilteredFixtures(sampleData);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const getSampleFixtures = () => {
-    const now = new Date();
-    return [
-      // Scheduled fixtures
-      {
-        id: 'MATCH_001',
-        homeTeam: 'Manchester United',
-        awayTeam: 'Liverpool',
-        league: 'Premier League',
-        kickoffTime: new Date('2026-01-22T20:15:00'),
-        matchStatus: 'scheduled',
-        homeScore: undefined,
-        awayScore: undefined,
-        predictions: 0,
-      },
-      {
-        id: 'MATCH_006',
-        homeTeam: 'Real Madrid',
-        awayTeam: 'Barcelona',
-        league: 'La Liga',
-        kickoffTime: new Date('2026-01-25T20:15:00'),
-        matchStatus: 'scheduled',
-        homeScore: undefined,
-        awayScore: undefined,
-        predictions: 0,
-      },
-      {
-        id: 'MATCH_007',
-        homeTeam: 'Bayern Munich',
-        awayTeam: 'Borussia Dortmund',
-        league: 'Bundesliga',
-        kickoffTime: new Date('2026-01-27T20:15:00'),
-        matchStatus: 'scheduled',
-        status: 'scheduled',
-        homeScore: undefined,
-        awayScore: undefined,
-        predictions: 0,
-      },
-      {
-        id: 'MATCH_012',
-        homeTeam: 'PSG',
-        awayTeam: 'Marseille',
-        league: 'Ligue 1',
-        kickoffTime: new Date('2026-01-23T21:00:00'),
-        matchStatus: 'scheduled',
-        status: 'scheduled',
-        homeScore: undefined,
-        awayScore: undefined,
-        predictions: 0,
-      },
-      // Published fixtures
-      {
-        id: 'MATCH_014',
-        homeTeam: 'Manchester City',
-        awayTeam: 'Tottenham',
-        league: 'Premier League',
-        kickoffTime: new Date('2026-01-21T15:00:00'),
-        matchStatus: 'published',
-        status: 'published',
-        homeScore: undefined,
-        awayScore: undefined,
-        predictions: 25,
-      },
-      {
-        id: 'MATCH_015',
-        homeTeam: 'AC Milan',
-        awayTeam: 'Inter Milan',
-        league: 'Serie A',
-        kickoffTime: new Date('2026-01-21T20:00:00'),
-        matchStatus: 'published',
-        status: 'published',
-        homeScore: undefined,
-        awayScore: undefined,
-        predictions: 18,
-      },
-      // Live fixtures
-      {
-        id: 'MATCH_003',
-        homeTeam: 'Arsenal',
-        awayTeam: 'Chelsea',
-        league: 'Premier League',
-        kickoffTime: new Date(now.getTime() - 1 * 60 * 60 * 1000),
-        matchStatus: 'live',
-        status: 'live',
-        homeScore: 1,
-        awayScore: 1,
-        predictions: 52,
-      },
-      {
-        id: 'MATCH_016',
-        homeTeam: 'Leicester City',
-        awayTeam: 'Southampton',
-        league: 'Premier League',
-        kickoffTime: new Date(now.getTime() - 0.5 * 60 * 60 * 1000),
-        matchStatus: 'live',
-        status: 'live',
-        homeScore: 2,
-        awayScore: 0,
-        predictions: 31,
-      },
-      // Result Pending fixtures
-      {
-        id: 'MATCH_009',
-        homeTeam: 'Everton',
-        awayTeam: 'Fulham',
-        league: 'Premier League',
-        kickoffTime: new Date('2026-01-20T18:15:00'),
-        matchStatus: 'resultsProcessing',
-        status: 'resultsProcessing',
-        homeScore: 1,
-        awayScore: 2,
-        firstGoalScorer: '',
-        firstGoalMinute: '',
-        predictions: 45,
-      },
-      {
-        id: 'MATCH_010',
-        homeTeam: 'Tottenham',
-        awayTeam: 'Newcastle',
-        league: 'Premier League',
-        kickoffTime: new Date(now.getTime() - 3 * 60 * 60 * 1000),
-        matchStatus: 'resultsProcessing',
-        status: 'resultsProcessing',
-        homeScore: 2,
-        awayScore: 1,
-        firstGoalScorer: '',
-        firstGoalMinute: '',
-        predictions: 38,
-      },
-      {
-        id: 'MATCH_011',
-        homeTeam: 'Brighton',
-        awayTeam: 'Crystal Palace',
-        league: 'Premier League',
-        kickoffTime: new Date(now.getTime() - 4 * 60 * 60 * 1000),
-        matchStatus: 'pending',
-        status: 'pending',
-        homeScore: 0,
-        awayScore: 1,
-        firstGoalScorer: '',
-        firstGoalMinute: '',
-        predictions: 22,
-      },
-      // Completed fixtures
-      {
-        id: 'MATCH_004',
-        homeTeam: 'Newcastle',
-        awayTeam: 'Brighton',
-        league: 'Premier League',
-        kickoffTime: new Date('2026-01-19T20:15:00'),
-        matchStatus: 'completed',
-        status: 'completed',
-        homeScore: 2,
-        awayScore: 1,
-        firstGoalScorer: 'Wilson',
-        firstGoalMinute: 23,
-        predictions: 48,
-      },
-      {
-        id: 'MATCH_005',
-        homeTeam: 'West Ham',
-        awayTeam: 'Aston Villa',
-        league: 'Premier League',
-        kickoffTime: new Date('2026-01-18T20:15:00'),
-        matchStatus: 'completed',
-        status: 'completed',
-        homeScore: 1,
-        awayScore: 1,
-        firstGoalScorer: 'Watkins',
-        firstGoalMinute: 15,
-        predictions: 42,
-      },
-      {
-        id: 'MATCH_008',
-        homeTeam: 'Wolves',
-        awayTeam: 'Crystal Palace',
-        league: 'Premier League',
-        kickoffTime: new Date('2026-01-17T20:15:00'),
-        matchStatus: 'completed',
-        status: 'completed',
-        homeScore: 3,
-        awayScore: 0,
-        firstGoalScorer: 'Neto',
-        firstGoalMinute: 8,
-        predictions: 35,
-      },
-      {
-        id: 'MATCH_017',
-        homeTeam: 'Burnley',
-        awayTeam: 'Sheffield United',
-        league: 'Premier League',
-        kickoffTime: new Date('2026-01-16T15:00:00'),
-        matchStatus: 'completed',
-        status: 'completed',
-        homeScore: 2,
-        awayScore: 2,
-        firstGoalScorer: 'Brownhill',
-        firstGoalMinute: 12,
-        predictions: 28,
-      },
-      {
-        id: 'MATCH_018',
-        homeTeam: 'Brentford',
-        awayTeam: 'Nottingham Forest',
-        league: 'Premier League',
-        kickoffTime: new Date('2026-01-15T17:30:00'),
-        matchStatus: 'completed',
-        status: 'completed',
-        homeScore: 1,
-        awayScore: 0,
-        firstGoalScorer: 'Toney',
-        firstGoalMinute: 34,
-        predictions: 39,
-      },
-    ];
-  };
-
-  const filterAndSortFixtures = () => {
-    let filtered = [...fixtures];
-
-    // Search filter
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (fixture) =>
-          fixture.homeTeam?.toLowerCase().includes(query) ||
-          fixture.awayTeam?.toLowerCase().includes(query) ||
-          fixture.matchId?.toLowerCase().includes(query) ||
-          fixture.id?.toLowerCase().includes(query) ||
-          fixture.league?.toLowerCase().includes(query)
-      );
-    }
-
-    // Status filter - map match flow states to backend statuses
-    if (selectedStatus && selectedStatus !== 'all') {
-      filtered = filtered.filter((fixture) => {
-        const status = fixture.matchStatus || fixture.status;
-        // Map filter values to backend statuses
-        if (selectedStatus === 'scheduled') {
-          return status === 'scheduled' || status === 'draft';
-        }
-        if (selectedStatus === 'published') {
-          return status === 'published' || status === 'predictionOpen';
-        }
-        if (selectedStatus === 'predictionLocked') {
-          return status === 'predictionLocked' || status === 'locked';
-        }
-        if (selectedStatus === 'resultsProcessing') {
-          // Result Pending includes both resultsProcessing and pending statuses
-          return status === 'resultsProcessing' || status === 'pending' || status === 'fullTimeProcessing';
-        }
-        return status === selectedStatus;
-      });
-    }
-
-    // Sort
-    switch (selectedSort) {
-      case 'dateNewest':
-        filtered.sort((a, b) => {
-          const dateA = a.kickoffTime?.toDate ? a.kickoffTime.toDate() : new Date(a.kickoffTime);
-          const dateB = b.kickoffTime?.toDate ? b.kickoffTime.toDate() : new Date(b.kickoffTime);
-          return dateB - dateA;
-        });
-        break;
-      case 'dateOldest':
-        filtered.sort((a, b) => {
-          const dateA = a.kickoffTime?.toDate ? a.kickoffTime.toDate() : new Date(a.kickoffTime);
-          const dateB = b.kickoffTime?.toDate ? b.kickoffTime.toDate() : new Date(b.kickoffTime);
-          return dateA - dateB;
-        });
-        break;
-      case 'teamAZ':
-        filtered.sort((a, b) => {
-          const teamA = `${a.homeTeam || ''} vs ${a.awayTeam || ''}`.toLowerCase();
-          const teamB = `${b.homeTeam || ''} vs ${b.awayTeam || ''}`.toLowerCase();
-          return teamA.localeCompare(teamB);
-        });
-        break;
-      case 'teamZA':
-        filtered.sort((a, b) => {
-          const teamA = `${a.homeTeam || ''} vs ${a.awayTeam || ''}`.toLowerCase();
-          const teamB = `${b.homeTeam || ''} vs ${b.awayTeam || ''}`.toLowerCase();
-          return teamB.localeCompare(teamA);
-        });
-        break;
-      case 'predictionsHigh':
-        filtered.sort((a, b) => (b.predictions || 0) - (a.predictions || 0));
-        break;
-      case 'predictionsLow':
-        filtered.sort((a, b) => (a.predictions || 0) - (b.predictions || 0));
-        break;
-      default:
-        break;
-    }
-
-    setFilteredFixtures(filtered);
-  };
 
   const getStatusChip = (status) => {
     // Map backend statuses to match flow states
@@ -494,33 +286,33 @@ const FixturesPage = () => {
     const mappedStatus = statusMap[status] || 'predictionOpen';
 
     const statusConfig = {
-      predictionOpen: { 
-        label: 'PREDICTION OPEN', 
-        backgroundColor: '#E3F2FD', 
+      predictionOpen: {
+        label: 'PREDICTION OPEN',
+        backgroundColor: '#E3F2FD',
         color: '#1976D2',
         textColor: '#1976D2'
       },
-      predictionLocked: { 
-        label: 'PREDICTION LOCKED', 
-        backgroundColor: '#FFF3E0', 
+      predictionLocked: {
+        label: 'PREDICTION LOCKED',
+        backgroundColor: '#FFF3E0',
         color: '#E65100',
         textColor: '#E65100'
       },
-      live: { 
-        label: 'LIVE', 
-        backgroundColor: colors.brandRed, 
+      live: {
+        label: 'LIVE',
+        backgroundColor: colors.brandRed,
         color: colors.brandWhite,
         textColor: colors.brandWhite
       },
-      completed: { 
-        label: 'COMPLETED', 
-        backgroundColor: '#E8F5E9', 
+      completed: {
+        label: 'COMPLETED',
+        backgroundColor: '#E8F5E9',
         color: '#2E7D32',
         textColor: '#2E7D32'
       },
-      resultsProcessing: { 
-        label: 'RESULT PENDING', 
-        backgroundColor: colors.warning, 
+      resultsProcessing: {
+        label: 'RESULT PENDING',
+        backgroundColor: colors.warning,
         color: colors.brandWhite,
         textColor: colors.brandWhite
       },
@@ -685,9 +477,9 @@ const FixturesPage = () => {
       id: 'teams',
       label: 'Teams',
       render: (_, row) => (
-          <Typography variant="body2" sx={{ fontWeight: 600 }}>
-            {row.homeTeam || 'TBD'} vs {row.awayTeam || 'TBD'}
-          </Typography>
+        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+          {row.homeTeam || 'TBD'} vs {row.awayTeam || 'TBD'}
+        </Typography>
       ),
     },
     {
@@ -727,7 +519,7 @@ const FixturesPage = () => {
       render: (_, row) => {
         const status = row.matchStatus || row.status;
         const isResultPending = status === 'resultsProcessing' || status === 'pending';
-        
+
         if (isResultPending) {
           return (
             <Chip
@@ -778,7 +570,7 @@ const FixturesPage = () => {
         const status = row.matchStatus || row.status;
         const isResultPending = status === 'resultsProcessing' || status === 'pending';
         const isScheduled = status === 'scheduled' || status === 'draft';
-        
+
         return (
           <Box>
             {isScheduled ? (
@@ -886,7 +678,7 @@ const FixturesPage = () => {
             isPrimary={false}
             delay={0}
           />
-          </Grid>
+        </Grid>
         <Grid item xs={6} md={3}>
           <StatCard
             title="Published"
@@ -934,12 +726,12 @@ const FixturesPage = () => {
             isPrimary={false}
             delay={400}
           />
-          </Grid>
+        </Grid>
       </Grid>
 
       {/* Status Filter Buttons - Connected Style */}
-            <Card
-              sx={{
+      <Card
+        sx={{
           mb: 3,
           borderRadius: '20px',
           backgroundColor: colors.brandWhite,
@@ -957,10 +749,10 @@ const FixturesPage = () => {
               <Button
                 key={filter.value}
                 onClick={() => setSelectedStatus(filter.value)}
-          sx={{
+                sx={{
                   flex: 1,
-              textTransform: 'none',
-              fontWeight: 600,
+                  textTransform: 'none',
+                  fontWeight: 600,
                   px: 2,
                   py: isSelected ? 3 : 2.5,
                   minHeight: 64,
@@ -985,11 +777,11 @@ const FixturesPage = () => {
                   '&:hover': {
                     backgroundColor: isSelected ? filter.color : `${filter.color}0D`,
                     boxShadow: isSelected ? `0 2px 8px ${filter.color}40` : 'none',
-            },
-          }}
-        >
+                  },
+                }}
+              >
                 <Icon
-              sx={{
+                  sx={{
                     fontSize: 20,
                     mr: 1,
                     color: isSelected ? colors.brandWhite : filter.color,
@@ -1005,16 +797,16 @@ const FixturesPage = () => {
       {/* Search, Sort, and Add Fixture Row */}
       <Box sx={{ display: 'flex', gap: 1.5, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
         <Box sx={{ flex: 1, minWidth: { xs: '100%', md: '300px' } }}>
-            <SearchBar
-              value={searchQuery}
-              onChange={setSearchQuery}
-              placeholder="Search by team name or match ID..."
-            />
+          <SearchBar
+            value={searchQuery}
+            onChange={setSearchQuery}
+            placeholder="Search by team name or match ID..."
+          />
         </Box>
         <FormControl sx={{ minWidth: { xs: '100%', md: 200 }, position: 'relative' }}>
-              <Select
-                value={selectedSort}
-                onChange={(e) => setSelectedSort(e.target.value)}
+          <Select
+            value={selectedSort}
+            onChange={(e) => setSelectedSort(e.target.value)}
             displayEmpty
             sx={{
               borderRadius: '12px',
@@ -1061,7 +853,7 @@ const FixturesPage = () => {
             <MenuItem value="dateOldest">
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
                 {selectedSort === 'dateOldest' && <Check sx={{ fontSize: 18, color: colors.brandRed }} />}
-                <ArrowUp sx={{ fontSize: 16, color: selectedSort === 'dateOldest' ? colors.brandRed : colors.textSecondary }} />
+                <ArrowUpward sx={{ fontSize: 16, color: selectedSort === 'dateOldest' ? colors.brandRed : colors.textSecondary }} />
                 <Typography sx={{ flex: 1 }}>Date: Oldest First</Typography>
               </Box>
             </MenuItem>
@@ -1093,8 +885,8 @@ const FixturesPage = () => {
                 <Typography sx={{ flex: 1 }}>Predictions: Lowest</Typography>
               </Box>
             </MenuItem>
-              </Select>
-            </FormControl>
+          </Select>
+        </FormControl>
         <Button
           variant="contained"
           startIcon={<Add />}
@@ -1203,7 +995,7 @@ const FixturesPage = () => {
             )}
           </Box>
         </DialogTitle>
-        
+
         <DialogContent sx={{ padding: 3, pt: 2 }}>
           {/* Match Information */}
           {selectedFixture && (

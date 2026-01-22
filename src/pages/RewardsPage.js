@@ -33,21 +33,62 @@ import {
   AccountBalanceWallet,
   VerifiedUser,
   Person,
+  Search as SearchIcon,
 } from '@mui/icons-material';
 import { colors, constants } from '../config/theme';
-import SearchBar from '../components/common/SearchBar';
 import DataTable from '../components/common/DataTable';
-import { collection, getDocs, query, orderBy, where } from 'firebase/firestore';
-import { db } from '../config/firebase';
 import { format } from 'date-fns';
+
+// Static rewards data
+const staticRewardsData = [
+  {
+    id: '1',
+    rank: 1,
+    username: 'ChiefPredictor',
+    userEmail: 'chief@example.com',
+    spTotal: 2850,
+    usdAmount: 500,
+    payoutMethod: 'USDT',
+    kycVerified: true,
+    kycStatus: 'verified',
+    status: 'processing',
+    rewardMonth: '2025-09',
+  },
+  {
+    id: '2',
+    rank: 2,
+    username: 'KingOfPredictions',
+    userEmail: 'king@example.com',
+    spTotal: 2780,
+    usdAmount: 300,
+    payoutMethod: 'Gift Card',
+    kycVerified: false,
+    kycStatus: 'under_review',
+    status: 'pending',
+    rewardMonth: '2025-09',
+  },
+  {
+    id: '3',
+    rank: 3,
+    username: 'AfricanLegend',
+    userEmail: 'legend@example.com',
+    spTotal: 2650,
+    usdAmount: 150,
+    payoutMethod: 'USDT',
+    kycVerified: false,
+    kycStatus: 'under_review',
+    status: 'pending',
+    rewardMonth: '2025-09',
+  },
+];
 
 const RewardsPage = () => {
   const navigate = useNavigate();
-  const [rewards, setRewards] = useState([]);
-  const [filteredRewards, setFilteredRewards] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [rewards] = useState(staticRewardsData);
+  const [filteredRewards, setFilteredRewards] = useState(staticRewardsData);
+  const [loading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [selectedMonth, setSelectedMonth] = useState('2025-09');
   const [statusFilter, setStatusFilter] = useState('all');
   const [rankFilter, setRankFilter] = useState('1st-3rd');
   const [selectedSort, setSelectedSort] = useState('rankLowest');
@@ -80,31 +121,8 @@ const RewardsPage = () => {
     .reduce((sum, r) => sum + (r.usdAmount || r.rewardAmount || 0), 0);
 
   useEffect(() => {
-    loadRewards();
-  }, []);
-
-  useEffect(() => {
     filterAndSortRewards();
   }, [rewards, searchQuery, selectedMonth, statusFilter, rankFilter, selectedSort]);
-
-  const loadRewards = async () => {
-    try {
-      setLoading(true);
-      const rewardsRef = collection(db, 'rewards');
-      const q = query(rewardsRef, orderBy('rewardMonth', 'desc'), orderBy('rank', 'asc'));
-      const snapshot = await getDocs(q);
-      const rewardsData = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setRewards(rewardsData);
-      setFilteredRewards(rewardsData);
-    } catch (error) {
-      console.error('Error loading rewards:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const filterAndSortRewards = () => {
     let filtered = [...rewards];
@@ -181,13 +199,13 @@ const RewardsPage = () => {
         label={label}
         size="small"
         sx={{
-          backgroundColor: isProcessing ? colors.info : colors.brandWhite,
-          color: isProcessing ? colors.brandWhite : colors.brandBlack,
-          border: isProcessing ? 'none' : `1.5px solid ${colors.divider}66`,
+          backgroundColor: 'transparent',
+          color: isProcessing ? '#42A5F5' : '#FF9800',
+          border: `2px solid ${isProcessing ? '#42A5F5' : '#FF9800'}`,
           fontWeight: 700,
-          fontSize: 11,
-          height: 28,
-          borderRadius: '6px',
+          fontSize: 13,
+          height: 32,
+          borderRadius: '8px',
         }}
       />
     );
@@ -265,9 +283,19 @@ const RewardsPage = () => {
       id: 'spTotal',
       label: 'SP Total',
       render: (value) => (
-        <Typography variant="body2" sx={{ fontWeight: 600, color: colors.warning }}>
-          {value?.toLocaleString() || '0'}
-        </Typography>
+        <Chip
+          label={value?.toLocaleString() || '0'}
+          size="small"
+          sx={{
+            backgroundColor: '#FFF4E6',
+            color: '#FF9800',
+            fontWeight: 700,
+            fontSize: 14,
+            height: 32,
+            borderRadius: '8px',
+            border: 'none',
+          }}
+        />
       ),
     },
     {
@@ -287,22 +315,31 @@ const RewardsPage = () => {
       label: 'Payout Method',
       render: (value, row) => {
         const method = value || row.payoutMethod || 'USDT';
+        const isGiftCard = method.toLowerCase().includes('gift');
         return (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Avatar
-              sx={{
-                width: 24,
-                height: 24,
-                backgroundColor: colors.success,
-                fontSize: 14,
-              }}
-            >
-              <AttachMoney sx={{ fontSize: 14 }} />
-            </Avatar>
-            <Typography variant="body2" sx={{ fontWeight: 500, color: colors.brandBlack }}>
-              {method}
-            </Typography>
-          </Box>
+          <Chip
+            icon={
+              isGiftCard ? (
+                <AccountBalanceWallet sx={{ fontSize: 16, color: '#42A5F5 !important' }} />
+              ) : (
+                <AttachMoney sx={{ fontSize: 16, color: '#66BB6A !important' }} />
+              )
+            }
+            label={method}
+            size="small"
+            sx={{
+              backgroundColor: isGiftCard ? '#E3F2FD' : '#E8F5E9',
+              color: isGiftCard ? '#42A5F5' : '#66BB6A',
+              fontWeight: 600,
+              fontSize: 13,
+              height: 32,
+              borderRadius: '20px',
+              border: 'none',
+              '& .MuiChip-icon': {
+                marginLeft: '8px',
+              },
+            }}
+          />
         );
       },
     },
@@ -310,14 +347,26 @@ const RewardsPage = () => {
       id: 'kycStatus',
       label: 'KYC Status',
       render: (value, row) => {
-        const isVerified = value || row.kycVerified || row.kycStatus === 'verified';
+        const kycStatus = row.kycStatus || (row.kycVerified ? 'verified' : 'under_review');
+        const isVerified = kycStatus === 'verified';
         return (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <CheckCircle sx={{ fontSize: 18, color: isVerified ? colors.success : colors.textSecondary }} />
-            <Typography variant="body2" sx={{ fontWeight: 500, color: colors.brandBlack }}>
-              {isVerified ? 'Verified' : 'Pending'}
-            </Typography>
-          </Box>
+          <Chip
+            icon={isVerified ? <CheckCircle sx={{ fontSize: 16, color: '#66BB6A !important' }} /> : <VerifiedUser sx={{ fontSize: 16, color: '#FF9800 !important' }} />}
+            label={isVerified ? 'Verified' : 'Under Review'}
+            size="small"
+            sx={{
+              backgroundColor: isVerified ? '#E8F5E9' : '#FFF4E6',
+              color: isVerified ? '#66BB6A' : '#FF9800',
+              fontWeight: 600,
+              fontSize: 13,
+              height: 32,
+              borderRadius: '20px',
+              border: 'none',
+              '& .MuiChip-icon': {
+                marginLeft: '8px',
+              },
+            }}
+          />
         );
       },
     },
@@ -337,12 +386,13 @@ const RewardsPage = () => {
             handleActionsOpen(e, row);
           }}
           sx={{
-            backgroundColor: colors.brandRed,
-            color: colors.brandWhite,
-            width: 32,
-            height: 32,
+            backgroundColor: '#FFE0E0',
+            color: colors.brandRed,
+            width: 36,
+            height: 36,
+            borderRadius: '8px',
             '&:hover': {
-              backgroundColor: colors.brandDarkRed,
+              backgroundColor: '#FFCCCC',
             },
           }}
         >
@@ -359,58 +409,75 @@ const RewardsPage = () => {
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%' }}>
-      {/* Header */}
-      <Box sx={{ mb: 3 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+      {/* Header Card */}
+      <Card
+        sx={{
+          padding: 3,
+          mb: 3,
+          borderRadius: '16px',
+          backgroundColor: colors.brandWhite,
+          border: `1.5px solid ${colors.divider}26`,
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <Box
             sx={{
-              padding: 1.5,
-              background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
+              width: 56,
+              height: 56,
+              backgroundColor: colors.brandRed,
               borderRadius: '14px',
-              border: `2px solid ${colors.brandWhite}`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
           >
-            <AttachMoney sx={{ fontSize: 28, color: colors.brandWhite }} />
+            <AttachMoney sx={{ fontSize: 32, color: colors.brandWhite }} />
           </Box>
-          <Typography
-            variant="h4"
-            sx={{
-              fontWeight: 700,
-              color: colors.brandBlack,
-              fontSize: { xs: 24, md: 28 },
-            }}
-          >
-            Monthly SP Rewards
-          </Typography>
+          <Box>
+            <Typography
+              variant="h5"
+              sx={{
+                fontWeight: 700,
+                color: colors.brandBlack,
+                fontSize: 22,
+                mb: 0.5,
+              }}
+            >
+              Monthly SP Rewards
+            </Typography>
+            <Typography
+              variant="body2"
+              sx={{
+                color: colors.textSecondary,
+                fontSize: 14,
+              }}
+            >
+              Manage payouts for Top 3 Monthly SP Leaderboard winners
+            </Typography>
+          </Box>
         </Box>
-        <Typography
-          variant="body2"
-          sx={{
-            color: colors.textSecondary,
-            fontSize: 14,
-            ml: 8.5,
-          }}
-        >
-          Manage payouts for Top 3 Monthly SP Leaderboard winners.
-        </Typography>
-      </Box>
+      </Card>
 
       {/* Stats Cards */}
-      <Grid container spacing={2} sx={{ mb: 3 }}>
+      <Grid container spacing={2.5} sx={{ mb: 3 }}>
         <Grid item xs={6} md={3}>
           <Card
             sx={{
               padding: 2.5,
-              background: colors.brandWhite,
-              border: `1.5px solid ${colors.warning}26`,
-              borderRadius: '20px',
-              boxShadow: `0 6px 14px ${colors.warning}1F`,
+              background: '#FFF8F0',
+              border: 'none',
+              borderRadius: '16px',
+              boxShadow: 'none',
+              height: '100%',
+              minHeight: '160px',
+              display: 'flex',
+              flexDirection: 'column',
             }}
           >
             <Box
               sx={{
                 padding: 1.25,
-                backgroundColor: `${colors.warning}1F`,
+                backgroundColor: '#FFF5E6',
                 borderRadius: '50%',
                 width: 48,
                 height: 48,
@@ -420,16 +487,16 @@ const RewardsPage = () => {
                 mb: 1.5,
               }}
             >
-              <Star sx={{ fontSize: 24, color: '#FFD700' }} />
+              <Star sx={{ fontSize: 24, color: '#FFA726' }} />
             </Box>
-            <Typography variant="h4" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.5 }}>
+            <Typography variant="h3" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 1, fontSize: 36 }}>
               {currentMonthWinners.length}
             </Typography>
-            <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack, fontSize: 13, mb: 0.25 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, color: '#4A4A4A', fontSize: 14, mb: 0.5 }}>
               Current Month Winners
             </Typography>
-            <Typography variant="caption" sx={{ color: colors.textSecondary, fontSize: 11 }}>
-              Top 3 from {currentMonthLabel}
+            <Typography variant="caption" sx={{ color: '#9E9E9E', fontSize: 12 }}>
+              Top 3 from November 2025
             </Typography>
           </Card>
         </Grid>
@@ -437,16 +504,20 @@ const RewardsPage = () => {
           <Card
             sx={{
               padding: 2.5,
-              background: colors.brandWhite,
-              border: `1.5px solid ${colors.info}26`,
-              borderRadius: '20px',
-              boxShadow: `0 6px 14px ${colors.info}1F`,
+              background: '#F0F7FF',
+              border: 'none',
+              borderRadius: '16px',
+              boxShadow: 'none',
+              height: '100%',
+              minHeight: '160px',
+              display: 'flex',
+              flexDirection: 'column',
             }}
           >
             <Box
               sx={{
                 padding: 1.25,
-                backgroundColor: `${colors.info}1F`,
+                backgroundColor: '#E3F2FD',
                 borderRadius: '50%',
                 width: 48,
                 height: 48,
@@ -456,15 +527,15 @@ const RewardsPage = () => {
                 mb: 1.5,
               }}
             >
-              <Schedule sx={{ fontSize: 24, color: colors.info }} />
+              <Schedule sx={{ fontSize: 24, color: '#42A5F5' }} />
             </Box>
-            <Typography variant="h4" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.5 }}>
+            <Typography variant="h3" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 1, fontSize: 36 }}>
               {pendingPayouts}
             </Typography>
-            <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack, fontSize: 13, mb: 0.25 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, color: '#4A4A4A', fontSize: 14, mb: 0.5 }}>
               Pending Payouts
             </Typography>
-            <Typography variant="caption" sx={{ color: colors.textSecondary, fontSize: 11 }}>
+            <Typography variant="caption" sx={{ color: '#9E9E9E', fontSize: 12 }}>
               Awaiting KYC or approval
             </Typography>
           </Card>
@@ -473,16 +544,20 @@ const RewardsPage = () => {
           <Card
             sx={{
               padding: 2.5,
-              background: colors.brandWhite,
-              border: `1.5px solid ${colors.success}26`,
-              borderRadius: '20px',
-              boxShadow: `0 6px 14px ${colors.success}1F`,
+              background: '#F0F9F1',
+              border: 'none',
+              borderRadius: '16px',
+              boxShadow: 'none',
+              height: '100%',
+              minHeight: '160px',
+              display: 'flex',
+              flexDirection: 'column',
             }}
           >
             <Box
               sx={{
                 padding: 1.25,
-                backgroundColor: `${colors.success}1F`,
+                backgroundColor: '#E8F5E9',
                 borderRadius: '50%',
                 width: 48,
                 height: 48,
@@ -492,15 +567,15 @@ const RewardsPage = () => {
                 mb: 1.5,
               }}
             >
-              <Refresh sx={{ fontSize: 24, color: colors.success }} />
+              <Refresh sx={{ fontSize: 24, color: '#66BB6A' }} />
             </Box>
-            <Typography variant="h4" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.5 }}>
+            <Typography variant="h3" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 1, fontSize: 36 }}>
               {processingCount}
             </Typography>
-            <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack, fontSize: 13, mb: 0.25 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, color: '#4A4A4A', fontSize: 14, mb: 0.5 }}>
               Processing
             </Typography>
-            <Typography variant="caption" sx={{ color: colors.textSecondary, fontSize: 11 }}>
+            <Typography variant="caption" sx={{ color: '#9E9E9E', fontSize: 12 }}>
               KYC verified, ready to pay
             </Typography>
           </Card>
@@ -509,16 +584,20 @@ const RewardsPage = () => {
           <Card
             sx={{
               padding: 2.5,
-              background: colors.brandWhite,
-              border: `1.5px solid ${colors.brandRed}26`,
-              borderRadius: '20px',
-              boxShadow: `0 6px 14px ${colors.brandRed}1F`,
+              background: '#FFF5F5',
+              border: 'none',
+              borderRadius: '16px',
+              boxShadow: 'none',
+              height: '100%',
+              minHeight: '160px',
+              display: 'flex',
+              flexDirection: 'column',
             }}
           >
             <Box
               sx={{
                 padding: 1.25,
-                backgroundColor: `${colors.brandRed}1F`,
+                backgroundColor: '#FFEBEE',
                 borderRadius: '50%',
                 width: 48,
                 height: 48,
@@ -528,15 +607,15 @@ const RewardsPage = () => {
                 mb: 1.5,
               }}
             >
-              <CheckCircle sx={{ fontSize: 24, color: colors.brandRed }} />
+              <CheckCircle sx={{ fontSize: 24, color: '#EF5350' }} />
             </Box>
-            <Typography variant="h4" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.5 }}>
+            <Typography variant="h3" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 1, fontSize: 36 }}>
               ${totalPaid.toFixed(0)}
             </Typography>
-            <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack, fontSize: 13, mb: 0.25 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, color: '#4A4A4A', fontSize: 14, mb: 0.5 }}>
               Total Paid (Current)
             </Typography>
-            <Typography variant="caption" sx={{ color: colors.textSecondary, fontSize: 11 }}>
+            <Typography variant="caption" sx={{ color: '#9E9E9E', fontSize: 12 }}>
               Payouts completed
             </Typography>
           </Card>
@@ -544,43 +623,75 @@ const RewardsPage = () => {
       </Grid>
 
       {/* Filters and Search Bar */}
-      <Box sx={{ display: 'flex', gap: 1.5, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
-        <Box sx={{ flex: 1, minWidth: 300 }}>
-          <SearchBar
-            value={searchQuery}
-            onChange={setSearchQuery}
-            placeholder="Search by username or e..."
-          />
+      <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 2, mb: 3 }}>
+        {/* Search Bar */}
+        <Box>
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 2,
+              padding: '16px 24px',
+              backgroundColor: '#F9F9F9',
+              borderRadius: '30px',
+              border: 'none',
+              width: '100%',
+            }}
+          >
+            <SearchIcon sx={{ fontSize: 22, color: colors.brandRed }} />
+            <input
+              type="text"
+              placeholder="Search by username or email..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{
+                border: 'none',
+                outline: 'none',
+                flex: 1,
+                fontSize: '15px',
+                color: '#4A4A4A',
+                backgroundColor: 'transparent',
+                width: '100%',
+              }}
+            />
+          </Box>
         </Box>
         <Button
           variant="outlined"
           startIcon={
             <Box
               sx={{
-                width: 24,
-                height: 24,
-                borderRadius: '6px',
-                backgroundColor: colors.brandRed,
+                width: 36,
+                height: 36,
+                borderRadius: '10px',
+                backgroundColor: '#FFB4B4',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 ml: -0.5,
               }}
             >
-              <ArrowDownward sx={{ fontSize: 14, color: colors.brandWhite }} />
+              <ArrowDownward sx={{ fontSize: 18, color: colors.brandWhite }} />
             </Box>
           }
-          endIcon={<ArrowDropDown sx={{ fontSize: 16, color: colors.brandRed }} />}
+          endIcon={<ArrowDropDown sx={{ fontSize: 22, color: colors.brandRed }} />}
           onClick={(e) => setRankAnchor(e.currentTarget)}
           sx={{
-            borderColor: `${colors.brandRed}33`,
+            borderColor: '#FFE0E0',
             color: colors.brandBlack,
-            backgroundColor: `${colors.brandRed}0D`,
-            borderRadius: '20px',
+            backgroundColor: '#FFF5F5',
+            borderRadius: '30px',
             textTransform: 'none',
             fontWeight: 500,
-            px: 2,
-            py: 1,
+            px: 3,
+            py: 1.75,
+            fontSize: 15,
+            border: '1.5px solid #FFE0E0',
+            width: '100%',
+            '&:hover': {
+              borderColor: '#FFCCCC',
+              backgroundColor: '#FFF0F0',
+            },
           }}
         >
           Rank: {rankFilter === '1st-3rd' ? '1st to 3rd' : 
@@ -618,30 +729,37 @@ const RewardsPage = () => {
           startIcon={
             <Box
               sx={{
-                width: 24,
-                height: 24,
-                borderRadius: '6px',
-                backgroundColor: colors.brandRed,
+                width: 36,
+                height: 36,
+                borderRadius: '10px',
+                backgroundColor: '#FFB4B4',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 ml: -0.5,
               }}
             >
-              <CalendarToday sx={{ fontSize: 14, color: colors.brandWhite }} />
+              <CalendarToday sx={{ fontSize: 18, color: colors.brandWhite }} />
             </Box>
           }
-          endIcon={<ArrowDropDown sx={{ fontSize: 16, color: colors.brandRed }} />}
+          endIcon={<ArrowDropDown sx={{ fontSize: 22, color: colors.brandRed }} />}
           onClick={(e) => setMonthAnchor(e.currentTarget)}
           sx={{
-            borderColor: `${colors.brandRed}33`,
+            borderColor: '#FFE0E0',
             color: colors.brandBlack,
-            backgroundColor: `${colors.brandRed}0D`,
-            borderRadius: '20px',
+            backgroundColor: '#FFF5F5',
+            borderRadius: '30px',
             textTransform: 'none',
             fontWeight: 500,
-            px: 2,
-            py: 1,
+            px: 3,
+            py: 1.75,
+            fontSize: 15,
+            border: '1.5px solid #FFE0E0',
+            width: '100%',
+            '&:hover': {
+              borderColor: '#FFCCCC',
+              backgroundColor: '#FFF0F0',
+            },
           }}
         >
           {selectedMonth === 'all' ? 'All Months' : format(new Date(selectedMonth + '-01'), 'MMMM yyyy')}
@@ -678,30 +796,37 @@ const RewardsPage = () => {
           startIcon={
             <Box
               sx={{
-                width: 24,
-                height: 24,
-                borderRadius: '6px',
-                backgroundColor: colors.brandRed,
+                width: 36,
+                height: 36,
+                borderRadius: '10px',
+                backgroundColor: '#FFB4B4',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 ml: -0.5,
               }}
             >
-              <ViewModule sx={{ fontSize: 14, color: colors.brandWhite }} />
+              <ViewModule sx={{ fontSize: 18, color: colors.brandWhite }} />
             </Box>
           }
-          endIcon={<ArrowDropDown sx={{ fontSize: 16, color: colors.brandRed }} />}
+          endIcon={<ArrowDropDown sx={{ fontSize: 22, color: colors.brandRed }} />}
           onClick={(e) => setStatusAnchor(e.currentTarget)}
           sx={{
-            borderColor: `${colors.brandRed}33`,
+            borderColor: '#FFE0E0',
             color: colors.brandBlack,
-            backgroundColor: `${colors.brandRed}0D`,
-            borderRadius: '20px',
+            backgroundColor: '#FFF5F5',
+            borderRadius: '30px',
             textTransform: 'none',
             fontWeight: 500,
-            px: 2,
-            py: 1,
+            px: 3,
+            py: 1.75,
+            fontSize: 15,
+            border: '1.5px solid #FFE0E0',
+            width: '100%',
+            '&:hover': {
+              borderColor: '#FFCCCC',
+              backgroundColor: '#FFF0F0',
+            },
           }}
         >
           {statusFilter === 'all' ? 'All Statuses' : 
@@ -740,37 +865,39 @@ const RewardsPage = () => {
       </Box>
 
       {/* Monthly Rewards Header */}
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
-        <Box
-          sx={{
-            padding: 0.75,
-            backgroundColor: colors.brandRed,
-            borderRadius: '8px',
-          }}
-        >
-          <AttachMoney sx={{ fontSize: 18, color: colors.brandWhite }} />
+      <Card
+        sx={{
+          padding: 2.5,
+          mb: 0,
+          borderRadius: '16px 16px 0 0',
+          backgroundColor: '#FFF5F5',
+          border: 'none',
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Box
+            sx={{
+              width: 48,
+              height: 48,
+              backgroundColor: colors.brandRed,
+              borderRadius: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <AttachMoney sx={{ fontSize: 28, color: colors.brandWhite }} />
+          </Box>
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 700, color: colors.brandBlack, fontSize: 18 }}>
+              Monthly Rewards
+            </Typography>
+            <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13 }}>
+              {filteredRewards.length} rewards found
+            </Typography>
+          </Box>
         </Box>
-        <Typography
-          variant="h6"
-          sx={{
-            fontWeight: 700,
-            color: colors.brandBlack,
-            fontSize: 18,
-          }}
-        >
-          Monthly Rewards
-        </Typography>
-        <Typography
-          variant="body2"
-          sx={{
-            color: colors.textSecondary,
-            fontSize: 13,
-            ml: 1,
-          }}
-        >
-          {filteredRewards.length} rewards found
-        </Typography>
-      </Box>
+      </Card>
 
       {/* Data Table */}
       <DataTable

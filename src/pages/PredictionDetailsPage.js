@@ -8,7 +8,6 @@ import {
   CardContent,
   Grid,
   Chip,
-  Divider,
   CircularProgress,
   Alert,
 } from '@mui/material';
@@ -21,7 +20,6 @@ import {
   Cancel,
   Star,
   CalendarToday,
-  Lock,
   Shield,
   Diamond,
 } from '@mui/icons-material';
@@ -38,11 +36,7 @@ const PredictionDetailsPage = () => {
   const [predictions, setPredictions] = useState([]);
   const [selectedPredictionIndex, setSelectedPredictionIndex] = useState(0);
 
-  useEffect(() => {
-    if (id) {
-      loadPredictionGroup();
-    }
-  }, [id]);
+
 
   const generateDummyPredictionData = (userId, matchId) => {
     const users = {
@@ -66,7 +60,7 @@ const PredictionDetailsPage = () => {
     // Generate a sample prediction
     const isCompleted = Math.random() > 0.5;
     const isCorrect = isCompleted && Math.random() > 0.5;
-    
+
     return {
       id: `PRED_${userId}_${matchId}_001`,
       userId: userId,
@@ -79,7 +73,7 @@ const PredictionDetailsPage = () => {
       awayTeam: match.awayTeam,
       predictionType: 'correct_score',
       prediction: '2-1',
-      predictionTime: isCompleted 
+      predictionTime: isCompleted
         ? new Date(Date.now() - (14 + Math.random() * 7) * 24 * 60 * 60 * 1000)
         : new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000),
       status: isCompleted ? (isCorrect ? 'correct' : 'incorrect') : 'ongoing',
@@ -89,73 +83,79 @@ const PredictionDetailsPage = () => {
     };
   };
 
-  const loadPredictionGroup = async () => {
-    try {
-      setLoading(true);
-      const decodedId = decodeURIComponent(id);
-      const [userId, matchId] = decodedId.split('_');
-
-      // Try to load from Firebase
-      let predictionsData = [];
+  useEffect(() => {
+    const loadPredictionGroup = async () => {
       try {
-        const predictionsRef = collection(db, 'predictions');
-        const q = query(
-          predictionsRef,
-          where('userId', '==', userId),
-          where('fixtureId', '==', matchId)
-        );
-        const snapshot = await getDocs(q);
-        predictionsData = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
+        setLoading(true);
+        const decodedId = decodeURIComponent(id);
+        const [userId, matchId] = decodedId.split('_');
+
+        // Try to load from Firebase
+        let predictionsData = [];
+        try {
+          const predictionsRef = collection(db, 'predictions');
+          const q = query(
+            predictionsRef,
+            where('userId', '==', userId),
+            where('fixtureId', '==', matchId)
+          );
+          const snapshot = await getDocs(q);
+          predictionsData = snapshot.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }));
+        } catch (error) {
+          console.log('Firebase query error, using dummy data:', error);
+        }
+
+        // Use dummy data if no Firebase data exists
+        if (predictionsData.length === 0) {
+          const dummyPred = generateDummyPredictionData(userId, matchId);
+          predictionsData = [dummyPred];
+        }
+
+        if (predictionsData.length > 0) {
+          const firstPred = predictionsData[0];
+          setGroupData({
+            userId: userId,
+            username: firstPred.username || 'Unknown User',
+            userEmail: firstPred.userEmail || '',
+            matchId: matchId,
+            matchName: firstPred.matchName || `${firstPred.homeTeam || 'TBD'} vs ${firstPred.awayTeam || 'TBD'}`,
+            homeTeam: firstPred.homeTeam || 'TBD',
+            awayTeam: firstPred.awayTeam || 'TBD',
+            fixtureId: firstPred.fixtureId || matchId,
+          });
+          setPredictions(predictionsData);
+          setSelectedPredictionIndex(0);
+        }
       } catch (error) {
-        console.log('Firebase query error, using dummy data:', error);
-      }
-
-      // Use dummy data if no Firebase data exists
-      if (predictionsData.length === 0) {
+        console.error('Error loading prediction group:', error);
+        // Fallback to dummy data
+        const decodedId = decodeURIComponent(id);
+        const [userId, matchId] = decodedId.split('_');
         const dummyPred = generateDummyPredictionData(userId, matchId);
-        predictionsData = [dummyPred];
-      }
-
-      if (predictionsData.length > 0) {
-        const firstPred = predictionsData[0];
         setGroupData({
           userId: userId,
-          username: firstPred.username || 'Unknown User',
-          userEmail: firstPred.userEmail || '',
+          username: dummyPred.username,
+          userEmail: dummyPred.userEmail,
           matchId: matchId,
-          matchName: firstPred.matchName || `${firstPred.homeTeam || 'TBD'} vs ${firstPred.awayTeam || 'TBD'}`,
-          homeTeam: firstPred.homeTeam || 'TBD',
-          awayTeam: firstPred.awayTeam || 'TBD',
-          fixtureId: firstPred.fixtureId || matchId,
+          matchName: dummyPred.matchName,
+          homeTeam: dummyPred.homeTeam,
+          awayTeam: dummyPred.awayTeam,
+          fixtureId: matchId,
         });
-        setPredictions(predictionsData);
+        setPredictions([dummyPred]);
         setSelectedPredictionIndex(0);
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('Error loading prediction group:', error);
-      // Fallback to dummy data
-      const decodedId = decodeURIComponent(id);
-      const [userId, matchId] = decodedId.split('_');
-      const dummyPred = generateDummyPredictionData(userId, matchId);
-      setGroupData({
-        userId: userId,
-        username: dummyPred.username,
-        userEmail: dummyPred.userEmail,
-        matchId: matchId,
-        matchName: dummyPred.matchName,
-        homeTeam: dummyPred.homeTeam,
-        awayTeam: dummyPred.awayTeam,
-        fixtureId: matchId,
-      });
-      setPredictions([dummyPred]);
-      setSelectedPredictionIndex(0);
-    } finally {
-      setLoading(false);
+    };
+
+    if (id) {
+      loadPredictionGroup();
     }
-  };
+  }, [id]);
 
   const getTypeChip = (type) => {
     const typeMap = {
@@ -164,7 +164,7 @@ const PredictionDetailsPage = () => {
       'match_result': { label: 'Match Result', icon: CheckCircle },
       'both_teams_score': { label: 'Both Teams Score', icon: Star },
     };
-    
+
     const config = typeMap[type] || typeMap['correct_score'];
     const Icon = config.icon;
 
@@ -202,7 +202,7 @@ const PredictionDetailsPage = () => {
         />
       );
     }
-    
+
     return (
       <Chip
         label="COMPLETED"
@@ -240,7 +240,7 @@ const PredictionDetailsPage = () => {
         />
       );
     }
-    
+
     return (
       <Chip
         icon={<Cancel sx={{ fontSize: 14 }} />}
@@ -293,7 +293,7 @@ const PredictionDetailsPage = () => {
 
   const selectedPrediction = predictions[selectedPredictionIndex] || predictions[0];
   if (!selectedPrediction) return null;
-  
+
   const predStatus = selectedPrediction.status || selectedPrediction.predictionStatus || 'ongoing';
   const isCompleted = predStatus === 'correct' || predStatus === 'incorrect';
 
@@ -407,11 +407,11 @@ const PredictionDetailsPage = () => {
               <Typography variant="body1" sx={{ fontWeight: 600, color: colors.brandWhite }}>
                 {selectedPrediction.predictionTime
                   ? format(
-                      selectedPrediction.predictionTime?.toDate
-                        ? selectedPrediction.predictionTime.toDate()
-                        : new Date(selectedPrediction.predictionTime),
-                      'MMM dd, yyyy HH:mm'
-                    )
+                    selectedPrediction.predictionTime?.toDate
+                      ? selectedPrediction.predictionTime.toDate()
+                      : new Date(selectedPrediction.predictionTime),
+                    'MMM dd, yyyy HH:mm'
+                  )
                   : 'N/A'}
               </Typography>
             </Grid>
@@ -542,11 +542,11 @@ const PredictionDetailsPage = () => {
                       <Typography variant="body2" sx={{ fontWeight: 500 }}>
                         {pred.predictionTime
                           ? format(
-                              pred.predictionTime?.toDate
-                                ? pred.predictionTime.toDate()
-                                : new Date(pred.predictionTime),
-                              'MMM dd, yyyy HH:mm'
-                            )
+                            pred.predictionTime?.toDate
+                              ? pred.predictionTime.toDate()
+                              : new Date(pred.predictionTime),
+                            'MMM dd, yyyy HH:mm'
+                          )
                           : 'N/A'}
                       </Typography>
                     </Grid>

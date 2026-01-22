@@ -1,40 +1,118 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Button, Card, Chip, Grid, CircularProgress } from '@mui/material';
-import { Star, StarBorder, Edit as EditIcon, CheckCircle } from '@mui/icons-material';
+import {
+  Box,
+  Typography,
+  Button,
+  Card,
+  Chip,
+  CircularProgress,
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  TextField,
+  IconButton,
+} from '@mui/material';
+import { Star, Edit as EditIcon, CheckCircle, Close, Description, Tag } from '@mui/icons-material';
 import { colors } from '../../config/theme';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
-import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../../config/firebase';
 import { format } from 'date-fns';
 
+// Static default content
+const defaultContent = `<h1>How CeBee Predict Works</h1>
+
+<h2>Welcome to CeBee Predict</h2>
+
+<p>CeBee Predict is a 100% skill-based prediction platform where you can test your football knowledge and win exciting rewards. No betting, no gambling - just pure prediction skills!</p>
+
+<h2>Getting Started</h2>
+
+<ul>
+  <li><strong>Create Account:</strong> Sign up with your email or social media account</li>
+  <li><strong>Complete Profile:</strong> Add your details and verify your account</li>
+  <li><strong>Start Predicting:</strong> Browse available matches and make your predictions</li>
+  <li><strong>Earn SP:</strong> Correct predictions earn you Skill Points (SP)</li>
+</ul>
+
+<h2>How SP (Skill Points) Work</h2>
+
+<ul>
+  <li>SP is awarded for accurate predictions</li>
+  <li>Difficult predictions earn more SP</li>
+  <li>SP accumulates throughout the month</li>
+  <li>SP has no monetary value - it's purely skill-based</li>
+</ul>
+
+<h2>Making Predictions</h2>
+
+<ul>
+  <li>Choose from available football matches</li>
+  <li>Predict the outcome: Home Win, Draw, or Away Win</li>
+  <li>Submit before match kickoff</li>
+  <li>Wait for match results to see your SP earnings</li>
+</ul>
+
+<h2>Monthly Leaderboard & Winners</h2>
+
+<ul>
+  <li>Leaderboard updates in real-time based on SP earned</li>
+  <li>Top performers at month-end win rewards</li>
+  <li>Rewards include merchandise, vouchers, and exclusive benefits</li>
+  <li>Winners announced on the 1st of each month</li>
+</ul>
+
+<h2>Reward System</h2>
+
+<ul>
+  <li>Rewards are 100% non-monetary</li>
+  <li>Options include branded merchandise, gift vouchers, and exclusive perks</li>
+  <li>Choose your preferred reward from available options</li>
+  <li>Rewards delivered within 15 business days</li>
+</ul>
+
+<h2>Fair Play Guidelines</h2>
+
+<ul>
+  <li>One account per user</li>
+  <li>No automated tools or bots</li>
+  <li>Predictions cannot be changed after submission</li>
+  <li>Violation results in account suspension</li>
+</ul>`;
+
 const AppFeaturesEditorPage = () => {
-  const [content, setContent] = useState('');
+  const [content, setContent] = useState(defaultContent);
+  const [title, setTitle] = useState('How CeBee Predict Works');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [version, setVersion] = useState('1.0');
-  const [updatedAt, setUpdatedAt] = useState(null);
+  const [updatedAt, setUpdatedAt] = useState(new Date('2026-01-14'));
   const [status, setStatus] = useState('published');
 
   useEffect(() => {
     loadContent();
   }, []);
 
-  const loadContent = async () => {
+  const loadContent = () => {
     try {
       setLoading(true);
-      const contentRef = doc(db, 'content', 'appFeatures');
-      const contentDoc = await getDoc(contentRef);
-      if (contentDoc.exists()) {
-        const data = contentDoc.data();
-        setContent(data.content || '');
-        setVersion(data.version || '1.0');
-        setStatus(data.status || 'published');
-        if (data.updatedAt) {
-          const date = data.updatedAt?.toDate ? data.updatedAt.toDate() : new Date(data.updatedAt);
-          setUpdatedAt(date);
-        }
+      // Load from localStorage if available
+      const savedContent = localStorage.getItem('appFeaturesContent');
+      const savedTitle = localStorage.getItem('appFeaturesTitle');
+      const savedVersion = localStorage.getItem('appFeaturesVersion');
+      const savedDate = localStorage.getItem('appFeaturesUpdatedAt');
+      
+      if (savedContent) {
+        setContent(savedContent);
+        setTitle(savedTitle || 'How CeBee Predict Works');
+        setVersion(savedVersion || '1.0');
+        setUpdatedAt(savedDate ? new Date(savedDate) : new Date('2026-01-14'));
+      } else {
+        // Use default content
+        setContent(defaultContent);
+        setTitle('How CeBee Predict Works');
+        setVersion('1.0');
+        setUpdatedAt(new Date('2026-01-14'));
       }
     } catch (error) {
       console.error('Error loading content:', error);
@@ -43,21 +121,19 @@ const AppFeaturesEditorPage = () => {
     }
   };
 
-  const handleSave = async () => {
+  const handleSave = () => {
     try {
       setSaving(true);
-      const contentRef = doc(db, 'content', 'appFeatures');
-      const newVersion = parseFloat(version) + 0.1;
-      await updateDoc(contentRef, {
-        content,
-        version: newVersion.toFixed(1),
-        status: 'published',
-        updatedAt: serverTimestamp(),
-      });
-      setVersion(newVersion.toFixed(1));
+      // Save to localStorage
+      localStorage.setItem('appFeaturesContent', content);
+      localStorage.setItem('appFeaturesTitle', title);
+      localStorage.setItem('appFeaturesVersion', version);
+      const newDate = new Date();
+      localStorage.setItem('appFeaturesUpdatedAt', newDate.toISOString());
+      
+      setUpdatedAt(newDate);
       setStatus('published');
-      setUpdatedAt(new Date());
-      setIsEditing(false);
+      setIsModalOpen(false);
       alert('Content saved successfully!');
     } catch (error) {
       console.error('Error saving content:', error);
@@ -65,6 +141,14 @@ const AppFeaturesEditorPage = () => {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleEditClick = () => {
+    setIsModalOpen(true);
+  };
+
+  const handleModalClose = () => {
+    setIsModalOpen(false);
   };
 
   if (loading) {
@@ -77,209 +161,400 @@ const AppFeaturesEditorPage = () => {
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%' }}>
-      <Grid container spacing={3}>
-        {/* App Features / How It Works Section */}
-        <Grid item xs={12} md={6}>
-          <Card
+      {/* App Features / How It Works Section */}
+      <Card
+        sx={{
+          padding: 3,
+          borderRadius: '20px',
+          backgroundColor: '#C8E6C9',
+          border: `1px solid #A5D6A7`,
+          boxShadow: 'none',
+          mb: 3,
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2.5, mb: 2 }}>
+          <Box
             sx={{
-              padding: 3,
-              borderRadius: '20px',
-              backgroundColor: `${colors.success}0D`,
-              border: `1.5px solid ${colors.success}26`,
-              boxShadow: `0 4px 12px ${colors.success}14`,
+              width: 72,
+              height: 72,
+              borderRadius: '18px',
+              backgroundColor: '#A5D6A7',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
           >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+            <Star sx={{ fontSize: 36, color: '#388E3C' }} />
+          </Box>
+          <Box sx={{ flex: 1 }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.75, fontSize: 18 }}>
+              App Features / How It Works
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#737373', fontSize: 14, lineHeight: 1.5 }}>
+              Explains how predictions work, how SP is earned, how monthly winners are selected, and what
+              rewards are. Basic text formatting only, no images or videos.
+            </Typography>
+          </Box>
+        </Box>
+
+        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mt: 2 }}>
+          <Chip
+            label={`Version: ${version}`}
+            size="small"
+            sx={{
+              backgroundColor: '#4CAF50',
+              color: colors.brandWhite,
+              fontWeight: 600,
+              fontSize: 13,
+              height: 34,
+              borderRadius: '20px',
+              px: 0.5,
+            }}
+          />
+          <Chip
+            label={updatedAt ? `Updated: ${format(updatedAt, 'MMM dd, yyyy')}` : 'Updated: Not yet'}
+            size="small"
+            sx={{
+              backgroundColor: '#2196F3',
+              color: colors.brandWhite,
+              fontWeight: 600,
+              fontSize: 13,
+              height: 34,
+              borderRadius: '20px',
+              px: 0.5,
+            }}
+          />
+          <Chip
+            label={status.toUpperCase()}
+            size="small"
+            sx={{
+              backgroundColor: '#F44336',
+              color: colors.brandWhite,
+              fontWeight: 600,
+              fontSize: 13,
+              height: 34,
+              borderRadius: '20px',
+              px: 0.5,
+            }}
+          />
+        </Box>
+      </Card>
+
+      {/* App Features Preview Section */}
+      <Card
+        sx={{
+          padding: 3,
+          borderRadius: '20px',
+          backgroundColor: '#FFEBEE',
+          border: `1px solid #FFCDD2`,
+          boxShadow: 'none',
+          position: 'relative',
+        }}
+      >
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2.5 }}>
+            <Box
+              sx={{
+                width: 56,
+                height: 56,
+                borderRadius: '12px',
+                backgroundColor: colors.brandRed,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Star sx={{ fontSize: 24, color: colors.brandWhite }} />
+            </Box>
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.5, fontSize: 18 }}>
+                App Features Preview
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#737373', fontSize: 14 }}>
+                Review app features and how it works
+              </Typography>
+            </Box>
+          </Box>
+          <Button
+            variant="contained"
+            startIcon={<EditIcon sx={{ fontSize: 18 }} />}
+            onClick={handleEditClick}
+            sx={{
+              backgroundColor: colors.brandRed,
+              borderRadius: '12px',
+              textTransform: 'none',
+              fontWeight: 600,
+              fontSize: 15,
+              px: 3,
+              py: 1.25,
+              boxShadow: 'none',
+              '&:hover': {
+                backgroundColor: colors.brandDarkRed,
+                boxShadow: 'none',
+              },
+            }}
+          >
+            Edit
+          </Button>
+        </Box>
+
+        <Box
+          sx={{
+            mt: 3,
+            padding: 4,
+            borderRadius: '20px',
+            backgroundColor: colors.brandWhite,
+            border: `1px solid ${colors.divider}26`,
+            minHeight: '500px',
+            maxWidth: '900px',
+            margin: '24px auto 0',
+          }}
+        >
+          <Box sx={{ textAlign: 'center', mb: 3 }}>
+            <Typography variant="h4" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 1.5, fontSize: 26 }}>
+              {title}
+            </Typography>
+            {updatedAt && (
+              <Typography variant="body2" sx={{ color: '#9CA3AF', fontSize: 14 }}>
+                Version {version} • Updated {format(updatedAt, 'MMM dd, yyyy')}
+              </Typography>
+            )}
+          </Box>
+          <Box
+            sx={{
+              '& .ql-editor': {
+                padding: 0,
+              },
+              '& h1': {
+                fontSize: '24px',
+                fontWeight: 700,
+                color: colors.brandBlack,
+                marginBottom: '16px',
+                marginTop: '0',
+              },
+              '& h2': {
+                fontSize: '18px',
+                fontWeight: 600,
+                color: colors.brandBlack,
+                marginTop: '24px',
+                marginBottom: '12px',
+              },
+              '& p': {
+                lineHeight: 1.7,
+                color: '#4A4A4A',
+                fontSize: '15px',
+                marginBottom: '12px',
+              },
+              '& ul': {
+                paddingLeft: '24px',
+                marginBottom: '16px',
+              },
+              '& li': {
+                lineHeight: 1.8,
+                color: '#4A4A4A',
+                fontSize: '15px',
+                marginBottom: '8px',
+              },
+              '& strong': {
+                fontWeight: 600,
+                color: colors.brandBlack,
+              },
+            }}
+            dangerouslySetInnerHTML={{ __html: content || '<p>No content available. Click Edit to add content.</p>' }}
+          />
+        </Box>
+      </Card>
+
+      {/* Edit App Features Modal */}
+      <Dialog
+        open={isModalOpen}
+        onClose={handleModalClose}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: '20px',
+            maxHeight: '90vh',
+          },
+        }}
+      >
+        <DialogTitle sx={{ pb: 2 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               <Box
                 sx={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: '50%',
-                  border: `2px solid ${colors.success}`,
+                  width: 40,
+                  height: 40,
+                  borderRadius: '12px',
+                  backgroundColor: colors.brandRed,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                 }}
               >
-                <StarBorder sx={{ fontSize: 28, color: colors.success }} />
+                <Star sx={{ fontSize: 24, color: colors.brandWhite }} />
               </Box>
               <Box>
-                <Typography variant="h6" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.5 }}>
-                  App Features / How It Works
+                <Typography variant="h5" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.5 }}>
+                  Edit App Features
                 </Typography>
                 <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13 }}>
-                  Explains how predictions work, how SP is earned, how monthly winners are selected, and what
-                  rewards are. Basic text formatting only, no images or videos.
+                  Make changes to how it works content
                 </Typography>
               </Box>
             </Box>
-
-            <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mt: 3 }}>
-              <Chip
-                label={`Version: ${version}`}
-                size="small"
-                sx={{
-                  backgroundColor: `${colors.success}1A`,
-                  color: colors.success,
-                  fontWeight: 600,
-                  fontSize: 12,
-                  borderRadius: '20px',
+            <IconButton
+              onClick={handleModalClose}
+              sx={{
+                border: `1.5px solid ${colors.divider}66`,
+                borderRadius: '12px',
+                color: colors.textSecondary,
+              }}
+            >
+              <Close />
+            </IconButton>
+          </Box>
+        </DialogTitle>
+        <DialogContent sx={{ pt: 0 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {/* Title Field */}
+            <Box>
+              <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, fontSize: 14 }}>
+                Title
+              </Typography>
+              <TextField
+                fullWidth
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="How CeBee Predict Works"
+                InputProps={{
+                  startAdornment: (
+                    <Box sx={{ mr: 1, color: colors.brandRed }}>
+                      <Typography sx={{ fontSize: 16, fontWeight: 600 }}>Aa</Typography>
+                    </Box>
+                  ),
                 }}
-              />
-              <Chip
-                label={
-                  updatedAt ? `Updated: ${format(updatedAt, 'MMM dd, yyyy')}` : 'Updated: Not yet'
-                }
-                size="small"
                 sx={{
-                  backgroundColor: `${colors.info}1A`,
-                  color: colors.info,
-                  fontWeight: 600,
-                  fontSize: 12,
-                  borderRadius: '20px',
-                }}
-              />
-              <Chip
-                label={status.toUpperCase()}
-                size="small"
-                sx={{
-                  backgroundColor: colors.brandRed,
-                  color: colors.brandWhite,
-                  fontWeight: 600,
-                  fontSize: 12,
-                  borderRadius: '20px',
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '14px',
+                    backgroundColor: colors.brandWhite,
+                    '& fieldset': {
+                      borderColor: `${colors.divider}66`,
+                    },
+                  },
                 }}
               />
             </Box>
-          </Card>
-        </Grid>
 
-        {/* App Features Preview Section */}
-        <Grid item xs={12} md={6}>
-          <Card
-            sx={{
-              padding: 3,
-              borderRadius: '20px',
-              backgroundColor: `${colors.brandRed}0D`,
-              border: `1.5px solid ${colors.brandRed}26`,
-              boxShadow: `0 4px 12px ${colors.brandRed}14`,
-              position: 'relative',
-            }}
-          >
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Box
-                  sx={{
-                    width: 48,
-                    height: 48,
-                    borderRadius: '12px',
-                    backgroundColor: colors.brandRed,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  <Star sx={{ fontSize: 24, color: colors.brandWhite }} />
-                </Box>
-                <Box>
-                  <Typography variant="h6" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.5 }}>
-                    App Features Preview
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13 }}>
-                    Review app features and how it works
-                  </Typography>
-                </Box>
-              </Box>
-              <Button
-                variant="contained"
-                startIcon={<EditIcon />}
-                onClick={() => setIsEditing(!isEditing)}
+            {/* Version Field */}
+            <Box>
+              <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, fontSize: 14 }}>
+                Version
+              </Typography>
+              <TextField
+                fullWidth
+                value={version}
+                onChange={(e) => setVersion(e.target.value)}
+                placeholder="1.0"
+                InputProps={{
+                  startAdornment: (
+                    <Box sx={{ mr: 1, color: colors.brandRed }}>
+                      <Tag sx={{ fontSize: 18 }} />
+                    </Box>
+                  ),
+                }}
                 sx={{
-                  background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
-                  borderRadius: '20px',
-                  textTransform: 'none',
-                  fontWeight: 600,
-                  px: 2.5,
-                  py: 1,
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '14px',
+                    backgroundColor: colors.brandWhite,
+                    '& fieldset': {
+                      borderColor: `${colors.divider}66`,
+                    },
+                  },
+                }}
+              />
+            </Box>
+
+            {/* Content Field (Markdown supported) */}
+            <Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                <Description sx={{ fontSize: 18, color: colors.brandRed }} />
+                <Typography variant="body2" sx={{ fontWeight: 600, fontSize: 14 }}>
+                  Content (Markdown supported)
+                </Typography>
+              </Box>
+              <Box
+                sx={{
+                  '& .ql-container': {
+                    minHeight: '400px',
+                    backgroundColor: colors.brandWhite,
+                  },
+                  '& .ql-editor': {
+                    minHeight: '400px',
+                  },
+                  '& .ql-editor.ql-blank::before': {
+                    fontStyle: 'normal',
+                    color: colors.textSecondary,
+                    fontSize: 14,
+                  },
                 }}
               >
-                {isEditing ? 'Preview' : 'Edit'}
-              </Button>
-            </Box>
-
-            {isEditing ? (
-              <Box sx={{ mt: 3 }}>
                 <ReactQuill
                   theme="snow"
                   value={content}
                   onChange={setContent}
-                  style={{
-                    minHeight: '400px',
-                    backgroundColor: colors.brandWhite,
+                  placeholder="Enter app features content (Markdown supported)..."
+                  modules={{
+                    toolbar: [
+                      [{ header: [1, 2, 3, false] }],
+                      ['bold', 'italic', 'underline', 'strike'],
+                      [{ list: 'ordered' }, { list: 'bullet' }],
+                      ['code-block'],
+                      ['clean'],
+                    ],
                   }}
+                  formats={['header', 'bold', 'italic', 'underline', 'strike', 'list', 'bullet', 'code-block']}
                 />
-                <Box sx={{ display: 'flex', gap: 2, mt: 3 }}>
-                  <Button
-                    variant="outlined"
-                    onClick={() => setIsEditing(false)}
-                    sx={{
-                      borderColor: colors.brandRed,
-                      color: colors.brandRed,
-                      textTransform: 'none',
-                      fontWeight: 600,
-                      borderRadius: '12px',
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    variant="contained"
-                    startIcon={<CheckCircle />}
-                    onClick={handleSave}
-                    disabled={saving}
-                    sx={{
-                      background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
-                      textTransform: 'none',
-                      fontWeight: 600,
-                      borderRadius: '12px',
-                    }}
-                  >
-                    {saving ? 'Saving...' : 'Save & Publish'}
-                  </Button>
-                </Box>
               </Box>
-            ) : (
-              <Box
+            </Box>
+
+            {/* Action Buttons */}
+            <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end', pt: 2 }}>
+              <Button
+                variant="outlined"
+                onClick={handleModalClose}
                 sx={{
-                  mt: 3,
-                  padding: 3,
-                  borderRadius: '16px',
-                  backgroundColor: colors.brandWhite,
-                  border: `1px solid ${colors.divider}33`,
-                  minHeight: '400px',
+                  borderColor: colors.divider,
+                  color: colors.textSecondary,
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  borderRadius: '12px',
+                  px: 3,
+                  py: 1,
                 }}
               >
-                <Typography variant="h5" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 2 }}>
-                  How CeBee Predict Works
-                </Typography>
-                {updatedAt && (
-                  <Typography variant="body2" sx={{ color: colors.textSecondary, mb: 3, fontSize: 14 }}>
-                    Version {version} • Updated {format(updatedAt, 'MMM dd, yyyy')}
-                  </Typography>
-                )}
-                <Box
-                  sx={{
-                    '& .ql-editor': {
-                      padding: 0,
-                    },
-                  }}
-                  dangerouslySetInnerHTML={{ __html: content || '<p>No content available. Click Edit to add content.</p>' }}
-                />
-              </Box>
-            )}
-          </Card>
-        </Grid>
-      </Grid>
+                Cancel
+              </Button>
+              <Button
+                variant="contained"
+                startIcon={<CheckCircle />}
+                onClick={handleSave}
+                disabled={saving}
+                sx={{
+                  background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  borderRadius: '12px',
+                  px: 3,
+                  py: 1,
+                }}
+              >
+                {saving ? 'Saving...' : 'Save & Publish'}
+              </Button>
+            </Box>
+          </Box>
+        </DialogContent>
+      </Dialog>
     </Box>
   );
 };

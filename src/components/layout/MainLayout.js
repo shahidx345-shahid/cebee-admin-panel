@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Drawer, AppBar, Toolbar, IconButton, Badge, Fade } from '@mui/material';
-import { Menu as MenuIcon, Notifications as NotificationsIcon } from '@mui/icons-material';
+import { Box, Drawer, Fade } from '@mui/material';
 import { useLocation } from 'react-router-dom';
 import SideMenu from './SideMenu';
 import TopBar from './TopBar';
@@ -79,9 +78,9 @@ const MainLayout = ({ children }) => {
           }}
         >
           <Fade in={fadeIn} timeout={600}>
-            <Box 
-              sx={{ 
-                width: '100%', 
+            <Box
+              sx={{
+                width: '100%',
                 maxWidth: '100%',
                 animation: fadeIn ? 'fadeInUp 0.6s ease-out' : 'none',
                 '@keyframes fadeInUp': {

@@ -34,34 +34,36 @@ const FaqFormPage = () => {
   });
 
   useEffect(() => {
+    const loadFaqData = async () => {
+      try {
+        setLoading(true);
+        const faqRef = doc(db, 'content', 'faq', 'items', id);
+        const faqDoc = await getDoc(faqRef);
+        if (faqDoc.exists()) {
+          const data = faqDoc.data();
+          setFormData({
+            question: data.question || '',
+            answer: data.answer || '',
+            category: data.category || 'gettingStarted',
+            status: data.status || 'draft',
+            order: data.order || 0,
+          });
+        }
+      } catch (error) {
+        console.error('Error loading FAQ:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     if (isEditMode) {
       loadFaqData();
     } else {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, isEditMode]);
 
-  const loadFaqData = async () => {
-    try {
-      setLoading(true);
-      const faqRef = doc(db, 'content', 'faq', 'items', id);
-      const faqDoc = await getDoc(faqRef);
-      if (faqDoc.exists()) {
-        const data = faqDoc.data();
-        setFormData({
-          question: data.question || '',
-          answer: data.answer || '',
-          category: data.category || 'gettingStarted',
-          status: data.status || 'draft',
-          order: data.order || 0,
-        });
-      }
-    } catch (error) {
-      console.error('Error loading FAQ:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+
 
   const handleChange = (field, value) => {
     setFormData({ ...formData, [field]: value });
