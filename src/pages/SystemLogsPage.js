@@ -30,6 +30,7 @@ import {
   CalendarToday,
   FileDownload,
   RemoveRedEye,
+  AccessTime,
 } from '@mui/icons-material';
 import { colors, constants } from '../config/theme';
 import SearchBar from '../components/common/SearchBar';
@@ -37,6 +38,7 @@ import DataTable from '../components/common/DataTable';
 import { collection, getDocs, query, orderBy, where } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { format } from 'date-fns';
+import ResolveLogModal from '../components/logs/ResolveLogModal';
 
 const SystemLogsPage = () => {
   const [logs, setLogs] = useState([]);
@@ -64,15 +66,89 @@ const SystemLogsPage = () => {
   const loadLogs = async () => {
     try {
       setLoading(true);
-      const logsRef = collection(db, 'systemLogs');
-      const q = query(logsRef, orderBy('createdAt', 'desc'));
-      const snapshot = await getDocs(q);
-      const logsData = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setLogs(logsData);
-      setFilteredLogs(logsData);
+      // Mock Data matching screenshot
+      const mockLogs = [
+        {
+          id: '1',
+          event: 'Content Updated',
+          relatedUsername: null,
+          adminName: 'Support Admin',
+          adminId: 'admin_3',
+          createdAt: new Date('2026-01-23T11:10:00'),
+          severity: 'low',
+          type: 'system',
+          status: 'acknowledged'
+        },
+        {
+          id: '2',
+          event: 'Login Anomaly Detected',
+          relatedUsername: 'traveling_user',
+          adminName: 'Auto-Detection System',
+          adminId: 'system',
+          createdAt: new Date('2026-01-23T10:40:00'),
+          severity: 'medium',
+          type: 'security',
+          status: 'unresolved'
+        },
+        {
+          id: '3',
+          event: 'Match Result Updated',
+          relatedUsername: null,
+          adminName: 'Super Admin',
+          adminId: 'admin_1',
+          createdAt: new Date('2026-01-23T10:40:00'),
+          severity: 'normal',
+          type: 'system',
+          status: 'acknowledged'
+        },
+        {
+          id: '4',
+          event: 'Reward Payout Processed',
+          relatedUsername: 'john_predictor',
+          adminName: 'Super Admin',
+          adminId: 'admin_1',
+          createdAt: new Date('2026-01-23T09:40:00'),
+          severity: 'high',
+          type: 'critical',
+          status: 'unresolved'
+        },
+        {
+          id: '5',
+          event: 'Settings Changed',
+          relatedUsername: null,
+          adminName: 'Super Admin',
+          adminId: 'admin_1',
+          createdAt: new Date('2026-01-23T09:40:00'),
+          severity: 'low',
+          type: 'system',
+          status: 'acknowledged'
+        },
+        {
+          id: '6',
+          event: 'Duplicate Identity Detected',
+          relatedUsername: 'duplicate_user',
+          adminName: 'Auto-Detection System',
+          adminId: 'system',
+          createdAt: new Date('2026-01-23T08:40:00'),
+          severity: 'medium',
+          type: 'security',
+          status: 'unresolved'
+        },
+        {
+          id: '7',
+          event: 'Leaderboard Calculated',
+          relatedUsername: null,
+          adminName: 'Backend Service',
+          adminId: 'system',
+          createdAt: new Date('2026-01-23T07:40:00'),
+          severity: 'normal',
+          type: 'system',
+          status: 'acknowledged'
+        },
+      ];
+
+      setLogs(mockLogs);
+      setFilteredLogs(mockLogs);
     } catch (error) {
       console.error('Error loading logs:', error);
     } finally {
@@ -177,13 +253,13 @@ const SystemLogsPage = () => {
   const getSeverityChip = (severity, type) => {
     const severityLevel = severity || type || 'normal';
     const severityConfig = {
-      high: { label: 'HIGH', color: colors.error },
-      critical: { label: 'HIGH', color: colors.error },
-      medium: { label: 'MEDIUM', color: colors.warning },
-      warning: { label: 'MEDIUM', color: colors.warning },
-      low: { label: 'LOW', color: colors.success },
-      normal: { label: 'NORMAL', color: colors.info },
-      info: { label: 'NORMAL', color: colors.info },
+      high: { label: 'HIGH', color: '#EF4444', bgcolor: '#FEE2E2' },
+      critical: { label: 'HIGH', color: '#EF4444', bgcolor: '#FEE2E2' },
+      medium: { label: 'MEDIUM', color: '#F59E0B', bgcolor: '#FEF3C7' },
+      warning: { label: 'MEDIUM', color: '#F59E0B', bgcolor: '#FEF3C7' },
+      low: { label: 'LOW', color: '#10B981', bgcolor: '#ECFDF5' }, // Green
+      normal: { label: 'NORMAL', color: '#3B82F6', bgcolor: '#EFF6FF' }, // Blue
+      info: { label: 'NORMAL', color: '#3B82F6', bgcolor: '#EFF6FF' },
     };
 
     const config = severityConfig[severityLevel.toLowerCase()] || severityConfig.normal;
@@ -193,32 +269,36 @@ const SystemLogsPage = () => {
         label={config.label}
         size="small"
         sx={{
-          backgroundColor: `${config.color}1A`,
+          backgroundColor: config.bgcolor,
           color: config.color,
           fontWeight: 700,
-          fontSize: 11,
-          borderRadius: '20px',
-          height: 24,
+          fontSize: 10,
+          borderRadius: '4px',
+          height: 22,
+          minWidth: 60,
+          letterSpacing: 0.5,
         }}
       />
     );
   };
 
   const getStatusChip = (status) => {
-    const statusValue = status || 'unresolved';
-    const isResolved = statusValue === 'acknowledged' || statusValue === 'resolved';
-    
+    const statusValue = status?.toLowerCase() || 'unresolved';
+    const isAck = statusValue === 'acknowledged' || statusValue === 'resolved';
+
     return (
       <Chip
-        label={isResolved ? 'ACKNOWLEDGED' : 'UNRESOLVED'}
+        label={isAck ? 'ACKNOWLEDGED' : 'UNRESOLVED'}
         size="small"
         sx={{
-          backgroundColor: isResolved ? `${colors.info}1A` : `${colors.error}1A`,
-          color: isResolved ? colors.info : colors.error,
+          backgroundColor: isAck ? '#EFF6FF' : '#FEE2E2', // Light Blue vs Light Red
+          color: isAck ? '#3B82F6' : '#EF4444',
           fontWeight: 700,
-          fontSize: 11,
-          borderRadius: '20px',
-          height: 24,
+          fontSize: 10,
+          borderRadius: '4px',
+          height: 22,
+          minWidth: 90,
+          letterSpacing: 0.5,
         }}
       />
     );
@@ -230,11 +310,11 @@ const SystemLogsPage = () => {
         label={username || 'N/A'}
         size="small"
         sx={{
-          backgroundColor: `${colors.error}1A`,
-          color: colors.error,
+          backgroundColor: '#FEF2F2',
+          color: '#EF4444',
           fontWeight: 600,
           fontSize: 11,
-          borderRadius: '20px',
+          borderRadius: '4px',
           height: 24,
         }}
       />
@@ -274,6 +354,23 @@ const SystemLogsPage = () => {
     setSortMenuAnchor(null);
   };
 
+  const [selectedLogForResolution, setSelectedLogForResolution] = useState(null);
+
+  const handleOpenResolveModal = (log) => {
+    setSelectedLogForResolution(log);
+  };
+
+  const handleCloseResolveModal = () => {
+    setSelectedLogForResolution(null);
+  };
+
+  const handleConfirmResolve = (log, notes) => {
+    console.log('Resolving log:', log.id, 'Notes:', notes);
+    // Logic to actually resolve the log (e.g. update status in mock or backend)
+    // For now, just close
+    handleCloseResolveModal();
+  };
+
   const columns = [
     {
       id: 'severity',
@@ -284,7 +381,7 @@ const SystemLogsPage = () => {
       id: 'event',
       label: 'Event',
       render: (value) => (
-        <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack }}>
+        <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack, fontSize: 13 }}>
           {value || 'N/A'}
         </Typography>
       ),
@@ -299,20 +396,27 @@ const SystemLogsPage = () => {
       label: 'Admin',
       render: (value, row) => {
         const adminName = value || row.adminId || 'System';
-        const isAuto = adminName.toLowerCase().includes('auto');
+        const isAuto = adminName.toLowerCase().includes('auto') || adminName.toLowerCase().includes('backend');
+        if (isAuto) {
+          return (
+            <Chip
+              icon={<Settings sx={{ fontSize: 12, color: '#3B82F6 !important' }} />}
+              label={adminName.length > 20 ? `${adminName.substring(0, 20)}...` : adminName}
+              size="small"
+              sx={{ bgcolor: 'transparent', color: '#3B82F6', fontWeight: 500, fontSize: 13, p: 0, '& .MuiChip-label': { paddingLeft: 0.5 } }}
+            />
+          );
+        }
         return (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-            {isAuto && <Settings sx={{ fontSize: 14, color: colors.info }} />}
-            <Typography
-              variant="body2"
-              sx={{
-                color: isAuto ? colors.info : colors.brandBlack,
-                fontSize: 14,
-              }}
-            >
-              {adminName.length > 20 ? `${adminName.substring(0, 20)}...` : adminName}
-            </Typography>
-          </Box>
+          <Typography
+            variant="body2"
+            sx={{
+              color: colors.brandBlack,
+              fontSize: 13,
+            }}
+          >
+            {adminName}
+          </Typography>
         );
       },
     },
@@ -323,7 +427,7 @@ const SystemLogsPage = () => {
         if (!value) return 'N/A';
         const date = value?.toDate ? value.toDate() : new Date(value);
         return (
-          <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 14 }}>
+          <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13 }}>
             {format(date, 'MMM d, yyyy HH:mm')}
           </Typography>
         );
@@ -338,28 +442,28 @@ const SystemLogsPage = () => {
       id: 'actions',
       label: 'Actions',
       render: (_, row) => {
-        const isResolved = (row.status || row.logStatus) === 'acknowledged' || (row.status || row.logStatus) === 'resolved';
         return (
           <Button
-            variant="contained"
+            variant="outlined"
             size="small"
             startIcon={<RemoveRedEye sx={{ fontSize: 16 }} />}
             onClick={(e) => {
               e.stopPropagation();
-              // Handle view/resolve action
+              handleOpenResolveModal(row);
             }}
             sx={{
-              backgroundColor: colors.info,
-              color: colors.brandWhite,
-              borderRadius: '12px',
+              backgroundColor: '#EFF6FF',
+              color: '#3B82F6',
+              border: '1px solid #BFDBFE',
+              borderRadius: '8px',
               textTransform: 'none',
               fontWeight: 600,
               fontSize: 12,
               px: 2,
               py: 0.5,
               '&:hover': {
-                backgroundColor: colors.info,
-                opacity: 0.9,
+                backgroundColor: '#DBEAFE',
+                border: '1px solid #93C5FD',
               },
             }}
           >
@@ -420,43 +524,39 @@ const SystemLogsPage = () => {
       {unresolvedLogs.length > 0 && (
         <Card
           sx={{
-            padding: 2.5,
-            mb: 3,
+            p: 3,
+            mb: 4,
             borderRadius: '16px',
-            backgroundColor: `${colors.error}0D`,
-            border: `1.5px solid ${colors.error}33`,
+            backgroundColor: '#FDF2F2', // Light red background matching screenshot
+            border: '1px solid #FECACA', // Light red border
+            boxShadow: 'none',
           }}
         >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          {/* Alert Header */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
             <Box
               sx={{
-                width: 0,
-                height: 0,
-                borderLeft: '12px solid transparent',
-                borderRight: '12px solid transparent',
-                borderBottom: '20px solid',
-                borderBottomColor: colors.error,
-                position: 'relative',
-                '&::after': {
-                  content: '"!"',
-                  position: 'absolute',
-                  top: 4,
-                  left: -6,
-                  color: colors.brandWhite,
-                  fontWeight: 700,
-                  fontSize: 14,
-                },
+                width: 40,
+                height: 40,
+                borderRadius: '12px',
+                backgroundColor: colors.brandRed,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 2px 8px rgba(220, 38, 38, 0.3)',
               }}
-            />
+            >
+              <Warning sx={{ fontSize: 24, color: 'white' }} />
+            </Box>
             <Box>
               <Typography
                 variant="h6"
                 sx={{
                   fontWeight: 700,
-                  color: colors.error,
-                  fontSize: 14,
+                  color: colors.brandRed,
+                  fontSize: 16,
+                  letterSpacing: '0.5px',
                   textTransform: 'uppercase',
-                  mb: 0.5,
                 }}
               >
                 SECURITY ALERTS
@@ -464,253 +564,268 @@ const SystemLogsPage = () => {
               <Typography
                 variant="body2"
                 sx={{
-                  color: colors.brandBlack,
-                  fontSize: 13,
+                  color: colors.textSecondary,
+                  fontSize: 14,
                 }}
               >
                 {unresolvedLogs.length} unresolved critical/security logs require Super Admin attention
               </Typography>
             </Box>
           </Box>
+
+          {/* Alert List */}
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {unresolvedLogs.map((log) => {
+              const date = log.createdAt instanceof Date ? log.createdAt : new Date(log.createdAt);
+              const isHigh = (log.severity || log.severityLevel) === 'high';
+              const badgeColors = isHigh
+                ? { bg: '#FFEBEB', text: colors.brandRed } // High: Pinkish red
+                : { bg: '#FFFBEB', text: '#D97706' }; // Medium: Yellowish orange
+
+              return (
+                <Card
+                  key={log.id}
+                  sx={{
+                    p: 2,
+                    borderRadius: '12px',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    border: 'none',
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                    {/* Severity Badge */}
+                    <Box
+                      sx={{
+                        px: 1.5,
+                        py: 0.5,
+                        borderRadius: '6px',
+                        backgroundColor: badgeColors.bg,
+                        color: badgeColors.text,
+                        fontWeight: 700,
+                        fontSize: 12,
+                        textTransform: 'uppercase',
+                        minWidth: 60,
+                        textAlign: 'center',
+                      }}
+                    >
+                      {(log.severity || log.severityLevel).toUpperCase()}
+                    </Box>
+
+                    {/* Content */}
+                    <Box>
+                      <Typography variant="body1" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.5 }}>
+                        {log.event}
+                      </Typography>
+                      <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13 }}>
+                        User: <span style={{ color: colors.textPrimary }}>{log.relatedUsername || 'N/A'}</span> • Admin: <span style={{ color: colors.textPrimary }}>{log.adminName || 'System'}</span> • {format(date, 'MMM dd, HH:mm')}
+                      </Typography>
+                    </Box>
+                  </Box>
+
+                  {/* Action Button */}
+                  <Button
+                    variant="contained"
+                    onClick={() => handleOpenResolveModal(log)}
+                    sx={{
+                      backgroundColor: colors.brandRed,
+                      color: 'white',
+                      textTransform: 'none',
+                      fontWeight: 600,
+                      borderRadius: '8px',
+                      px: 3,
+                      '&:hover': {
+                        backgroundColor: colors.brandDarkRed,
+                      },
+                    }}
+                  >
+                    Resolve
+                  </Button>
+                </Card>
+              );
+            })}
+          </Box>
         </Card>
       )}
 
       {/* Stats Cards */}
-      <Grid container spacing={2.5} sx={{ mb: 3 }}>
-        {/* Total Logs */}
-        <Grid item xs={6} md={3}>
-          <Card
-            sx={{
-              padding: 2.5,
-              borderRadius: '16px',
-              boxShadow: `0 4px 12px ${colors.shadow}14`,
-              backgroundColor: `${colors.info}0D`,
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1.5 }}>
-              <Box
+      <Grid container spacing={3} sx={{ mb: 4 }}>
+        {[
+          {
+            title: 'Total Logs',
+            count: logs.length,
+            icon: Description,
+            color: '#3B82F6', // Blue
+            bgColor: '#EFF6FF', // Light Blue
+          },
+          {
+            title: 'Critical',
+            count: criticalLogs.length,
+            icon: Error,
+            color: '#EF4444', // Red
+            bgColor: '#FEF2F2', // Light Red
+          },
+          {
+            title: 'Security',
+            count: securityLogs.length,
+            icon: Shield,
+            color: '#F59E0B', // Amber
+            bgColor: '#FFFBEB', // Light Amber
+          },
+          {
+            title: 'Unresolved',
+            count: unresolvedLogs.length,
+            icon: AccessTime, // Changed to clock icon
+            color: '#EF4444', // Red
+            bgColor: '#FEF2F2', // Light Red
+          },
+        ].map((stat, index) => {
+          const Icon = stat.icon;
+          return (
+            <Grid item xs={6} md={3} key={index}>
+              <Card
                 sx={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: '12px',
-                  backgroundColor: colors.info,
+                  p: 4,
+                  borderRadius: '16px',
+                  bgcolor: stat.bgColor,
+                  boxShadow: 'none',
+                  border: `1px solid ${stat.color}20`,
                   display: 'flex',
+                  flexDirection: 'column',
                   alignItems: 'center',
-                  justifyContent: 'center',
+                  gap: 2,
+                  height: '100%',
                 }}
               >
-                <Description sx={{ fontSize: 24, color: colors.brandWhite }} />
-              </Box>
-              <Box sx={{ flexGrow: 1 }}>
-                <Typography variant="h4" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.25 }}>
-                  {logs.length}
-                </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack, fontSize: 14 }}>
-                  Total Logs
-                </Typography>
-              </Box>
-            </Box>
-          </Card>
-        </Grid>
-
-        {/* Critical */}
-        <Grid item xs={6} md={3}>
-          <Card
-            sx={{
-              padding: 2.5,
-              borderRadius: '16px',
-              boxShadow: `0 4px 12px ${colors.shadow}14`,
-              backgroundColor: `${colors.error}0D`,
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1.5 }}>
-              <Box
-                sx={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: '12px',
-                  backgroundColor: colors.error,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Error sx={{ fontSize: 24, color: colors.brandWhite }} />
-              </Box>
-              <Box sx={{ flexGrow: 1 }}>
-                <Typography variant="h4" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.25 }}>
-                  {criticalLogs.length}
-                </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack, fontSize: 14 }}>
-                  Critical
-                </Typography>
-              </Box>
-            </Box>
-          </Card>
-        </Grid>
-
-        {/* Security */}
-        <Grid item xs={6} md={3}>
-          <Card
-            sx={{
-              padding: 2.5,
-              borderRadius: '16px',
-              boxShadow: `0 4px 12px ${colors.shadow}14`,
-              backgroundColor: `${colors.warning}0D`,
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1.5 }}>
-              <Box
-                sx={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: '12px',
-                  backgroundColor: colors.warning,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Lock sx={{ fontSize: 24, color: colors.brandWhite }} />
-              </Box>
-              <Box sx={{ flexGrow: 1 }}>
-                <Typography variant="h4" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.25 }}>
-                  {securityLogs.length}
-                </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack, fontSize: 14 }}>
-                  Security
-                </Typography>
-              </Box>
-            </Box>
-          </Card>
-        </Grid>
-
-        {/* Unresolved */}
-        <Grid item xs={6} md={3}>
-          <Card
-            sx={{
-              padding: 2.5,
-              borderRadius: '16px',
-              boxShadow: `0 4px 12px ${colors.shadow}14`,
-              backgroundColor: `${colors.error}0D`,
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1.5 }}>
-              <Box
-                sx={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: '12px',
-                  backgroundColor: colors.error,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Warning sx={{ fontSize: 24, color: colors.brandWhite }} />
-              </Box>
-              <Box sx={{ flexGrow: 1 }}>
-                <Typography variant="h4" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.25 }}>
-                  {unresolvedLogs.length}
-                </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack, fontSize: 14 }}>
-                  Unresolved
-                </Typography>
-              </Box>
-            </Box>
-          </Card>
-        </Grid>
+                <Icon sx={{ fontSize: 32, color: stat.color }} />
+                <Box sx={{ textAlign: 'center' }}>
+                  <Typography variant="h3" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.5 }}>
+                    {stat.count}
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: colors.textSecondary, fontWeight: 500 }}>
+                    {stat.title}
+                  </Typography>
+                </Box>
+              </Card>
+            </Grid>
+          );
+        })}
       </Grid>
 
       {/* Filter Buttons */}
-      <Box sx={{ mb: 3, display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+      {/* Filter Buttons Stripe */}
+      <Card
+        sx={{
+          mb: 4,
+          p: 1,
+          borderRadius: '24px',
+          backgroundColor: 'white',
+          display: 'flex',
+          gap: 1,
+          overflowX: 'auto',
+          width: '100%',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)',
+          '::-webkit-scrollbar': { display: 'none' }
+        }}
+      >
         {[
-          { value: 'all', label: 'All Logs', icon: List, color: colors.brandRed },
-          { value: 'critical', label: 'Critical', icon: Error, color: colors.error },
-          { value: 'security', label: 'Security', icon: Lock, color: colors.warning },
-          { value: 'system', label: 'System', icon: Settings, color: colors.info },
-          { value: 'admin', label: 'Admin Activity', icon: Person, color: colors.success },
+          { value: 'all', label: 'All Logs', icon: List, color: '#DC2626', lightColor: '#FEF2F2' },
+          { value: 'critical', label: 'Critical', icon: Error, color: '#EF4444', lightColor: '#FEF2F2' },
+          { value: 'security', label: 'Security', icon: Shield, color: '#F59E0B', lightColor: '#FFFBEB' },
+          { value: 'system', label: 'System', icon: Settings, color: '#3B82F6', lightColor: '#EFF6FF' },
+          { value: 'admin', label: 'Admin Activity', icon: Person, color: '#10B981', lightColor: '#ECFDF5' },
         ].map((filter) => {
           const isSelected = typeFilter === filter.value;
           const Icon = filter.icon;
+
           return (
             <Button
               key={filter.value}
-              variant={isSelected ? 'contained' : 'outlined'}
               onClick={() => setTypeFilter(filter.value)}
               sx={{
+                flex: 1,
+                minWidth: { xs: 150, md: 'auto' },
+                backgroundColor: isSelected ? filter.color : 'transparent',
+                color: isSelected ? 'white' : colors.textPrimary,
                 borderRadius: '20px',
-                textTransform: 'none',
-                fontWeight: 600,
-                px: 3,
                 py: 1.5,
-                backgroundColor: isSelected ? filter.color : colors.brandWhite,
-                color: isSelected ? colors.brandWhite : filter.color,
-                border: `1.5px solid ${isSelected ? filter.color : colors.divider}66`,
+                px: 2,
+                boxShadow: isSelected ? '0 4px 12px rgba(0,0,0,0.15)' : 'none',
+                textTransform: 'none',
+                fontSize: 15,
+                fontWeight: 600,
+                whiteSpace: 'nowrap',
                 '&:hover': {
-                  backgroundColor: isSelected ? filter.color : `${colors.divider}0D`,
+                  backgroundColor: isSelected ? filter.color : 'rgba(0,0,0,0.02)',
+                  opacity: isSelected ? 0.95 : 1,
                 },
+                justifyContent: 'center',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.5,
+                transition: 'all 0.2s ease-in-out',
               }}
             >
               <Box
                 sx={{
-                  width: 24,
-                  height: 24,
-                  borderRadius: '6px',
-                  backgroundColor: `${filter.color}${isSelected ? '' : '1A'}`,
+                  width: 32,
+                  height: 32,
+                  borderRadius: '8px',
+                  backgroundColor: isSelected ? 'rgba(255,255,255,0.2)' : filter.lightColor,
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  mr: 1.5,
                 }}
               >
-                <Icon sx={{ fontSize: 14, color: isSelected ? colors.brandWhite : filter.color }} />
+                <Icon sx={{ fontSize: 18, color: isSelected ? 'white' : filter.color }} />
               </Box>
               {filter.label}
             </Button>
           );
         })}
-      </Box>
+      </Card>
 
       {/* Advanced Filters */}
       <Card
         sx={{
-          padding: 2.5,
-          mb: 3,
+          p: 3,
+          mb: 4,
           borderRadius: '16px',
-          backgroundColor: colors.brandWhite,
-          boxShadow: `0 4px 12px ${colors.shadow}14`,
+          backgroundColor: 'white',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-          <FilterList sx={{ fontSize: 18, color: colors.brandRed }} />
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
+          <FilterList sx={{ fontSize: 20, color: colors.brandRed }} />
           <Typography variant="h6" sx={{ fontWeight: 700, color: colors.brandBlack, fontSize: 16 }}>
             Advanced Filters
           </Typography>
         </Box>
-        <Grid container spacing={2}>
+        <Grid container spacing={3}>
           <Grid item xs={12} md={6}>
-            <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, fontSize: 14 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, fontSize: 13, color: colors.textSecondary }}>
               Date Range
             </Typography>
             <Button
               variant="outlined"
               fullWidth
               onClick={(e) => setDateMenuAnchor(e.currentTarget)}
-              endIcon={<ArrowDropDown sx={{ color: colors.brandRed }} />}
+              endIcon={<ArrowDropDown sx={{ color: colors.textSecondary }} />}
               sx={{
-                borderRadius: '14px',
+                borderRadius: '10px',
                 textTransform: 'none',
-                fontWeight: 600,
+                fontWeight: 500,
                 justifyContent: 'space-between',
                 px: 2,
                 py: 1.5,
                 color: colors.brandBlack,
-                borderColor: `${colors.divider}66`,
-                backgroundColor: colors.brandWhite,
+                borderColor: '#E5E7EB',
+                backgroundColor: '#F9FAFB',
                 '&:hover': {
-                  backgroundColor: `${colors.divider}0D`,
-                  borderColor: colors.brandRed,
+                  backgroundColor: '#F3F4F6',
+                  borderColor: '#D1D5DB',
                 },
               }}
             >
@@ -718,27 +833,27 @@ const SystemLogsPage = () => {
             </Button>
           </Grid>
           <Grid item xs={12} md={6}>
-            <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, fontSize: 14 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, fontSize: 13, color: colors.textSecondary }}>
               Admin User
             </Typography>
             <Button
               variant="outlined"
               fullWidth
               onClick={(e) => setAdminMenuAnchor(e.currentTarget)}
-              endIcon={<ArrowDropDown sx={{ color: colors.brandRed }} />}
+              endIcon={<ArrowDropDown sx={{ color: colors.textSecondary }} />}
               sx={{
-                borderRadius: '14px',
+                borderRadius: '10px',
                 textTransform: 'none',
-                fontWeight: 600,
+                fontWeight: 500,
                 justifyContent: 'space-between',
                 px: 2,
                 py: 1.5,
                 color: colors.brandBlack,
-                borderColor: `${colors.divider}66`,
-                backgroundColor: colors.brandWhite,
+                borderColor: '#E5E7EB',
+                backgroundColor: '#F9FAFB',
                 '&:hover': {
-                  backgroundColor: `${colors.divider}0D`,
-                  borderColor: colors.brandRed,
+                  backgroundColor: '#F3F4F6',
+                  borderColor: '#D1D5DB',
                 },
               }}
             >
@@ -748,30 +863,62 @@ const SystemLogsPage = () => {
         </Grid>
       </Card>
 
-      {/* Search and Action Bar */}
-      <Box sx={{ mb: 3, display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap' }}>
+      {/* Search and Action Bar Card */}
+      <Card
+        sx={{
+          p: 2,
+          mb: 4,
+          borderRadius: '16px',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 2,
+          flexWrap: 'wrap',
+          backgroundColor: 'white',
+        }}
+      >
         <Box sx={{ flexGrow: 1, minWidth: 300 }}>
           <SearchBar
             value={searchQuery}
             onChange={setSearchQuery}
             placeholder="Search logs by event, admin, or user..."
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                backgroundColor: '#F9FAFB',
+                borderRadius: '8px',
+                border: 'none',
+                '& fieldset': { border: 'none' },
+                '&:hover fieldset': { border: 'none' },
+                '&.Mui-focused fieldset': { border: 'none' },
+              }
+            }}
           />
         </Box>
         <Button
-          variant="outlined"
+          variant="contained"
           onClick={(e) => setSortMenuAnchor(e.currentTarget)}
           endIcon={<ArrowDropDown sx={{ color: colors.brandRed }} />}
+          startIcon={
+            <Box sx={{
+              width: 24, height: 24, borderRadius: '50%', backgroundColor: '#FECACA',
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}>
+              <ArrowDropDown sx={{ transform: 'rotate(180deg)', color: '#DC2626', fontSize: 16 }} />
+            </Box>
+          }
           sx={{
-            borderRadius: '20px',
+            borderRadius: '8px',
             textTransform: 'none',
             fontWeight: 600,
-            px: 3,
+            px: 2,
             py: 1.5,
-            color: colors.brandRed,
-            borderColor: `${colors.divider}66`,
+            backgroundColor: '#FEF2F2',
+            color: colors.brandBlack,
+            boxShadow: 'none',
+            border: '1px solid #FECACA',
             '&:hover': {
-              backgroundColor: `${colors.divider}0D`,
-              borderColor: colors.brandRed,
+              backgroundColor: '#FEE2E2',
+              boxShadow: 'none',
             },
           }}
         >
@@ -781,80 +928,96 @@ const SystemLogsPage = () => {
           variant="contained"
           startIcon={<FileDownload sx={{ fontSize: 18 }} />}
           sx={{
-            borderRadius: '20px',
+            borderRadius: '8px',
             textTransform: 'none',
             fontWeight: 600,
             px: 3,
             py: 1.5,
-            backgroundColor: colors.success,
+            backgroundColor: '#4CAF50',
+            boxShadow: 'none',
             '&:hover': {
-              backgroundColor: colors.success,
-              opacity: 0.9,
+              backgroundColor: '#43A047',
+              boxShadow: 'none',
             },
           }}
         >
           Export
         </Button>
-      </Box>
+      </Card>
 
-      {/* Audit Trail Header */}
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <Box
-            sx={{
-              width: 32,
-              height: 32,
-              borderRadius: '8px',
-              backgroundColor: colors.brandRed,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Description sx={{ fontSize: 18, color: colors.brandWhite }} />
-          </Box>
-          <Typography variant="h6" sx={{ fontWeight: 700, color: colors.brandBlack, fontSize: 16 }}>
-            Audit Trail
-          </Typography>
-          <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 14 }}>
-            {filteredLogs.length} logs • Page {page + 1} of {Math.ceil(filteredLogs.length / rowsPerPage) || 1}
-          </Typography>
-        </Box>
-        <FormControl size="small" sx={{ minWidth: 100 }}>
-          <Select
-            value={rowsPerPage}
-            onChange={(e) => {
-              setRowsPerPage(parseInt(e.target.value, 10));
-              setPage(0);
-            }}
-            sx={{
-              borderRadius: '12px',
-              fontSize: 14,
-            }}
-          >
-            <MenuItem value={10}>10</MenuItem>
-            <MenuItem value={25}>25</MenuItem>
-            <MenuItem value={50}>50</MenuItem>
-            <MenuItem value={100}>100</MenuItem>
-          </Select>
-        </FormControl>
-      </Box>
-
-      {/* Data Table */}
-      <DataTable
-        columns={columns}
-        data={paginatedLogs}
-        loading={loading}
-        page={page}
-        rowsPerPage={rowsPerPage}
-        totalCount={filteredLogs.length}
-        onPageChange={(e, newPage) => setPage(newPage)}
-        onRowsPerPageChange={(e) => {
-          setRowsPerPage(parseInt(e.target.value, 10));
-          setPage(0);
+      {/* Audit Trail Card */}
+      <Card
+        sx={{
+          borderRadius: '16px',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+          backgroundColor: 'white',
+          overflow: 'hidden',
         }}
-        emptyMessage="No system logs found"
-      />
+      >
+        {/* Audit Trail Header */}
+        <Box sx={{ p: 3, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Box
+              sx={{
+                width: 40,
+                height: 40,
+                borderRadius: '12px',
+                backgroundColor: '#DC2626',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 4px 6px -1px rgba(220, 38, 38, 0.3)',
+              }}
+            >
+              <Description sx={{ fontSize: 20, color: 'white' }} />
+            </Box>
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: colors.brandBlack, fontSize: 18, lineHeight: 1.2 }}>
+                Audit Trail
+              </Typography>
+              <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 14 }}>
+                {filteredLogs.length} logs • Page {page + 1} of {Math.ceil(filteredLogs.length / rowsPerPage) || 1}
+              </Typography>
+            </Box>
+          </Box>
+          <FormControl size="small" sx={{ minWidth: 100 }}>
+            <Select
+              value={rowsPerPage}
+              onChange={(e) => {
+                setRowsPerPage(parseInt(e.target.value, 10));
+                setPage(0);
+              }}
+              sx={{
+                borderRadius: '8px',
+                fontSize: 14,
+                backgroundColor: '#F9FAFB',
+                '& .MuiOutlinedInput-notchedOutline': { border: 'none' },
+              }}
+            >
+              <MenuItem value={10}>10</MenuItem>
+              <MenuItem value={25}>25</MenuItem>
+              <MenuItem value={50}>50</MenuItem>
+              <MenuItem value={100}>100</MenuItem>
+            </Select>
+          </FormControl>
+        </Box>
+
+        {/* Data Table */}
+        <DataTable
+          columns={columns}
+          data={paginatedLogs}
+          loading={loading}
+          page={page}
+          rowsPerPage={rowsPerPage}
+          totalCount={filteredLogs.length}
+          onPageChange={(e, newPage) => setPage(newPage)}
+          onRowsPerPageChange={(e) => {
+            setRowsPerPage(parseInt(e.target.value, 10));
+            setPage(0);
+          }}
+          emptyMessage="No system logs found"
+        />
+      </Card>
 
       {/* Date Range Menu */}
       <Menu
@@ -917,7 +1080,14 @@ const SystemLogsPage = () => {
         <MenuItem onClick={() => handleSortMenuClose('severityHigh')}>Severity (High to Low)</MenuItem>
         <MenuItem onClick={() => handleSortMenuClose('severityLow')}>Severity (Low to High)</MenuItem>
       </Menu>
-    </Box>
+
+      <ResolveLogModal
+        open={Boolean(selectedLogForResolution)}
+        onClose={handleCloseResolveModal}
+        log={selectedLogForResolution}
+        onResolve={handleConfirmResolve}
+      />
+    </Box >
   );
 };
 

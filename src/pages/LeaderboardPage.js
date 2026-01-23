@@ -28,6 +28,11 @@ import {
   ArrowDropDown,
   AllInclusive,
   Search,
+  Check,
+  Timeline,
+  ArrowDownward,
+  RemoveRedEye,
+  ArrowForwardIos,
 } from '@mui/icons-material';
 import { colors, constants } from '../config/theme';
 import SearchBar from '../components/common/SearchBar';
@@ -297,15 +302,15 @@ const staticLeaderboardData = [
     period: 'allTime'
   },
   // Adding more users for ranks 21-50
-  ...Array.from({ length: 30 }, (_, i) => ({
+  ...Array.from({ length: 180 }, (_, i) => ({
     id: `${21 + i}`,
     rank: 21 + i,
     username: `Player${21 + i}`,
     userEmail: `player${21 + i}@example.com`,
-    points: 3000 - (i * 100),
-    spTotal: 3000 - (i * 100),
-    totalPredictions: 100 - (i * 2),
-    accuracyRate: 64.0 - (i * 0.5),
+    points: 3000 - Math.floor(i * 10),
+    spTotal: 3000 - Math.floor(i * 10),
+    totalPredictions: 100 - Math.floor(i * 0.5),
+    accuracyRate: 64.0 - (i * 0.1),
     isVerified: false,
     lastUpdated: new Date(Date.now() - (i * 3 * 60 * 1000)),
     period: 'allTime'
@@ -479,10 +484,10 @@ const LeaderboardPage = () => {
       id: 'accuracyRate',
       label: 'Accuracy',
       render: (value) => (
-        <Typography 
-          variant="body2" 
-          sx={{ 
-            fontWeight: 700, 
+        <Typography
+          variant="body2"
+          sx={{
+            fontWeight: 700,
             color: colors.success,
             backgroundColor: `${colors.success}1A`,
             display: 'inline-block',
@@ -733,50 +738,72 @@ const LeaderboardPage = () => {
         </Grid>
       </Grid>
 
-      {/* Filters and Search Bar */}
-      <Box sx={{ display: 'flex', gap: 1.5, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
-        {/* All Time Leaders Dropdown */}
+      {/* Filters and Search Bar Strip */}
+      <Card
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 2,
+          mb: 3,
+          p: 1,
+          borderRadius: '24px',
+          backgroundColor: colors.brandWhite,
+          border: `1px solid ${colors.divider}`,
+          boxShadow: '0 2px 12px rgba(0,0,0,0.03)'
+        }}
+      >
+        {/* Period Filter (Monthly SP Leaders) */}
         <Button
           variant="outlined"
+          startIcon={
+            <Box
+              sx={{
+                width: 36,
+                height: 36,
+                borderRadius: '10px',
+                backgroundColor: '#FFB4B4',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                ml: -0.5,
+              }}
+            >
+              <BarChart sx={{ fontSize: 18, color: colors.brandWhite }} />
+            </Box>
+          }
+          endIcon={
+            <Box sx={{
+              width: 30, height: 30, borderRadius: '8px', backgroundColor: '#FFDADA',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              mr: -0.5
+            }}>
+              <ArrowDropDown sx={{ fontSize: 20, color: colors.brandRed }} />
+            </Box>
+          }
           onClick={(e) => setPeriodAnchor(e.currentTarget)}
           sx={{
-            borderColor: colors.brandRed,
-            borderWidth: 1,
+            flex: 1,
+            borderColor: '#FFE0E0',
             color: colors.brandBlack,
-            backgroundColor: colors.brandWhite,
-            borderRadius: '25px',
+            backgroundColor: '#FFF5F5',
+            borderRadius: '30px',
             textTransform: 'none',
             fontWeight: 500,
-            px: 2.5,
-            py: 1.25,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1,
-            minWidth: 'auto',
+            px: 2,
+            py: 1.0,
+            fontSize: 15,
+            border: '1.5px solid #FFE0E0',
+            justifyContent: 'space-between',
             '&:hover': {
-              borderColor: colors.brandRed,
-              backgroundColor: colors.brandWhite,
+              borderColor: '#FFCCCC',
+              backgroundColor: '#FFF0F0',
             },
           }}
         >
-          <AllInclusive sx={{ fontSize: 18, color: colors.brandRed }} />
-          <Typography sx={{ fontSize: 14, fontWeight: 500, color: colors.brandBlack }}>
-            All Time Leaders
-          </Typography>
-          <Box
-            sx={{
-              width: 24,
-              height: 24,
-              backgroundColor: colors.brandRed,
-              borderRadius: '4px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              ml: 0.5,
-            }}
-          >
-            <ArrowDropDown sx={{ fontSize: 16, color: colors.brandWhite }} />
-          </Box>
+          {selectedPeriod === 'allTime' ? 'All Time Leaders' :
+            selectedPeriod === 'monthly' ? 'Monthly SP Leaders' :
+              selectedPeriod === 'weekly' ? 'Weekly SP Leaders' :
+                selectedPeriod === 'daily' ? 'Daily SP Leaders' : 'Leaders'}
         </Button>
         <Menu
           anchorEl={periodAnchor}
@@ -784,104 +811,151 @@ const LeaderboardPage = () => {
           onClose={() => setPeriodAnchor(null)}
           PaperProps={{
             sx: {
-              borderRadius: '12px',
-              minWidth: 200,
-              boxShadow: `0 4px 12px ${colors.shadow}33`,
-              mt: 0.5,
+              borderRadius: '16px',
+              minWidth: 260,
+              boxShadow: '0 10px 40px -10px rgba(0,0,0,0.1)',
+              mt: 1,
+              p: 1,
+              border: '1px solid #F3F4F6'
             },
           }}
         >
-          <MenuItem onClick={() => { setSelectedPeriod('allTime'); setPeriodAnchor(null); }}>
-            All Time Leaders
-          </MenuItem>
-          <MenuItem onClick={() => { setSelectedPeriod('monthly'); setPeriodAnchor(null); }}>
-            Monthly Leaders
-          </MenuItem>
-          <MenuItem onClick={() => { setSelectedPeriod('weekly'); setPeriodAnchor(null); }}>
-            Weekly Leaders
-          </MenuItem>
-          <MenuItem onClick={() => { setSelectedPeriod('daily'); setPeriodAnchor(null); }}>
-            Daily Leaders
-          </MenuItem>
+          {[
+            { value: 'monthly', label: 'Monthly SP Leaders', icon: <BarChart sx={{ fontSize: 18 }} /> },
+            { value: 'allTime', label: 'All Time Leaders', icon: <AllInclusive sx={{ fontSize: 18 }} /> },
+          ].map((option) => {
+            const isSelected = selectedPeriod === option.value;
+            return (
+              <MenuItem
+                key={option.value}
+                onClick={() => { setSelectedPeriod(option.value); setPeriodAnchor(null); }}
+                sx={{
+                  borderRadius: '12px',
+                  mb: 0.5,
+                  py: 1.5,
+                  px: 2,
+                  backgroundColor: isSelected ? '#FFF1F2' : 'transparent',
+                  '&:hover': { backgroundColor: isSelected ? '#FFF1F2' : '#F9FAFB' },
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 2
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Box sx={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: '10px',
+                    backgroundColor: isSelected ? '#FECACA' : '#F9FAFB',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    border: isSelected ? 'none' : '1px solid #E5E7EB'
+                  }}>
+                    {React.cloneElement(option.icon, { color: isSelected ? '#B91C1C' : '#9CA3AF' })}
+                  </Box>
+                  <Typography variant="body2" sx={{ fontWeight: isSelected ? 700 : 500, color: colors.brandBlack, fontSize: 14 }}>
+                    {option.label}
+                  </Typography>
+                </Box>
+                {isSelected && (
+                  <Box sx={{
+                    width: 20, height: 20, borderRadius: '50%', backgroundColor: '#FECACA',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                  }}>
+                    <Check sx={{ fontSize: 14, color: '#B91C1C' }} />
+                  </Box>
+                )}
+              </MenuItem>
+            );
+          })}
         </Menu>
 
         {/* Search Bar */}
-        <Box sx={{ flex: 1, minWidth: 300 }}>
-          <TextField
-            fullWidth
-            placeholder="Search by username or email..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+        <Box sx={{ flex: 1.5 }}>
+          <Box
             sx={{
-              '& .MuiOutlinedInput-root': {
-                borderRadius: '25px',
-                backgroundColor: colors.brandWhite,
-                fontSize: 14,
-                '& fieldset': {
-                  borderColor: colors.divider,
-                  borderWidth: 1,
-                },
-                '&:hover fieldset': {
-                  borderColor: colors.divider,
-                },
-                '&.Mui-focused fieldset': {
-                  borderColor: colors.divider,
-                  borderWidth: 1,
-                },
-              },
+              display: 'flex',
+              alignItems: 'center',
+              gap: 2,
+              padding: '12px 24px',
+              backgroundColor: '#F9F9F9',
+              borderRadius: '30px',
+              border: 'none',
+              width: '100%',
+              height: 54
             }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Search sx={{ color: colors.brandRed, fontSize: 20 }} />
-                </InputAdornment>
-              ),
-            }}
-          />
+          >
+            <Search sx={{ fontSize: 22, color: colors.brandRed }} />
+            <input
+              type="text"
+              placeholder="Search by username or email..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              style={{
+                border: 'none',
+                outline: 'none',
+                flex: 1,
+                fontSize: '15px',
+                color: '#4A4A4A',
+                backgroundColor: 'transparent',
+                width: '100%',
+              }}
+            />
+          </Box>
         </Box>
 
-        {/* Rank Dropdown */}
+        {/* Rank Filter */}
         <Button
           variant="outlined"
+          startIcon={
+            <Box
+              sx={{
+                width: 36,
+                height: 36,
+                borderRadius: '10px',
+                backgroundColor: '#FFB4B4',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                ml: -0.5,
+              }}
+            >
+              <ArrowUpward sx={{ fontSize: 18, color: colors.brandWhite }} />
+            </Box>
+          }
+          endIcon={
+            <Box sx={{
+              width: 30, height: 30, borderRadius: '8px', backgroundColor: '#FFDADA',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              mr: -0.5
+            }}>
+              <ArrowDropDown sx={{ fontSize: 20, color: colors.brandRed }} />
+            </Box>
+          }
           onClick={(e) => setSortAnchor(e.currentTarget)}
           sx={{
-            borderColor: colors.brandRed,
-            borderWidth: 1,
+            flex: 1,
+            borderColor: '#FFE0E0',
             color: colors.brandBlack,
-            backgroundColor: colors.brandWhite,
-            borderRadius: '25px',
+            backgroundColor: '#FFF5F5',
+            borderRadius: '30px',
             textTransform: 'none',
             fontWeight: 500,
-            px: 2.5,
-            py: 1.25,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1,
-            minWidth: 'auto',
+            px: 2,
+            py: 1.0,
+            fontSize: 15,
+            border: '1.5px solid #FFE0E0',
+            justifyContent: 'space-between',
             '&:hover': {
-              borderColor: colors.brandRed,
-              backgroundColor: colors.brandWhite,
+              borderColor: '#FFCCCC',
+              backgroundColor: '#FFF0F0',
             },
           }}
         >
-          <ArrowUpward sx={{ fontSize: 18, color: colors.brandRed }} />
-          <Typography sx={{ fontSize: 14, fontWeight: 500, color: colors.brandBlack }}>
-            Rank: {selectedSort === 'rankAsc' ? 'Low to High' : 'High to Low'}
-          </Typography>
-          <Box
-            sx={{
-              width: 24,
-              height: 24,
-              backgroundColor: colors.brandRed,
-              borderRadius: '4px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              ml: 0.5,
-            }}
-          >
-            <ArrowDropDown sx={{ fontSize: 16, color: colors.brandWhite }} />
-          </Box>
+          {selectedSort === 'rankAsc' ? 'Rank: Low to High' :
+            selectedSort === 'rankDesc' ? 'Rank: High to Low' : 'Sort Items'}
         </Button>
         <Menu
           anchorEl={sortAnchor}
@@ -889,28 +963,81 @@ const LeaderboardPage = () => {
           onClose={() => setSortAnchor(null)}
           PaperProps={{
             sx: {
-              borderRadius: '12px',
-              minWidth: 200,
-              boxShadow: `0 4px 12px ${colors.shadow}33`,
-              mt: 0.5,
+              borderRadius: '16px',
+              minWidth: 280, // Slightly wider for sorting options
+              boxShadow: '0 10px 40px -10px rgba(0,0,0,0.1)',
+              mt: 1,
+              p: 1,
+              border: '1px solid #F3F4F6'
             },
           }}
         >
-          <MenuItem onClick={() => { setSelectedSort('rankAsc'); setSortAnchor(null); }}>
-            Rank: Low to High
-          </MenuItem>
-          <MenuItem onClick={() => { setSelectedSort('rankDesc'); setSortAnchor(null); }}>
-            Rank: High to Low
-          </MenuItem>
+          {[
+            { value: 'rankAsc', label: 'Rank: Low to High', icon: <ArrowUpward sx={{ fontSize: 18 }} /> },
+            { value: 'rankDesc', label: 'Rank: High to Low', icon: <ArrowDownward sx={{ fontSize: 18 }} /> },
+            { value: 'pointsHighest', label: 'Points: Highest First', icon: <ArrowUpward sx={{ fontSize: 18 }} /> },
+            { value: 'pointsLowest', label: 'Points: Lowest First', icon: <ArrowDownward sx={{ fontSize: 18 }} /> },
+            { value: 'accuracyHighest', label: 'Accuracy: Highest First', icon: <ArrowUpward sx={{ fontSize: 18 }} /> },
+            { value: 'accuracyLowest', label: 'Accuracy: Lowest First', icon: <ArrowDownward sx={{ fontSize: 18 }} /> },
+            { value: 'usernameAZ', label: 'Username: A-Z', icon: <ListIcon sx={{ fontSize: 18 }} /> },
+            { value: 'usernameZA', label: 'Username: Z-A', icon: <ListIcon sx={{ fontSize: 18 }} /> },
+          ].map((option) => {
+            const isSelected = selectedSort === option.value;
+            return (
+              <MenuItem
+                key={option.value}
+                onClick={() => { setSelectedSort(option.value); setSortAnchor(null); }}
+                sx={{
+                  borderRadius: '12px',
+                  mb: 0.5,
+                  py: 1.5,
+                  px: 2,
+                  backgroundColor: isSelected ? '#FFF1F2' : 'transparent',
+                  '&:hover': { backgroundColor: isSelected ? '#FFF1F2' : '#F9FAFB' },
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 2
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Box sx={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: '10px',
+                    backgroundColor: isSelected ? '#FECACA' : '#F9FAFB',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    border: isSelected ? 'none' : '1px solid #E5E7EB'
+                  }}>
+                    {React.cloneElement(option.icon, { color: isSelected ? '#B91C1C' : '#9CA3AF' })}
+                  </Box>
+                  <Typography variant="body2" sx={{ fontWeight: isSelected ? 700 : 500, color: colors.brandBlack, fontSize: 14 }}>
+                    {option.label}
+                  </Typography>
+                </Box>
+                {isSelected && (
+                  <Box sx={{
+                    width: 20, height: 20, borderRadius: '50%', backgroundColor: '#FECACA',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                  }}>
+                    <Check sx={{ fontSize: 14, color: '#B91C1C' }} />
+                  </Box>
+                )}
+              </MenuItem>
+            );
+          })}
         </Menu>
-      </Box>
+
+      </Card>
 
       {/* Leaderboard Rankings Header */}
-      <Box 
-        sx={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'space-between', 
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
           mb: 2,
           padding: 2,
           backgroundColor: colors.brandWhite,
@@ -1031,11 +1158,16 @@ const LeaderboardPage = () => {
         onClose={handleActionsClose}
         PaperProps={{
           sx: {
-            borderRadius: '12px',
-            minWidth: 180,
-            boxShadow: `0 4px 12px ${colors.shadow}33`,
+            borderRadius: '16px',
+            minWidth: 200,
+            boxShadow: '0 10px 40px -10px rgba(0,0,0,0.1)',
+            p: 1,
+            border: '1px solid #F3F4F6',
+            mt: 1
           },
         }}
+        transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+        anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
       >
         <MenuItem
           onClick={() => {
@@ -1044,23 +1176,32 @@ const LeaderboardPage = () => {
             }
             handleActionsClose();
           }}
-        >
-          View Details
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            handleActionsClose();
+          sx={{
+            borderRadius: '12px',
+            p: 1.5,
+            gap: 2,
+            '&:hover': {
+              backgroundColor: '#F9FAFB',
+            },
           }}
         >
-          View User Profile
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            handleActionsClose();
-          }}
-          sx={{ color: colors.error }}
-        >
-          Reset Points
+          <Box
+            sx={{
+              width: 40,
+              height: 40,
+              borderRadius: '10px',
+              backgroundColor: '#EBF5FF',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <RemoveRedEye sx={{ fontSize: 20, color: '#1C64F2' }} />
+          </Box>
+          <Typography sx={{ flex: 1, fontWeight: 500, fontSize: 14, color: '#111928' }}>
+            View Details
+          </Typography>
+          <ArrowForwardIos sx={{ fontSize: 14, color: '#9CA3AF' }} />
         </MenuItem>
       </Menu>
     </Box>

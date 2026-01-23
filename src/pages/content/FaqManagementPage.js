@@ -11,7 +11,7 @@ import {
   Dialog,
   DialogContent,
 } from '@mui/material';
-import { Add, Help, MoreVert, List as ListIcon, ArrowDropDown, Close } from '@mui/icons-material';
+import { Add, Help, MoreVert, List as ListIcon, ArrowDropDown } from '@mui/icons-material';
 import { colors } from '../../config/theme';
 import DataTable from '../../components/common/DataTable';
 import { useNavigate } from 'react-router-dom';
@@ -316,7 +316,23 @@ const FaqManagementPage = () => {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedFaq, setSelectedFaq] = useState(null);
+
   const [openDialog, setOpenDialog] = useState(false);
+  const [rowsPerPageMenuAnchor, setRowsPerPageMenuAnchor] = useState(null);
+
+  const handleRowsPerPageMenuOpen = (event) => {
+    setRowsPerPageMenuAnchor(event.currentTarget);
+  };
+
+  const handleRowsPerPageMenuClose = () => {
+    setRowsPerPageMenuAnchor(null);
+  };
+
+  const handleRowsPerPageSelect = (value) => {
+    setRowsPerPage(value);
+    setPage(0);
+    handleRowsPerPageMenuClose();
+  };
 
   const handleMenuOpen = (event, faq) => {
     setAnchorEl(event.currentTarget);
@@ -533,6 +549,7 @@ const FaqManagementPage = () => {
             </Box>
           </Box>
           <Button
+            onClick={handleRowsPerPageMenuOpen}
             endIcon={<ArrowDropDown sx={{ color: colors.brandRed }} />}
             sx={{
               borderRadius: '8px',
@@ -553,6 +570,32 @@ const FaqManagementPage = () => {
             <ListIcon sx={{ fontSize: 18, mr: 1, color: colors.brandRed }} />
             {rowsPerPage} / page
           </Button>
+          <Menu
+            anchorEl={rowsPerPageMenuAnchor}
+            open={Boolean(rowsPerPageMenuAnchor)}
+            onClose={handleRowsPerPageMenuClose}
+            PaperProps={{
+              sx: {
+                borderRadius: '12px',
+                minWidth: 140,
+                mt: 1,
+                boxShadow: `0 4px 12px ${colors.shadow}33`,
+              },
+            }}
+          >
+            {[10, 25, 50].map((num) => (
+              <MenuItem
+                key={num}
+                onClick={() => handleRowsPerPageSelect(num)}
+                sx={{ gap: 1.5, py: 1.5 }}
+              >
+                <ListIcon sx={{ fontSize: 18, color: colors.brandRed }} />
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                  {num} / page
+                </Typography>
+              </MenuItem>
+            ))}
+          </Menu>
         </Box>
       </Card>
 

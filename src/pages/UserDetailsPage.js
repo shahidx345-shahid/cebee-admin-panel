@@ -32,6 +32,8 @@ import SearchBar from '../components/common/SearchBar';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { format } from 'date-fns';
+import { VerifiedUser, Security, Edit, Gavel, TimerOff, AssignmentInd } from '@mui/icons-material';
+import { MockDataService } from '../services/mockDataService';
 
 const UserDetailsPage = () => {
   const navigate = useNavigate();
@@ -39,6 +41,14 @@ const UserDetailsPage = () => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [activities, setActivities] = useState([]);
+  const [kycData, setKycData] = useState({
+    status: 'not_submitted', // not_submitted, pending, verified, rejected, expired
+    submittedAt: null,
+    verifiedAt: null,
+    verifiedBy: null,
+    riskLevel: 'none',
+    notes: ''
+  });
 
   useEffect(() => {
     loadUserData();
@@ -79,24 +89,35 @@ const UserDetailsPage = () => {
   const loadUserData = async () => {
     try {
       setLoading(true);
+
+      // Fetch KYC data from MockService (parallel to user data loading logic if we had real backend)
+      const kyc = await MockDataService.getKycData(id);
+      if (kyc) {
+        setKycData({
+          ...kyc,
+          submittedAt: kyc.submittedAt ? new Date(kyc.submittedAt) : null,
+          verifiedAt: kyc.verifiedAt ? new Date(kyc.verifiedAt) : null,
+        });
+      }
+
       let userData = null;
-      
-      // Try to load from Firebase
+
+      // Try to load from Firebase (mock logic kept for structure)
       try {
-      const userRef = doc(db, 'users', id);
-      const userDoc = await getDoc(userRef);
-      if (userDoc.exists()) {
+        const userRef = doc(db, 'users', id);
+        const userDoc = await getDoc(userRef);
+        if (userDoc.exists()) {
           userData = { id: userDoc.id, ...userDoc.data() };
         }
       } catch (error) {
         console.log('Using dummy data:', error);
       }
-      
+
       // Use dummy data if no real data exists
       if (!userData) {
         userData = generateDummyUserData(id);
       }
-      
+
       setUser(userData);
       setActivities([]);
     } catch (error) {
@@ -108,6 +129,19 @@ const UserDetailsPage = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleKycUpdate = async (updates) => {
+    // Optimistic update
+    const newData = { ...kycData, ...updates };
+    // Ensure specific date fields are Date objects for UI, but might be strings in updates
+    if (updates.submittedAt) newData.submittedAt = new Date(updates.submittedAt);
+    if (updates.verifiedAt) newData.verifiedAt = new Date(updates.verifiedAt);
+
+    setKycData(newData);
+
+    // Persist
+    await MockDataService.updateKycData(id, updates);
   };
 
   if (loading) {
@@ -322,8 +356,8 @@ const UserDetailsPage = () => {
                   {user.lastLogin
                     ? format(user.lastLogin?.toDate ? user.lastLogin.toDate() : new Date(user.lastLogin), 'MMM dd, yyyy HH:mm')
                     : user.lastLoginAt
-                    ? format(user.lastLoginAt?.toDate ? user.lastLoginAt.toDate() : new Date(user.lastLoginAt), 'MMM dd, yyyy HH:mm')
-                    : 'Never'}
+                      ? format(user.lastLoginAt?.toDate ? user.lastLoginAt.toDate() : new Date(user.lastLoginAt), 'MMM dd, yyyy HH:mm')
+                      : 'Never'}
                 </Typography>
               </Grid>
               {user.fraudFlags && user.fraudFlags.length > 0 && (
@@ -349,6 +383,83 @@ const UserDetailsPage = () => {
                 </Grid>
               )}
             </Grid>
+          </Grid>
+        </Grid>
+      </Card>
+
+
+
+      {/* KYC Verification Section (Phase 1) */}
+      <Card sx={{ padding: 3, mb: 3, borderRadius: '16px', border: `1px solid ${colors.divider}` }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <VerifiedUser sx={{ color: colors.brandRed, fontSize: 24 }} />
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>KYC Verification</Typography>
+              <Typography variant="caption" sx={{ color: colors.textSecondary }}>Used for reward payouts only in Phase 1.</Typography>
+            </Box>
+          </Box>
+          <Chip
+            label={kycData.status.replace('_', ' ').toUpperCase()}
+            color={kycData.status === 'verified' ? 'success' : kycData.status === 'rejected' ? 'error' : 'default'}
+            sx={{ fontWeight: 700 }}
+          />
+        </Box>
+
+        <Grid container spacing={3}>
+          {/* Metadata */}
+          <Grid item xs={12} md={8}>
+            <Grid container spacing={2}>
+              <Grid item xs={6} md={4}>
+                <Typography variant="caption" sx={{ color: colors.textSecondary }}>Submitted At</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>{kycData.submittedAt ? format(kycData.submittedAt, 'MMM dd, yyyy HH:mm') : '-'}</Typography>
+              </Grid>
+              <Grid item xs={6} md={4}>
+                <Typography variant="caption" sx={{ color: colors.textSecondary }}>Verified / Rejected At</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>{kycData.verifiedAt ? format(kycData.verifiedAt, 'MMM dd, yyyy HH:mm') : '-'}</Typography>
+              </Grid>
+              <Grid item xs={6} md={4}>
+                <Typography variant="caption" sx={{ color: colors.textSecondary }}>Verified By</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>{kycData.verifiedBy || '-'}</Typography>
+              </Grid>
+              <Grid item xs={6} md={4}>
+                <Typography variant="caption" sx={{ color: colors.textSecondary }}>Risk Level</Typography>
+                <Chip label={kycData.riskLevel.toUpperCase()} size="small" color={kycData.riskLevel === 'high' ? 'error' : 'default'} sx={{ height: 24, fontSize: 11, fontWeight: 700 }} />
+              </Grid>
+            </Grid>
+
+            <Box sx={{ mt: 3 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Internal Notes (Admin Only)</Typography>
+              <Grid container spacing={1}>
+                <Grid item xs={10}>
+                  <Typography variant="body2" sx={{ p: 1.5, bgcolor: '#F9FAFB', borderRadius: '8px', border: '1px solid #E5E7EB', minHeight: '60px' }}>
+                    {kycData.notes || 'No notes added.'}
+                  </Typography>
+                </Grid>
+                <Grid item xs={2}>
+                  <Button variant="outlined" size="small" fullWidth sx={{ height: '100%' }}>Edit</Button>
+                </Grid>
+              </Grid>
+            </Box>
+          </Grid>
+
+          {/* Actions */}
+          <Grid item xs={12} md={4}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5 }}>Admin Actions</Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <Button variant="outlined" startIcon={<AssignmentInd />} size="small" onClick={() => handleKycUpdate({ status: 'pending', submittedAt: new Date().toISOString() })}>
+                Request KYC
+              </Button>
+              <Button variant="contained" color="success" startIcon={<CheckCircle />} size="small" onClick={() => handleKycUpdate({ status: 'verified', verifiedAt: new Date().toISOString(), verifiedBy: 'Admin' })}>
+                Mark as Verified
+              </Button>
+              <Button variant="outlined" color="error" startIcon={<Gavel />} size="small" onClick={() => handleKycUpdate({ status: 'rejected', verifiedAt: new Date().toISOString(), verifiedBy: 'Admin' })}>
+                Mark as Rejected
+              </Button>
+              <Button variant="text" color="warning" startIcon={<TimerOff />} size="small" onClick={() => handleKycUpdate({ status: 'expired' })}>
+                Mark as Expired
+              </Button>
+            </Box>
           </Grid>
         </Grid>
       </Card>
@@ -459,20 +570,20 @@ const UserDetailsPage = () => {
           </Card>
         </Grid>
         <Grid item xs={6} md={3}>
-            <Card
-              sx={{
-                padding: 2,
+          <Card
+            sx={{
+              padding: 2,
               background: `linear-gradient(135deg, ${colors.success}1A 0%, ${colors.success}0D 100%)`,
               border: `1.5px solid ${colors.success}33`,
-                borderRadius: '16px',
-              }}
-            >
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+              borderRadius: '16px',
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
               <CheckCircle sx={{ fontSize: 24, color: colors.success }} />
-                <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 12 }}>
+              <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 12 }}>
                 Prediction Accuracy %
-                </Typography>
-              </Box>
+              </Typography>
+            </Box>
             <Typography variant="h4" sx={{ fontWeight: 700, color: colors.success }}>
               {(user.predictionAccuracy || 0).toFixed(1)}%
             </Typography>
@@ -567,8 +678,8 @@ const UserDetailsPage = () => {
                 </Typography>
               </Grid>
             </Grid>
-            </Card>
-          </Grid>
+          </Card>
+        </Grid>
       </Grid>
 
       {/* Activity Log */}
@@ -578,7 +689,7 @@ const UserDetailsPage = () => {
       <Card sx={{ padding: 3, borderRadius: '16px' }}>
         <SearchBar
           value=""
-          onChange={() => {}}
+          onChange={() => { }}
           placeholder="Search activities..."
           sx={{ mb: 2 }}
         />
@@ -611,7 +722,7 @@ const UserDetailsPage = () => {
           </TableContainer>
         )}
       </Card>
-    </Box>
+    </Box >
   );
 };
 

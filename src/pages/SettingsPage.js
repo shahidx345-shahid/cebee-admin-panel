@@ -36,6 +36,8 @@ import {
   Block,
   CheckCircleOutline,
   Info,
+  SystemUpdate,
+  Build,
 } from '@mui/icons-material';
 import { colors, constants } from '../config/theme';
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
@@ -59,7 +61,15 @@ const SettingsPage = () => {
     timeFormat: 'hour12', // 'hour12' or 'hour24'
     androidAppVersion: '1.0.0',
     iosAppVersion: '1.0.0',
-    releaseNotes: 'Initial release',
+    releaseNotes: `### Version 1.2.3 - Released on Jan 15, 2025
+
+**New Features:**
+- Enhanced prediction interface
+- Improved leaderboard performance
+- New notification system
+
+**Bug Fixes:**
+- Fixed SP calculation edge cases`,
     lastVersionUpdate: null,
     displayTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
   });
@@ -130,7 +140,7 @@ const SettingsPage = () => {
   const performToggleMaintenance = async () => {
     const isEnablingMaintenance = settings.platformStatus === 'online';
     const newStatus = isEnablingMaintenance ? 'maintenance' : 'online';
-    
+
     const updatedSettings = {
       ...settings,
       platformStatus: newStatus,
@@ -147,7 +157,7 @@ const SettingsPage = () => {
     setSettings(updatedSettings);
     setHasUnsavedChanges(true);
     setMaintenanceDialogOpen(false);
-    
+
     alert(isEnablingMaintenance ? 'Maintenance mode enabled' : 'Platform is now online');
   };
 
@@ -167,7 +177,15 @@ const SettingsPage = () => {
       timeFormat: 'hour12',
       androidAppVersion: '1.0.0',
       iosAppVersion: '1.0.0',
-      releaseNotes: 'Initial release',
+      releaseNotes: `### Version 1.2.3 - Released on Jan 15, 2025
+
+**New Features:**
+- Enhanced prediction interface
+- Improved leaderboard performance
+- New notification system
+
+**Bug Fixes:**
+- Fixed SP calculation edge cases`,
       lastVersionUpdate: null,
       displayTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     });
@@ -288,12 +306,17 @@ const SettingsPage = () => {
               startIcon={<Refresh />}
               onClick={handleReset}
               sx={{
-                borderColor: colors.warning,
-                color: colors.warning,
+                borderColor: '#FE9C0A', // Custom Orange
+                color: '#FE9C0A',
                 borderWidth: 1.5,
                 textTransform: 'none',
-                fontWeight: 600,
+                fontWeight: 700,
                 borderRadius: '12px',
+                px: 3,
+                '&:hover': {
+                  borderColor: '#D97706',
+                  backgroundColor: '#FFFBEB'
+                }
               }}
             >
               Reset
@@ -305,13 +328,21 @@ const SettingsPage = () => {
             onClick={handleSave}
             disabled={!hasUnsavedChanges}
             sx={{
-              background: `linear-gradient(135deg, #0D9488 0%, #0D9488DD 100%)`,
+              backgroundColor: '#C9E7CA !important', // Requested Green
+              color: '#065F46', // Dark Green Text
               borderRadius: '12px',
               textTransform: 'none',
-              fontWeight: 600,
+              fontWeight: 700,
+              px: 3,
+              boxShadow: 'none',
               '&:disabled': {
-                backgroundColor: `${colors.success}4D`,
+                backgroundColor: '#E5E7EB !important',
+                color: '#9CA3AF !important'
               },
+              '&:hover': {
+                backgroundColor: '#B4E0B6 !important', // Slightly darker shade of #C9E7CA
+                boxShadow: 'none'
+              }
             }}
           >
             Save Changes
@@ -321,249 +352,165 @@ const SettingsPage = () => {
 
       {/* Unsaved Changes Alert */}
       {hasUnsavedChanges && (
-        <Alert
-          severity="warning"
-          sx={{ mb: 3, borderRadius: '14px', border: `1.5px solid ${colors.warning}4D` }}
-          icon={<Warning />}
+        <Box
+          sx={{
+            mb: 3,
+            p: 2,
+            borderRadius: '16px',
+            backgroundColor: '#FFF7ED', // Light orange background
+            border: '1.5px solid #FFEDD5', // Light orange border
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.5,
+            color: '#F59E0B' // Orange text
+          }}
         >
-          You have unsaved changes. Don't forget to save!
-        </Alert>
+          <Warning sx={{ fontSize: 20 }} />
+          <Typography sx={{ fontWeight: 600, fontSize: 14 }}>
+            You have unsaved changes. Don't forget to save!
+          </Typography>
+        </Box>
       )}
 
-      {/* Platform Status Section */}
+      {/* Platform Status Card */}
       <Card
         sx={{
           padding: 3,
           borderRadius: '20px',
           border: `1.5px solid ${colors.divider}33`,
           mb: 2.5,
+          backgroundColor: 'white',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 4 }}>
           <Box
             sx={{
-              padding: 1.25,
-              backgroundColor: isMaintenanceMode ? colors.warning : colors.success,
+              width: 40,
+              height: 40,
               borderRadius: '12px',
+              background: '#22C55E', // Green
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 4px 6px -1px rgba(34, 197, 94, 0.3)',
             }}
           >
-            <Public sx={{ fontSize: 22, color: colors.brandWhite }} />
+            <Public sx={{ fontSize: 24, color: 'white' }} />
           </Box>
           <Box>
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, fontSize: 18, color: colors.brandBlack }}>
               Platform Status
             </Typography>
-            <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13 }}>
+            <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 14 }}>
               Control platform availability and maintenance mode
             </Typography>
           </Box>
         </Box>
 
-        {/* Current Status Display */}
-        <Box
-          sx={{
-            padding: 2.5,
-            borderRadius: '16px',
-            background: `linear-gradient(135deg, ${
-              isMaintenanceMode ? colors.warning : colors.success
-            }26 0%, ${isMaintenanceMode ? colors.warning : colors.success}0D 100%)`,
-            border: `2px solid ${isMaintenanceMode ? colors.warning : colors.success}4D`,
-            mb: 2,
-          }}
-        >
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Box
-                sx={{
-                  padding: 1.5,
-                  backgroundColor: isMaintenanceMode ? colors.warning : colors.success,
-                  borderRadius: '12px',
-                }}
-              >
-                {isMaintenanceMode ? (
-                  <Block sx={{ fontSize: 24, color: colors.brandWhite }} />
-                ) : (
-                  <CheckCircleOutline sx={{ fontSize: 24, color: colors.brandWhite }} />
-                )}
-              </Box>
-              <Box>
-                <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13 }}>
-                  Current Status
-                </Typography>
-                <Typography
-                  variant="h5"
-                  sx={{
-                    fontWeight: 700,
-                    color: isMaintenanceMode ? colors.warning : colors.success,
-                    fontSize: 20,
-                  }}
-                >
-                  {isMaintenanceMode ? 'MAINTENANCE MODE' : 'ONLINE'}
-                </Typography>
-                {isMaintenanceMode && settings.maintenanceStartedAt && (
-                  <Box sx={{ mt: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Typography variant="caption" sx={{ color: colors.warning, fontSize: 12 }}>
-                      Started: {format(new Date(settings.maintenanceStartedAt), 'MMM dd, yyyy HH:mm')}
-                      {settings.maintenanceStartedBy && ` by ${settings.maintenanceStartedBy}`}
-                    </Typography>
-                  </Box>
-                )}
-              </Box>
-            </Box>
-            {isSuperAdmin && (
-              <Button
-                variant="contained"
-                startIcon={isMaintenanceMode ? <CheckCircleOutline /> : <Block />}
-                onClick={handleToggleMaintenance}
-                sx={{
-                  background: `linear-gradient(135deg, ${
-                    isMaintenanceMode ? colors.success : colors.warning
-                  } 0%, ${isMaintenanceMode ? colors.success : colors.warning}E6 100%)`,
-                  textTransform: 'none',
-                  fontWeight: 700,
-                  borderRadius: '12px',
-                  px: 2.5,
-                }}
-              >
-                {isMaintenanceMode ? 'Go Online' : 'Enable Maintenance'}
-              </Button>
-            )}
-          </Box>
-        </Box>
-
-        {/* Maintenance Active Banner */}
-        {isMaintenanceMode && (
-          <Box
-            sx={{
-              padding: 2,
-              borderRadius: '12px',
-              background: `linear-gradient(135deg, ${colors.error}1A 0%, ${colors.warning}0D 100%)`,
-              border: `2px solid ${colors.error}4D`,
-              mb: 2,
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
-              <Box
-                sx={{
-                  padding: 1,
-                  backgroundColor: colors.error,
-                  borderRadius: '8px',
-                }}
-              >
-                <Warning sx={{ fontSize: 18, color: colors.brandWhite }} />
-              </Box>
-              <Box>
-                <Typography sx={{ fontWeight: 700, color: colors.error, fontSize: 14, mb: 0.5 }}>
-                  MAINTENANCE MODE ACTIVE
-                </Typography>
-                <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13 }}>
-                  All user logins and registrations are currently blocked.
-                </Typography>
-              </Box>
-            </Box>
-          </Box>
-        )}
-
-        {/* Maintenance Message Editor (Super Admin only) */}
-        {isSuperAdmin && (
-          <Box
-            sx={{
-              padding: 2.5,
-              borderRadius: '16px',
-              backgroundColor: `${colors.backgroundLight}4D`,
-              border: `1px solid ${colors.divider}33`,
-              mb: 2,
-            }}
-          >
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Description sx={{ fontSize: 20, color: colors.brandRed }} />
-                <Typography variant="h6" sx={{ fontWeight: 700, fontSize: 16 }}>
-                  Maintenance Message
-                </Typography>
-              </Box>
-              <Chip
-                label="Super Admin Only"
-                size="small"
-                sx={{
-                  backgroundColor: `${colors.brandRed}1A`,
-                  color: colors.brandRed,
-                  fontSize: 11,
-                  fontWeight: 700,
-                }}
-              />
-            </Box>
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, fontSize: 13 }}>
-                Title
-              </Typography>
-              <TextField
-                fullWidth
-                placeholder="Enter maintenance title..."
-                value={settings.maintenanceTitle}
-                onChange={(e) => handleChange('maintenanceTitle', e.target.value)}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: '12px',
-                    backgroundColor: colors.brandWhite,
-                  },
-                }}
-              />
-            </Box>
-            <Box sx={{ mb: 2 }}>
-              <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, fontSize: 13 }}>
-                Message Body
-              </Typography>
-              <TextField
-                fullWidth
-                multiline
-                rows={4}
-                placeholder="Enter maintenance message..."
-                value={settings.maintenanceMessage}
-                onChange={(e) => handleChange('maintenanceMessage', e.target.value)}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    borderRadius: '12px',
-                    backgroundColor: colors.brandWhite,
-                  },
-                }}
-              />
-            </Box>
-            <Button
-              variant="text"
-              startIcon={<Refresh />}
-              onClick={handleResetMaintenanceMessage}
-              sx={{
-                textTransform: 'none',
-                fontWeight: 600,
-                color: colors.textSecondary,
-                fontSize: 13,
-              }}
-            >
-              Reset to Default
-            </Button>
-          </Box>
-        )}
-
-        {/* Timezone Info */}
+        {/* Current Status Strip */}
         <Box
           sx={{
             padding: 2,
-            borderRadius: '12px',
-            backgroundColor: `${colors.info}14`,
-            border: `1px solid ${colors.info}33`,
+            borderRadius: '16px',
+            backgroundColor: isMaintenanceMode ? '#FFFBEB' : '#ECFDF5', // Light orange or light green
+            border: `1px solid ${isMaintenanceMode ? '#FCD34D' : '#6EE7B7'}`,
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            mb: 4
           }}
         >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <AccessTime sx={{ fontSize: 20, color: colors.info }} />
-            <Box>
-              <Typography variant="body2" sx={{ fontWeight: 700, fontSize: 14 }}>
-                Timezone Handling
-              </Typography>
-              <Typography variant="caption" sx={{ color: colors.textSecondary, fontSize: 13 }}>
-                Display: Device timezone ({settings.displayTimezone}) | Storage: UTC
-              </Typography>
+          <Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
+              <Box sx={{
+                width: 32, height: 32, borderRadius: '8px',
+                backgroundColor: isMaintenanceMode ? '#F59E0B' : '#22C55E', // Orange or Green bg
+                display: 'flex', alignItems: 'center', justifyContent: 'center'
+              }}>
+                {isMaintenanceMode ? <Block sx={{ color: 'white', fontSize: 18 }} /> : <CheckCircle sx={{ color: 'white', fontSize: 18 }} />}
+              </Box>
+              <Box>
+                <Typography variant="caption" sx={{ color: colors.textSecondary, fontSize: 12, fontWeight: 600, display: 'block' }}>
+                  Current Status
+                </Typography>
+                <Typography variant="h6" sx={{ fontWeight: 700, fontSize: 18, color: isMaintenanceMode ? '#B45309' : '#15803D' }}>
+                  {isMaintenanceMode ? 'MAINTENANCE MODE' : 'ONLINE'}
+                </Typography>
+              </Box>
             </Box>
+          </Box>
+
+          {isSuperAdmin && (
+            <Button
+              variant="contained"
+              onClick={handleToggleMaintenance}
+              startIcon={<Build />} // Changed from Settings rot to Build
+              sx={{
+                backgroundColor: '#FE9C0A !important', // Custom Orange
+                color: 'white',
+                textTransform: 'none',
+                fontWeight: 700,
+                borderRadius: '12px',
+                px: 3,
+                py: 1,
+                boxShadow: '0 4px 6px -1px rgba(254, 156, 10, 0.3)',
+                '&:hover': {
+                  backgroundColor: '#F59E0B !important'
+                }
+              }}
+            >
+              {isMaintenanceMode ? 'Go Online' : 'Enable Maintenance'}
+            </Button>
+          )}
+
+        </Box>
+
+        {/* Maintenance Message Inputs */}
+        <Box sx={{ mb: 3 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
+            <Description sx={{ fontSize: 20, color: '#EF4444' }} />
+            <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: 15, color: colors.brandBlack }}>
+              Maintenance Message
+            </Typography>
+            <Chip label="Super Admin Only" size="small" sx={{ bgcolor: '#FEE2E2', color: '#EF4444', fontWeight: 700, fontSize: 10, height: 20 }} />
+          </Box>
+
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="caption" sx={{ fontWeight: 700, mb: 0.5, display: 'block', color: colors.brandBlack }}>
+              Title
+            </Typography>
+            <TextField
+              fullWidth
+              value={settings.maintenanceTitle}
+              onChange={(e) => handleChange('maintenanceTitle', e.target.value)}
+              placeholder="Under Maintenance"
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: '12px',
+                  backgroundColor: '#FAFAFA' // Very light gray bg
+                }
+              }}
+            />
+          </Box>
+          <Box>
+            <Typography variant="caption" sx={{ fontWeight: 700, mb: 0.5, display: 'block', color: colors.brandBlack }}>
+              Message Body
+            </Typography>
+            <TextField
+              fullWidth
+              multiline
+              rows={2}
+              value={settings.maintenanceMessage}
+              onChange={(e) => handleChange('maintenanceMessage', e.target.value)}
+              placeholder="We are currently performing scheduled maintenance..."
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  borderRadius: '12px',
+                  backgroundColor: '#FAFAFA'
+                }
+              }}
+            />
           </Box>
         </Box>
       </Card>
@@ -575,73 +522,196 @@ const SettingsPage = () => {
           borderRadius: '20px',
           border: `1.5px solid ${colors.divider}33`,
           mb: 2.5,
+          backgroundColor: 'white',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 4 }}>
           <Box
             sx={{
-              padding: 1.25,
-              background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
+              width: 40,
+              height: 40,
               borderRadius: '12px',
+              background: '#DC2626',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 4px 6px -1px rgba(220, 38, 38, 0.3)',
             }}
           >
-            <Settings sx={{ fontSize: 22, color: colors.brandWhite }} />
+            <Settings sx={{ fontSize: 24, color: 'white' }} />
           </Box>
           <Box>
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, fontSize: 18, color: colors.brandBlack }}>
               General Settings
             </Typography>
-            <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13 }}>
+            <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 14 }}>
               Configure basic app settings and preferences
             </Typography>
           </Box>
         </Box>
 
-        <Grid container spacing={2.5}>
-          <Grid item xs={12}>
-            <TextField
-              fullWidth
-              label="App Name"
-              value={settings.appName}
-              onChange={(e) => handleChange('appName', e.target.value)}
+        <Box sx={{ mb: 4 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
+            <Box sx={{
+              width: 32, height: 32, borderRadius: '8px', backgroundColor: '#FEE2E2',
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}>
+              <PhoneAndroid sx={{ fontSize: 18, color: '#DC2626' }} />
+            </Box>
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: 15, color: colors.brandBlack }}>
+                App Name
+              </Typography>
+              <Typography variant="caption" sx={{ color: colors.textSecondary, fontSize: 13 }}>
+                Display name for the admin panel
+              </Typography>
+            </Box>
+          </Box>
+          <TextField
+            fullWidth
+            value={settings.appName}
+            onChange={(e) => handleChange('appName', e.target.value)}
+            disabled={!isSuperAdmin}
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                borderRadius: '12px',
+                borderColor: '#FECACA', // Light red border
+                '& fieldset': { borderColor: '#FECACA' },
+                '&:hover fieldset': { borderColor: '#FCA5A5' },
+                '&.Mui-focused fieldset': { borderColor: '#DC2626' },
+                backgroundColor: 'white',
+              },
+              '& .MuiInputBase-input': {
+                padding: '14px 16px',
+                fontSize: 15,
+                fontWeight: 500
+              }
+            }}
+          />
+        </Box>
+
+        <Box>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
+            <Box sx={{
+              width: 32, height: 32, borderRadius: '8px', backgroundColor: '#ECFDF5',
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}>
+              <Public sx={{ fontSize: 18, color: '#059669' }} />
+            </Box>
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: 15, color: colors.brandBlack }}>
+                Platform Status
+              </Typography>
+              <Typography variant="caption" sx={{ color: colors.textSecondary, fontSize: 13 }}>
+                Current status of the platform
+              </Typography>
+            </Box>
+          </Box>
+
+          <FormControl fullWidth>
+            <Select
+              value={settings.platformStatus}
+              onChange={(e) => {
+                // Direct state update for UI, logic handled by perform/save usually but complying with requested UI structure
+                handleChange('platformStatus', e.target.value);
+              }}
               disabled={!isSuperAdmin}
               sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: '12px',
-                },
+                borderRadius: '12px',
+                backgroundColor: settings.platformStatus === 'online' ? '#ECFDF5' : '#FFFBEB',
+                color: settings.platformStatus === 'online' ? '#065F46' : '#92400E',
+                fontWeight: 600,
+                '& .MuiOutlinedInput-notchedOutline': { border: 'none' },
+                '& .MuiSelect-icon': { color: 'inherit' }
               }}
-            />
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <FormControl fullWidth>
-              <InputLabel>Date Format</InputLabel>
-              <Select
-                value={settings.dateFormat}
-                label="Date Format"
-                onChange={(e) => handleChange('dateFormat', e.target.value)}
-                sx={{ borderRadius: '12px' }}
-              >
-                <MenuItem value="ddMmYyyy">DD/MM/YYYY</MenuItem>
-                <MenuItem value="mmDdYyyy">MM/DD/YYYY</MenuItem>
-                <MenuItem value="yyyyMmDd">YYYY-MM-DD</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <FormControl fullWidth>
-              <InputLabel>Time Format</InputLabel>
-              <Select
-                value={settings.timeFormat}
-                label="Time Format"
-                onChange={(e) => handleChange('timeFormat', e.target.value)}
-                sx={{ borderRadius: '12px' }}
-              >
-                <MenuItem value="hour12">12-hour (AM/PM)</MenuItem>
-                <MenuItem value="hour24">24-hour</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-        </Grid>
+            >
+              <MenuItem value="online">
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#10B981' }} />
+                  Online
+                </Box>
+              </MenuItem>
+              <MenuItem value="maintenance">
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#F59E0B' }} />
+                  Maintenance
+                </Box>
+              </MenuItem>
+            </Select>
+          </FormControl>
+        </Box>
+
+        <Box sx={{ mt: 4 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
+            <Box sx={{
+              width: 32, height: 32, borderRadius: '8px', backgroundColor: '#FFEDD5',
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}>
+              <CalendarToday sx={{ fontSize: 18, color: '#F97316' }} />
+            </Box>
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: 15, color: colors.brandBlack }}>
+                Date Format
+              </Typography>
+              <Typography variant="caption" sx={{ color: colors.textSecondary, fontSize: 13 }}>
+                How dates are displayed throughout the app
+              </Typography>
+            </Box>
+          </Box>
+          <FormControl fullWidth>
+            <Select
+              value={settings.dateFormat}
+              onChange={(e) => handleChange('dateFormat', e.target.value)}
+              sx={{
+                borderRadius: '12px',
+                backgroundColor: 'white',
+                '& .MuiOutlinedInput-notchedOutline': { borderColor: '#FED7AA' }, // Light orange border
+                '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#FDBA74' },
+                '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#F97316' },
+              }}
+            >
+              <MenuItem value="ddMmYyyy">DD/MM/YYYY</MenuItem>
+              <MenuItem value="mmDdYyyy">MM/DD/YYYY</MenuItem>
+              <MenuItem value="yyyyMmDd">YYYY-MM-DD</MenuItem>
+            </Select>
+          </FormControl>
+        </Box>
+
+        <Box sx={{ mt: 4 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
+            <Box sx={{
+              width: 32, height: 32, borderRadius: '8px', backgroundColor: '#DBEAFE',
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}>
+              <AccessTime sx={{ fontSize: 18, color: '#3B82F6' }} />
+            </Box>
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: 15, color: colors.brandBlack }}>
+                Time Format
+              </Typography>
+              <Typography variant="caption" sx={{ color: colors.textSecondary, fontSize: 13 }}>
+                How time is displayed throughout the app
+              </Typography>
+            </Box>
+          </Box>
+          <FormControl fullWidth>
+            <Select
+              value={settings.timeFormat}
+              onChange={(e) => handleChange('timeFormat', e.target.value)}
+              sx={{
+                borderRadius: '12px',
+                backgroundColor: 'white',
+                '& .MuiOutlinedInput-notchedOutline': { borderColor: '#BFDBFE' }, // Light blue border
+                '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#93C5FD' },
+                '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#3B82F6' },
+              }}
+            >
+              <MenuItem value="hour12">12-hour (AM/PM)</MenuItem>
+              <MenuItem value="hour24">24-hour</MenuItem>
+            </Select>
+          </FormControl>
+        </Box>
       </Card>
 
       {/* App Updates Section */}
@@ -650,127 +720,183 @@ const SettingsPage = () => {
           padding: 3,
           borderRadius: '20px',
           border: `1.5px solid ${colors.divider}33`,
+          backgroundColor: 'white',
+          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 4 }}>
           <Box
             sx={{
-              padding: 1.25,
-              background: `linear-gradient(135deg, ${colors.info} 0%, ${colors.info}DD 100%)`,
+              width: 40,
+              height: 40,
               borderRadius: '12px',
+              background: '#3B82F6',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 4px 6px -1px rgba(59, 130, 246, 0.3)',
             }}
           >
-            <PowerSettingsNew sx={{ fontSize: 22, color: colors.brandWhite }} />
+            <SystemUpdate sx={{ fontSize: 24, color: 'white' }} />
           </Box>
           <Box>
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, fontSize: 18, color: colors.brandBlack }}>
               App Updates
             </Typography>
-            <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13 }}>
+            <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 14 }}>
               Manage application updates and versioning
             </Typography>
           </Box>
         </Box>
 
-        <Grid container spacing={2.5}>
-          <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              label="iOS Version"
-              value={settings.iosAppVersion}
-              onChange={(e) => handleChange('iosAppVersion', e.target.value)}
-              placeholder="Enter iOS version (e.g., 1.2.3)"
-              InputProps={{
-                startAdornment: (
-                  <Box sx={{ mr: 1, color: colors.info }}>
-                    <PhoneIphone sx={{ fontSize: 18 }} />
-                  </Box>
-                ),
-              }}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: '12px',
-                },
-              }}
-            />
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <TextField
-              fullWidth
-              label="Android Version"
-              value={settings.androidAppVersion}
-              onChange={(e) => handleChange('androidAppVersion', e.target.value)}
-              placeholder="Enter Android version (e.g., 1.2.3)"
-              InputProps={{
-                startAdornment: (
-                  <Box sx={{ mr: 1, color: colors.success }}>
-                    <PhoneAndroid sx={{ fontSize: 18 }} />
-                  </Box>
-                ),
-              }}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: '12px',
-                },
-              }}
-            />
-          </Grid>
-          <Grid item xs={12}>
-            <Box
-              sx={{
-                padding: 2,
-                borderRadius: '14px',
-                background: `linear-gradient(135deg, ${colors.backgroundLight}4D 0%, ${colors.backgroundLight}1A 100%)`,
-                border: `1.5px solid ${colors.divider}26`,
-              }}
-            >
-              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Description sx={{ fontSize: 18, color: colors.brandRed }} />
-                  <Typography variant="h6" sx={{ fontWeight: 700, fontSize: 18 }}>
-                    Release Notes
-                  </Typography>
-                </Box>
-                {settings.lastVersionUpdate && (
-                  <Typography variant="caption" sx={{ color: colors.textSecondary, fontSize: 12 }}>
-                    Updated: {format(new Date(settings.lastVersionUpdate), 'MMM dd, yyyy')}
-                  </Typography>
-                )}
-              </Box>
-              <Box
-                sx={{
-                  maxHeight: 200,
-                  overflow: 'auto',
-                  padding: 1.5,
-                  backgroundColor: colors.brandWhite,
-                  borderRadius: '8px',
-                }}
-              >
-                <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 14, lineHeight: 1.6 }}>
-                  {settings.releaseNotes || 'No release notes available'}
-                </Typography>
-              </Box>
+        {/* iOS Section */}
+        <Box sx={{ mb: 4 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
+            <Box sx={{
+              width: 32, height: 32, borderRadius: '8px', backgroundColor: '#DBEAFE',
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}>
+              <PhoneIphone sx={{ fontSize: 18, color: '#3B82F6' }} />
             </Box>
-          </Grid>
-          <Grid item xs={12}>
-            <Button
-              variant="contained"
-              fullWidth
-              startIcon={isCheckingUpdates ? <CircularProgress size={16} sx={{ color: colors.brandWhite }} /> : <PowerSettingsNew />}
-              onClick={handleCheckForUpdates}
-              disabled={isCheckingUpdates}
-              sx={{
-                background: `linear-gradient(135deg, ${colors.info} 0%, ${colors.info}DD 100%)`,
-                textTransform: 'none',
-                fontWeight: 600,
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: 15, color: colors.brandBlack }}>
+                iOS Version
+              </Typography>
+              <Typography variant="caption" sx={{ color: colors.textSecondary, fontSize: 13 }}>
+                Current version for iOS app
+              </Typography>
+            </Box>
+          </Box>
+          <TextField
+            fullWidth
+            value={settings.iosAppVersion}
+            onChange={(e) => handleChange('iosAppVersion', e.target.value)}
+            sx={{
+              '& .MuiOutlinedInput-root': {
                 borderRadius: '12px',
-                py: 1.5,
-              }}
-            >
-              {isCheckingUpdates ? 'Checking for Updates...' : 'Check for Updates'}
-            </Button>
-          </Grid>
-        </Grid>
+                borderColor: '#BFDBFE',
+                '& fieldset': { borderColor: '#BFDBFE' },
+                '&:hover fieldset': { borderColor: '#93C5FD' },
+                '&.Mui-focused fieldset': { borderColor: '#3B82F6' },
+                backgroundColor: 'white',
+              },
+              '& .MuiInputBase-input': {
+                padding: '14px 16px',
+                fontSize: 15,
+                fontWeight: 500
+              }
+            }}
+          />
+        </Box>
+
+        {/* Android Section */}
+        <Box sx={{ mb: 4 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
+            <Box sx={{
+              width: 32, height: 32, borderRadius: '8px', backgroundColor: '#DCFCE7',
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}>
+              <PhoneAndroid sx={{ fontSize: 18, color: '#22C55E' }} />
+            </Box>
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: 15, color: colors.brandBlack }}>
+                Android Version
+              </Typography>
+              <Typography variant="caption" sx={{ color: colors.textSecondary, fontSize: 13 }}>
+                Current version for Android app
+              </Typography>
+            </Box>
+          </Box>
+          <TextField
+            fullWidth
+            value={settings.androidAppVersion}
+            onChange={(e) => handleChange('androidAppVersion', e.target.value)}
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                borderRadius: '12px',
+                borderColor: '#86EFAC',
+                '& fieldset': { borderColor: '#86EFAC' },
+                '&:hover fieldset': { borderColor: '#4ADE80' },
+                '&.Mui-focused fieldset': { borderColor: '#22C55E' },
+                backgroundColor: 'white',
+              },
+              '& .MuiInputBase-input': {
+                padding: '14px 16px',
+                fontSize: 15,
+                fontWeight: 500
+              }
+            }}
+          />
+        </Box>
+
+        {/* Release Notes */}
+        <Box sx={{ mb: 4 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Description sx={{ fontSize: 20, color: '#EF4444' }} />
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: 15, color: colors.brandBlack }}>
+                Release Notes
+              </Typography>
+            </Box>
+            <Typography variant="caption" sx={{ color: colors.textSecondary }}>
+              Updated: {format(new Date('2026-01-18'), 'MMM dd, yyyy')}
+            </Typography>
+          </Box>
+          <Box
+            sx={{
+              padding: 3,
+              backgroundColor: '#F9FAFB', // Neutral Gray Background
+              borderRadius: '12px',
+              border: '1px solid #E5E7EB', // Neutral Gray Border
+              maxHeight: '300px',
+              overflowY: 'auto',
+              '&::-webkit-scrollbar': {
+                width: '6px',
+              },
+              '&::-webkit-scrollbar-track': {
+                background: 'transparent',
+              },
+              '&::-webkit-scrollbar-thumb': {
+                background: '#FCA5A5',
+                borderRadius: '3px',
+              },
+            }}
+          >
+            <Typography variant="body2" component="div" sx={{ color: colors.textSecondary, fontSize: 14, whiteSpace: 'pre-line' }}>
+              {settings.releaseNotes ? settings.releaseNotes :
+                `### Version 1.2.3 - Released on Jan 15, 2025
+
+**New Features:**
+- Enhanced prediction interface
+- Improved leaderboard performance
+- New notification system
+
+**Bug Fixes:**
+- Fixed SP calculation edge cases`}
+            </Typography>
+          </Box>
+        </Box>
+
+        <Button
+          variant="contained"
+          fullWidth
+          startIcon={isCheckingUpdates ? <CircularProgress size={16} sx={{ color: 'white' }} /> : <Refresh />}
+          onClick={handleCheckForUpdates}
+          disabled={isCheckingUpdates}
+          sx={{
+            background: '#3B82F6',
+            textTransform: 'none',
+            fontWeight: 600,
+            borderRadius: '12px',
+            py: 1.5,
+            boxShadow: '0 4px 6px -1px rgba(59, 130, 246, 0.3)',
+            '&:hover': {
+              background: '#2563EB',
+            }
+          }}
+        >
+          {isCheckingUpdates ? 'Checking for Updates...' : 'Check for Updates'}
+        </Button>
       </Card>
 
       {/* Save Confirmation Dialog */}
@@ -988,9 +1114,8 @@ const SettingsPage = () => {
       >
         <Box
           sx={{
-            background: `linear-gradient(135deg, ${
-              isMaintenanceMode ? colors.success : colors.warning
-            } 0%, ${isMaintenanceMode ? colors.success : colors.warning}E6 100%)`,
+            background: `linear-gradient(135deg, ${isMaintenanceMode ? colors.success : colors.warning
+              } 0%, ${isMaintenanceMode ? colors.success : colors.warning}E6 100%)`,
             padding: 3,
             color: colors.brandWhite,
           }}
@@ -1079,9 +1204,8 @@ const SettingsPage = () => {
             onClick={performToggleMaintenance}
             variant="contained"
             sx={{
-              background: `linear-gradient(135deg, ${
-                isMaintenanceMode ? colors.success : colors.warning
-              } 0%, ${isMaintenanceMode ? colors.success : colors.warning}DD 100%)`,
+              background: `linear-gradient(135deg, ${isMaintenanceMode ? colors.success : colors.warning
+                } 0%, ${isMaintenanceMode ? colors.success : colors.warning}DD 100%)`,
               textTransform: 'none',
               fontWeight: 700,
               borderRadius: '12px',

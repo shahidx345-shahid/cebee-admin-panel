@@ -10,6 +10,7 @@ import {
   MenuItem,
   Menu,
   IconButton,
+  Dialog,
 } from '@mui/material';
 import {
   Add,
@@ -22,9 +23,18 @@ import {
   ArrowUpward,
   ArrowDownward,
   ArrowDropDown,
+  Check,
+  SortByAlpha,
   Search as SearchIcon,
   MoreVert,
   Notifications,
+  Close,
+  Timeline,
+  Person,
+  EventNote,
+  BarChart,
+  ArrowBack,
+  ChevronRight,
 } from '@mui/icons-material';
 import { colors } from '../config/theme';
 import DataTable from '../components/common/DataTable';
@@ -226,7 +236,22 @@ const NotificationsPage = () => {
   const [selectedSort, setSelectedSort] = useState('dateNewest');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPageAnchor, setRowsPerPageAnchor] = useState(null);
   const [sortAnchor, setSortAnchor] = useState(null);
+  const [actionAnchorEl, setActionAnchorEl] = useState(null);
+  const [activeRow, setActiveRow] = useState(null);
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [selectedNotification, setSelectedNotification] = useState(null);
+
+  const handleRowClick = (notification) => {
+    setSelectedNotification(notification);
+    setDetailsDialogOpen(true);
+  };
+
+  const handleCloseDetails = () => {
+    setDetailsDialogOpen(false);
+    setSelectedNotification(null);
+  };
 
   // Calculate stats from static data
   const totalSent = staticNotifications.reduce((sum, notif) => sum + (notif.sentCount || 0), 0);
@@ -374,7 +399,7 @@ const NotificationsPage = () => {
     },
     {
       id: 'openedPercentage',
-      label: 'Opened %',
+      label: 'Opened\u00A0%',
       render: (value) => (
         <Typography variant="body2" sx={{ fontWeight: 700, color: colors.success, fontSize: 14 }}>
           {value?.toFixed(1) || 0}%
@@ -421,6 +446,11 @@ const NotificationsPage = () => {
       render: (_, row) => (
         <IconButton
           size="small"
+          onClick={(e) => {
+            e.stopPropagation();
+            setActionAnchorEl(e.currentTarget);
+            setActiveRow(row);
+          }}
           sx={{
             backgroundColor: `${colors.brandRed}1A`,
             color: colors.brandRed,
@@ -470,513 +500,726 @@ const NotificationsPage = () => {
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%' }}>
-      {/* Stats Cards */}
-      <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid item xs={6} md={3}>
-          <Card
-            sx={{
-              padding: 2.5,
-              background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
-              borderRadius: '20px',
-              boxShadow: `0 6px 18px ${colors.brandRed}40`,
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-              <Box
+      {!detailsDialogOpen ? (
+        <>
+          {/* Stats Cards */}
+          <Grid container spacing={2} sx={{ mb: 3 }}>
+            <Grid item xs={6} md={3}>
+              <Card
                 sx={{
-                  padding: 1.25,
-                  backgroundColor: `${colors.brandWhite}33`,
-                  borderRadius: '12px',
+                  padding: 2.5,
+                  background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
+                  borderRadius: '20px',
+                  boxShadow: `0 6px 18px ${colors.brandRed}40`,
                 }}
               >
-                <Send sx={{ fontSize: 24, color: colors.brandWhite, transform: 'rotate(-45deg)' }} />
-              </Box>
-              <Chip
-                label="+12.5%"
-                size="small"
-                icon={<ArrowUpward sx={{ fontSize: 14 }} />}
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                  <Box
+                    sx={{
+                      padding: 1.25,
+                      backgroundColor: `${colors.brandWhite}33`,
+                      borderRadius: '12px',
+                    }}
+                  >
+                    <Send sx={{ fontSize: 24, color: colors.brandWhite, transform: 'rotate(-45deg)' }} />
+                  </Box>
+                  <Chip
+                    label="+12.5%"
+                    size="small"
+                    icon={<ArrowUpward sx={{ fontSize: 14 }} />}
+                    sx={{
+                      backgroundColor: `${colors.brandWhite}26`,
+                      color: colors.brandWhite,
+                      height: 24,
+                      fontSize: 11,
+                      fontWeight: 600,
+                      '& .MuiChip-icon': {
+                        color: colors.brandWhite,
+                      },
+                    }}
+                  />
+                </Box>
+                <Typography variant="h4" sx={{ fontWeight: 700, color: colors.brandWhite, mb: 0.5 }}>
+                  {totalSent.toLocaleString()}
+                </Typography>
+                <Typography variant="body2" sx={{ color: `${colors.brandWhite}DD`, fontSize: 13 }}>
+                  Total Sent
+                </Typography>
+              </Card>
+            </Grid>
+            <Grid item xs={6} md={3}>
+              <Card
                 sx={{
-                  backgroundColor: `${colors.brandWhite}26`,
-                  color: colors.brandWhite,
-                  height: 24,
-                  fontSize: 11,
-                  fontWeight: 600,
-                  '& .MuiChip-icon': {
-                    color: colors.brandWhite,
-                  },
-                }}
-              />
-            </Box>
-            <Typography variant="h4" sx={{ fontWeight: 700, color: colors.brandWhite, mb: 0.5 }}>
-              {totalSent.toLocaleString()}
-            </Typography>
-            <Typography variant="body2" sx={{ color: `${colors.brandWhite}DD`, fontSize: 13 }}>
-              Total Sent
-            </Typography>
-          </Card>
-        </Grid>
-        <Grid item xs={6} md={3}>
-          <Card
-            sx={{
-              padding: 2.5,
-              background: colors.brandWhite,
-              border: `1.5px solid ${colors.success}26`,
-              borderRadius: '20px',
-              boxShadow: `0 6px 14px ${colors.success}1F`,
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-              <Box
-                sx={{
-                  padding: 1.25,
-                  backgroundColor: `${colors.success}1F`,
-                  borderRadius: '50%',
-                  width: 48,
-                  height: 48,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
+                  padding: 2.5,
+                  background: colors.brandWhite,
+                  border: `1.5px solid ${colors.success}26`,
+                  borderRadius: '20px',
+                  boxShadow: `0 6px 14px ${colors.success}1F`,
                 }}
               >
-                <CheckCircle sx={{ fontSize: 24, color: colors.success }} />
-              </Box>
-              <Chip
-                label={`+${deliveredRate}%`}
-                size="small"
-                icon={<ArrowUpward sx={{ fontSize: 14 }} />}
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                  <Box
+                    sx={{
+                      padding: 1.25,
+                      backgroundColor: `${colors.success}1F`,
+                      borderRadius: '50%',
+                      width: 48,
+                      height: 48,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <CheckCircle sx={{ fontSize: 24, color: colors.success }} />
+                  </Box>
+                  <Chip
+                    label={`+${deliveredRate}%`}
+                    size="small"
+                    icon={<ArrowUpward sx={{ fontSize: 14 }} />}
+                    sx={{
+                      backgroundColor: `${colors.success}1A`,
+                      color: colors.success,
+                      height: 24,
+                      fontSize: 11,
+                      fontWeight: 600,
+                      '& .MuiChip-icon': {
+                        color: colors.success,
+                      },
+                    }}
+                  />
+                </Box>
+                <Typography variant="h4" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.5 }}>
+                  {totalDelivered.toLocaleString()}
+                </Typography>
+                <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13 }}>
+                  Delivered
+                </Typography>
+              </Card>
+            </Grid>
+            <Grid item xs={6} md={3}>
+              <Card
                 sx={{
-                  backgroundColor: `${colors.success}1A`,
-                  color: colors.success,
-                  height: 24,
-                  fontSize: 11,
-                  fontWeight: 600,
-                  '& .MuiChip-icon': {
-                    color: colors.success,
-                  },
-                }}
-              />
-            </Box>
-            <Typography variant="h4" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.5 }}>
-              {totalDelivered.toLocaleString()}
-            </Typography>
-            <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13 }}>
-              Delivered
-            </Typography>
-          </Card>
-        </Grid>
-        <Grid item xs={6} md={3}>
-          <Card
-            sx={{
-              padding: 2.5,
-              background: colors.brandWhite,
-              border: `1.5px solid ${colors.info}26`,
-              borderRadius: '20px',
-              boxShadow: `0 6px 14px ${colors.info}1F`,
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-              <Box
-                sx={{
-                  padding: 1.25,
-                  backgroundColor: `${colors.info}1F`,
-                  borderRadius: '50%',
-                  width: 48,
-                  height: 48,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Visibility sx={{ fontSize: 24, color: colors.info }} />
-              </Box>
-              <Chip
-                label={`+${openedRate}%`}
-                size="small"
-                icon={<ArrowUpward sx={{ fontSize: 14 }} />}
-                sx={{
-                  backgroundColor: `${colors.success}1A`,
-                  color: colors.success,
-                  height: 24,
-                  fontSize: 11,
-                  fontWeight: 600,
-                  '& .MuiChip-icon': {
-                    color: colors.success,
-                  },
-                }}
-              />
-            </Box>
-            <Typography variant="h4" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.5 }}>
-              {totalOpened.toLocaleString()}
-            </Typography>
-            <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13 }}>
-              Opened
-            </Typography>
-          </Card>
-        </Grid>
-        <Grid item xs={6} md={3}>
-          <Card
-            sx={{
-              padding: 2.5,
-              background: colors.brandWhite,
-              border: `1.5px solid ${colors.warning}26`,
-              borderRadius: '20px',
-              boxShadow: `0 6px 14px ${colors.warning}1F`,
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-              <Box
-                sx={{
-                  padding: 1.25,
-                  backgroundColor: `${colors.warning}1F`,
-                  borderRadius: '50%',
-                  width: 48,
-                  height: 48,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
+                  padding: 2.5,
+                  background: colors.brandWhite,
+                  border: `1.5px solid ${colors.info}26`,
+                  borderRadius: '20px',
+                  boxShadow: `0 6px 14px ${colors.info}1F`,
                 }}
               >
-                <Schedule sx={{ fontSize: 24, color: colors.warning }} />
-              </Box>
-              <Chip
-                label="+5.2%"
-                size="small"
-                icon={<ArrowUpward sx={{ fontSize: 14 }} />}
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                  <Box
+                    sx={{
+                      padding: 1.25,
+                      backgroundColor: `${colors.info}1F`,
+                      borderRadius: '50%',
+                      width: 48,
+                      height: 48,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Visibility sx={{ fontSize: 24, color: colors.info }} />
+                  </Box>
+                  <Chip
+                    label={`+${openedRate}%`}
+                    size="small"
+                    icon={<ArrowUpward sx={{ fontSize: 14 }} />}
+                    sx={{
+                      backgroundColor: `${colors.success}1A`,
+                      color: colors.success,
+                      height: 24,
+                      fontSize: 11,
+                      fontWeight: 600,
+                      '& .MuiChip-icon': {
+                        color: colors.success,
+                      },
+                    }}
+                  />
+                </Box>
+                <Typography variant="h4" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.5 }}>
+                  {totalOpened.toLocaleString()}
+                </Typography>
+                <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13 }}>
+                  Opened
+                </Typography>
+              </Card>
+            </Grid>
+            <Grid item xs={6} md={3}>
+              <Card
                 sx={{
-                  backgroundColor: `${colors.success}1A`,
-                  color: colors.success,
-                  height: 24,
-                  fontSize: 11,
-                  fontWeight: 600,
-                  '& .MuiChip-icon': {
-                    color: colors.success,
-                  },
+                  padding: 2.5,
+                  background: colors.brandWhite,
+                  border: `1.5px solid ${colors.warning}26`,
+                  borderRadius: '20px',
+                  boxShadow: `0 6px 14px ${colors.warning}1F`,
                 }}
-              />
-            </Box>
-            <Typography variant="h4" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.5 }}>
-              {scheduledCount}
-            </Typography>
-            <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13 }}>
-              Scheduled
-            </Typography>
-          </Card>
-        </Grid>
-      </Grid>
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                  <Box
+                    sx={{
+                      padding: 1.25,
+                      backgroundColor: `${colors.warning}1F`,
+                      borderRadius: '50%',
+                      width: 48,
+                      height: 48,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Schedule sx={{ fontSize: 24, color: colors.warning }} />
+                  </Box>
+                  <Chip
+                    label="+5.2%"
+                    size="small"
+                    icon={<ArrowUpward sx={{ fontSize: 14 }} />}
+                    sx={{
+                      backgroundColor: `${colors.success}1A`,
+                      color: colors.success,
+                      height: 24,
+                      fontSize: 11,
+                      fontWeight: 600,
+                      '& .MuiChip-icon': {
+                        color: colors.success,
+                      },
+                    }}
+                  />
+                </Box>
+                <Typography variant="h4" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.5 }}>
+                  {scheduledCount}
+                </Typography>
+                <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13 }}>
+                  Scheduled
+                </Typography>
+              </Card>
+            </Grid>
+          </Grid>
 
-      {/* Status Filter Buttons */}
-      <Box sx={{ mb: 3, display: 'flex', gap: 2 }}>
-        {/* Sent Button */}
-        <Button
-          variant={selectedStatus === 'sent' ? 'contained' : 'outlined'}
-          onClick={() => setSelectedStatus('sent')}
-          startIcon={
-            <CheckCircle
-              sx={{
-                fontSize: 18,
-                color: selectedStatus === 'sent' ? colors.brandWhite : colors.success,
-              }}
-            />
-          }
-          sx={{
-            flex: 1,
-            borderRadius: '16px',
-            textTransform: 'none',
-            fontWeight: 600,
-            fontSize: 15,
-            px: 3,
-            py: 1.75,
-            backgroundColor: selectedStatus === 'sent' ? colors.success : colors.brandWhite,
-            color: selectedStatus === 'sent' ? colors.brandWhite : colors.textSecondary,
-            border: `2px solid ${selectedStatus === 'sent' ? colors.success : colors.divider}`,
-            boxShadow: 'none',
-            '&:hover': {
-              backgroundColor: selectedStatus === 'sent' ? colors.success : `${colors.backgroundLight}`,
-              boxShadow: 'none',
-            },
-          }}
-        >
-          Sent
-        </Button>
-
-        {/* Scheduled Button */}
-        <Button
-          variant="outlined"
-          onClick={() => setSelectedStatus('scheduled')}
-          startIcon={
-            <Schedule
-              sx={{
-                fontSize: 18,
-                color: colors.info,
-              }}
-            />
-          }
-          sx={{
-            flex: 1,
-            borderRadius: '16px',
-            textTransform: 'none',
-            fontWeight: 600,
-            fontSize: 15,
-            px: 3,
-            py: 1.75,
-            backgroundColor: colors.brandWhite,
-            color: colors.textSecondary,
-            border: `2px solid ${colors.divider}`,
-            boxShadow: 'none',
-            '&:hover': {
-              backgroundColor: `${colors.backgroundLight}`,
-              boxShadow: 'none',
-            },
-          }}
-        >
-          Scheduled
-        </Button>
-
-        {/* Drafts Button */}
-        <Button
-          variant="outlined"
-          onClick={() => setSelectedStatus('draft')}
-          startIcon={
-            <Description
-              sx={{
-                fontSize: 18,
-                color: colors.warning,
-              }}
-            />
-          }
-          sx={{
-            flex: 1,
-            borderRadius: '16px',
-            textTransform: 'none',
-            fontWeight: 600,
-            fontSize: 15,
-            px: 3,
-            py: 1.75,
-            backgroundColor: colors.brandWhite,
-            color: colors.textSecondary,
-            border: `2px solid ${colors.divider}`,
-            boxShadow: 'none',
-            '&:hover': {
-              backgroundColor: `${colors.backgroundLight}`,
-              boxShadow: 'none',
-            },
-          }}
-        >
-          Drafts
-        </Button>
-
-        {/* Failed Button */}
-        <Button
-          variant="outlined"
-          onClick={() => setSelectedStatus('failed')}
-          startIcon={
-            <Error
-              sx={{
-                fontSize: 18,
-                color: colors.error,
-              }}
-            />
-          }
-          sx={{
-            flex: 1,
-            borderRadius: '16px',
-            textTransform: 'none',
-            fontWeight: 600,
-            fontSize: 15,
-            px: 3,
-            py: 1.75,
-            backgroundColor: colors.brandWhite,
-            color: colors.textSecondary,
-            border: `2px solid ${colors.divider}`,
-            boxShadow: 'none',
-            '&:hover': {
-              backgroundColor: `${colors.backgroundLight}`,
-              boxShadow: 'none',
-            },
-          }}
-        >
-          Failed
-        </Button>
-      </Box>
-
-      {/* Search and Action Bar */}
-      <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
-        {/* Search Bar */}
-        <Box sx={{ flex: 1, minWidth: 300 }}>
-          <Box
+          {/* Filter Strip */}
+          <Card
             sx={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 2,
-              padding: '14px 20px',
+              mb: 3,
+              p: 1,
+              borderRadius: '20px',
               backgroundColor: colors.brandWhite,
-              borderRadius: '25px',
-              border: `1.5px solid ${colors.divider}40`,
+              border: 'none',
+              boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)',
+              display: 'flex',
+              gap: 1,
+              overflowX: 'auto',
             }}
           >
-            <SearchIcon sx={{ fontSize: 22, color: colors.brandRed }} />
-            <input
-              type="text"
-              placeholder="Search by title, message or ID..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{
-                border: 'none',
-                outline: 'none',
-                flex: 1,
-                fontSize: 14,
-                fontFamily: 'inherit',
-                color: colors.brandBlack,
-                backgroundColor: 'transparent',
-              }}
-            />
-          </Box>
-        </Box>
+            {[
+              { id: 'sent', label: 'Sent', icon: <CheckCircle />, color: colors.brandRed, bgColor: '#D32F2F' }, // Using Brand Red or dark red for active sent
+              { id: 'scheduled', label: 'Scheduled', icon: <Schedule />, color: '#3B82F6', bgColor: '#3B82F6' },
+              { id: 'draft', label: 'Drafts', icon: <Description />, color: '#F59E0B', bgColor: '#F59E0B' },
+              { id: 'failed', label: 'Failed', icon: <Error />, color: '#EF4444', bgColor: '#EF4444' },
+            ].map((item) => {
+              const isSelected = selectedStatus === item.id;
+              return (
+                <Button
+                  key={item.id}
+                  onClick={() => setSelectedStatus(item.id)}
+                  disableRipple
+                  sx={{
+                    flex: 1,
+                    minWidth: 120,
+                    borderRadius: '16px',
+                    textTransform: 'none',
+                    fontWeight: 700,
+                    fontSize: 15,
+                    py: 1.5,
+                    backgroundColor: isSelected ? item.bgColor : 'transparent',
+                    color: isSelected ? colors.brandWhite : colors.brandBlack,
+                    transition: 'all 0.2s',
+                    border: isSelected ? 'none' : `1.5px solid ${colors.divider}`,
+                    '&:hover': {
+                      backgroundColor: isSelected ? item.bgColor : '#F3F4F6',
+                    },
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                    {React.cloneElement(item.icon, { sx: { fontSize: 18, color: isSelected ? colors.brandWhite : item.color } })}
+                    {item.label}
+                  </Box>
+                </Button>
+              );
+            })}
+          </Card>
 
-        {/* Date Sort Button */}
-        <Button
-          variant="outlined"
-          startIcon={<ArrowDownward sx={{ fontSize: 18, color: colors.brandRed }} />}
-          endIcon={<ArrowDropDown sx={{ fontSize: 18 }} />}
-          onClick={(e) => setSortAnchor(e.currentTarget)}
-          sx={{
-            borderColor: `${colors.brandRed}26`,
-            color: colors.brandBlack,
-            backgroundColor: `${colors.brandRed}0D`,
-            borderRadius: '25px',
-            textTransform: 'none',
-            fontWeight: 500,
-            px: 3,
-            py: 1.5,
-            minWidth: 200,
-            '&:hover': {
-              borderColor: `${colors.brandRed}40`,
-              backgroundColor: `${colors.brandRed}1A`,
-            },
-          }}
-        >
-          Date: {selectedSort === 'dateNewest' ? 'Newest First' : 'Oldest First'}
-        </Button>
-        <Menu
-          anchorEl={sortAnchor}
-          open={Boolean(sortAnchor)}
-          onClose={() => setSortAnchor(null)}
-          PaperProps={{
-            sx: {
-              borderRadius: '12px',
-              minWidth: 200,
-              boxShadow: `0 4px 12px rgba(0, 0, 0, 0.2)`,
-              mt: 0.5,
-            },
-          }}
-        >
-          <MenuItem onClick={() => { setSelectedSort('dateNewest'); setSortAnchor(null); }}>
-            Date: Newest First
-          </MenuItem>
-          <MenuItem onClick={() => { setSelectedSort('dateOldest'); setSortAnchor(null); }}>
-            Date: Oldest First
-          </MenuItem>
-        </Menu>
+          {/* Search and Action Bar */}
+          <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
+            {/* Search Bar */}
+            <Box sx={{ flex: 1, minWidth: 300 }}>
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 2,
+                  padding: '14px 20px',
+                  backgroundColor: colors.brandWhite,
+                  borderRadius: '25px',
+                  border: `1.5px solid ${colors.divider}40`,
+                }}
+              >
+                <SearchIcon sx={{ fontSize: 22, color: colors.brandRed }} />
+                <input
+                  type="text"
+                  placeholder="Search by title, message or ID..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{
+                    border: 'none',
+                    outline: 'none',
+                    flex: 1,
+                    fontSize: 14,
+                    fontFamily: 'inherit',
+                    color: colors.brandBlack,
+                    backgroundColor: 'transparent',
+                  }}
+                />
+              </Box>
+            </Box>
 
-        {/* Create Notification Button */}
-        <Button
-          variant="contained"
-          startIcon={<Add />}
-          onClick={() => navigate('/notifications/create')}
-          sx={{
-            background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
-            borderRadius: '25px',
-            textTransform: 'none',
-            fontWeight: 700,
-            px: 4,
-            py: 1.5,
-            fontSize: 15,
-            boxShadow: `0 4px 12px ${colors.brandRed}40`,
-            '&:hover': {
-              background: `linear-gradient(135deg, ${colors.brandDarkRed} 0%, ${colors.brandRed} 100%)`,
-              boxShadow: `0 6px 16px ${colors.brandRed}50`,
-            },
-          }}
-        >
-          Create Notification
-        </Button>
-      </Box>
-
-      {/* Notifications List Header */}
-      <Card
-        sx={{
-          padding: 2.5,
-          mb: 0,
-          borderRadius: '16px 16px 0 0',
-          backgroundColor: colors.brandWhite,
-          border: `1.5px solid ${colors.divider}26`,
-          borderBottom: 'none',
-        }}
-      >
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Box
+            {/* Date Sort Button */}
+            <Button
+              variant="outlined"
+              startIcon={<ArrowDownward sx={{ fontSize: 18, color: colors.brandRed }} />}
+              endIcon={<ArrowDropDown sx={{ fontSize: 18 }} />}
+              onClick={(e) => setSortAnchor(e.currentTarget)}
               sx={{
-                width: 48,
-                height: 48,
-                backgroundColor: colors.brandRed,
-                borderRadius: '12px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
+                borderColor: `${colors.brandRed}26`,
+                color: colors.brandBlack,
+                backgroundColor: `${colors.brandRed}0D`,
+                borderRadius: '25px',
+                textTransform: 'none',
+                fontWeight: 500,
+                px: 3,
+                py: 1.5,
+                minWidth: 200,
+                justifyContent: 'space-between',
+                '&:hover': {
+                  borderColor: `${colors.brandRed}40`,
+                  backgroundColor: `${colors.brandRed}1A`,
+                },
               }}
             >
-              <Notifications sx={{ fontSize: 24, color: colors.brandWhite }} />
-            </Box>
-            <Box>
-              <Typography variant="h6" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.25, fontSize: 17 }}>
-                Notifications List
-              </Typography>
-              <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13 }}>
-                {filteredNotifications.length} notifications found
-              </Typography>
-            </Box>
+              <Box component="span" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                Date: {selectedSort.startsWith('date') ? (selectedSort === 'dateNewest' ? 'Newest First' : 'Oldest First') : selectedSort.startsWith('title') ? (selectedSort === 'titleAZ' ? 'A-Z' : 'Z-A') : (selectedSort === 'openRateHighest' ? 'Highest' : 'Lowest')}
+              </Box>
+            </Button>
+            <Menu
+              anchorEl={sortAnchor}
+              open={Boolean(sortAnchor)}
+              onClose={() => setSortAnchor(null)}
+              PaperProps={{
+                sx: {
+                  borderRadius: '16px',
+                  minWidth: 240,
+                  boxShadow: '0 10px 40px -10px rgba(0,0,0,0.1)',
+                  mt: 1,
+                  p: 1,
+                  border: '1px solid #F3F4F6'
+                },
+              }}
+            >
+              {[
+                { id: 'dateNewest', label: 'Date: Newest First', icon: <ArrowDownward /> },
+                { id: 'dateOldest', label: 'Date: Oldest First', icon: <ArrowUpward /> },
+                { id: 'titleAZ', label: 'Title: A-Z', icon: <SortByAlpha /> },
+                { id: 'titleZA', label: 'Title: Z-A', icon: <SortByAlpha sx={{ transform: 'scaleY(-1)' }} /> },
+                { id: 'openRateHighest', label: 'Open Rate: Highest', icon: <ArrowUpward /> },
+                { id: 'openRateLowest', label: 'Open Rate: Lowest', icon: <ArrowDownward /> },
+              ].map((option) => {
+                const isSelected = selectedSort === option.id;
+                return (
+                  <MenuItem
+                    key={option.id}
+                    onClick={() => { setSelectedSort(option.id); setSortAnchor(null); }}
+                    sx={{
+                      borderRadius: '12px',
+                      mb: 0.5,
+                      py: 1.5,
+                      px: 2,
+                      backgroundColor: isSelected ? '#F2E9E9' : 'transparent',
+                      '&:hover': { backgroundColor: isSelected ? '#F2E9E9' : '#F3F4F6' },
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between'
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      <Box sx={{
+                        color: isSelected ? colors.brandRed : '#9CA3AF',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: 28,
+                        height: 28,
+                        borderRadius: '50%',
+                        backgroundColor: isSelected ? '#FECACA' : '#F9FAFB',
+                        border: isSelected ? `1px solid ${colors.brandRed}` : '1px solid #E5E7EB'
+                      }}>
+                        {React.cloneElement(option.icon, { sx: { fontSize: 16 } })}
+                      </Box>
+                      <Typography variant="body2" sx={{ fontWeight: isSelected ? 700 : 500, color: colors.brandBlack }}>
+                        {option.label}
+                      </Typography>
+                    </Box>
+                    {isSelected && <Check sx={{ fontSize: 16, color: colors.brandRed }} />}
+                  </MenuItem>
+                );
+              })}
+            </Menu>
+
+            {/* Create Notification Button */}
+            <Button
+              variant="contained"
+              startIcon={<Add />}
+              onClick={() => navigate('/notifications/create')}
+              sx={{
+                background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
+                borderRadius: '25px',
+                textTransform: 'none',
+                fontWeight: 700,
+                px: 4,
+                py: 1.5,
+                fontSize: 15,
+                boxShadow: `0 4px 12px ${colors.brandRed}40`,
+                '&:hover': {
+                  background: `linear-gradient(135deg, ${colors.brandDarkRed} 0%, ${colors.brandRed} 100%)`,
+                  boxShadow: `0 6px 16px ${colors.brandRed}50`,
+                },
+              }}
+            >
+              Create Notification
+            </Button>
           </Box>
-          <Button
-            variant="outlined"
-            endIcon={<ArrowDropDown sx={{ fontSize: 18 }} />}
+
+          {/* Notifications List Header */}
+          <Card
             sx={{
-              borderColor: colors.divider,
-              color: colors.brandBlack,
+              padding: 2.5,
+              mb: 0,
+              borderRadius: '16px 16px 0 0',
               backgroundColor: colors.brandWhite,
-              borderRadius: '8px',
-              textTransform: 'none',
-              fontWeight: 500,
-              px: 2.5,
-              py: 1,
-              fontSize: 14,
-              '&:hover': {
-                borderColor: colors.brandRed,
-                backgroundColor: `${colors.brandRed}0D`,
-              },
+              border: `1.5px solid ${colors.divider}26`,
+              borderBottom: 'none',
             }}
           >
-            {rowsPerPage} / page
-          </Button>
-        </Box>
-      </Card>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Box
+                  sx={{
+                    width: 48,
+                    height: 48,
+                    backgroundColor: colors.brandRed,
+                    borderRadius: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Notifications sx={{ fontSize: 24, color: colors.brandWhite }} />
+                </Box>
+                <Box>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.25, fontSize: 17 }}>
+                    Notifications List
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13 }}>
+                    {filteredNotifications.length} notifications found
+                  </Typography>
+                </Box>
+              </Box>
+              <Button
+                variant="outlined"
+                endIcon={<ArrowDropDown sx={{ fontSize: 18 }} />}
+                onClick={(e) => setRowsPerPageAnchor(e.currentTarget)}
+                sx={{
+                  borderColor: colors.divider,
+                  color: colors.brandBlack,
+                  backgroundColor: colors.brandWhite,
+                  borderRadius: '8px',
+                  textTransform: 'none',
+                  fontWeight: 500,
+                  px: 2.5,
+                  py: 1,
+                  fontSize: 14,
+                  '&:hover': {
+                    borderColor: colors.brandRed,
+                    backgroundColor: `${colors.brandRed}0D`,
+                  },
+                }}
+              >
+                {rowsPerPage} / page
+              </Button>
+              <Menu
+                anchorEl={rowsPerPageAnchor}
+                open={Boolean(rowsPerPageAnchor)}
+                onClose={() => setRowsPerPageAnchor(null)}
+                PaperProps={{
+                  sx: {
+                    borderRadius: '12px',
+                    minWidth: 120,
+                    boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                    mt: 1,
+                    border: '1px solid #F3F4F6'
+                  },
+                }}
+              >
+                {[10, 25, 50].map((count) => (
+                  <MenuItem
+                    key={count}
+                    onClick={() => {
+                      setRowsPerPage(count);
+                      setPage(0);
+                      setRowsPerPageAnchor(null);
+                    }}
+                    sx={{
+                      fontSize: 14,
+                      fontWeight: rowsPerPage === count ? 600 : 400,
+                      backgroundColor: rowsPerPage === count ? '#F2E9E9' : 'transparent',
+                      '&:hover': { backgroundColor: rowsPerPage === count ? '#F2E9E9' : '#F3F4F6' },
+                      py: 1,
+                    }}
+                  >
+                    {count} / page
+                  </MenuItem>
+                ))}
+              </Menu>
+            </Box>
+          </Card>
 
-      {/* Data Table */}
-      <DataTable
-        columns={columns}
-        data={paginatedNotifications}
-        loading={loading}
-        page={page}
-        rowsPerPage={rowsPerPage}
-        totalCount={filteredNotifications.length}
-        onPageChange={(e, newPage) => setPage(newPage)}
-        onRowsPerPageChange={(e) => {
-          setRowsPerPage(parseInt(e.target.value, 10));
-          setPage(0);
-        }}
-        onRowClick={(row) => navigate(`/notifications/details/${row.id}`)}
-        emptyMessage="No notifications found"
-      />
+          {/* Data Table */}
+          <DataTable
+            columns={columns}
+            data={paginatedNotifications}
+            loading={loading}
+            page={page}
+            rowsPerPage={rowsPerPage}
+            totalCount={filteredNotifications.length}
+            onPageChange={(e, newPage) => setPage(newPage)}
+            onRowsPerPageChange={(e) => {
+              setRowsPerPage(parseInt(e.target.value, 10));
+              setPage(0);
+            }}
+            onRowClick={handleRowClick}
+            emptyMessage="No notifications found"
+          />
+          <Menu
+            anchorEl={actionAnchorEl}
+            open={Boolean(actionAnchorEl)}
+            onClose={() => { setActionAnchorEl(null); setActiveRow(null); }}
+            PaperProps={{
+              sx: {
+                borderRadius: '16px',
+                minWidth: 220,
+                boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
+                mt: 1,
+                p: 1.5,
+                border: 'none',
+              },
+            }}
+            transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+            anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+          >
+            <MenuItem
+              onClick={() => {
+                if (activeRow) handleRowClick(activeRow);
+                setActionAnchorEl(null);
+                setActiveRow(null);
+              }}
+              sx={{
+                borderRadius: '12px',
+                py: 1,
+                px: 1.5,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 2,
+                '&:hover': { backgroundColor: '#F3F4F6' },
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Box sx={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: '12px',
+                  backgroundColor: '#E0F2FE', // Light blue background for icon
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: '1px solid #BAE6FD'
+                }}>
+                  <Visibility sx={{ fontSize: 20, color: '#0284C7' }} />
+                </Box>
+                <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack, fontSize: 15 }}>
+                  View Details
+                </Typography>
+              </Box>
+              <ChevronRight sx={{ fontSize: 20, color: '#9CA3AF' }} />
+            </MenuItem>
+          </Menu>
+        </>
+      ) : (
+        selectedNotification && (
+          <Box sx={{ backgroundColor: '#F9FAFB', minHeight: '100%', pb: 4, borderRadius: '12px' }}>
+            {/* Header Bar */}
+            <Box sx={{
+              px: 4, py: 2, backgroundColor: colors.brandWhite,
+              borderBottom: `1px solid ${colors.divider}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              position: 'sticky', top: 0, zIndex: 10
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <IconButton onClick={handleCloseDetails} size="small">
+                  <ArrowBack />
+                </IconButton>
+                <Typography variant="h6" sx={{ fontWeight: 700, color: colors.brandBlack }}>
+                  Notification Details
+                </Typography>
+              </Box>
+              <Chip
+                icon={<Visibility sx={{ fontSize: 14 }} />}
+                label="Read Only"
+                size="small"
+                sx={{
+                  backgroundColor: '#DBEAFE',
+                  color: '#1E40AF',
+                  fontWeight: 600,
+                  borderRadius: '6px',
+                  '& .MuiChip-icon': { color: '#1E40AF' }
+                }}
+              />
+            </Box>
+
+            {/* Main Content Area */}
+            <Box sx={{ maxWidth: '1200px', mx: 'auto', mt: 4, px: 3 }}>
+              {/* Top Summary Card */}
+              <Card sx={{
+                borderRadius: '24px',
+                backgroundColor: '#FEF2F2', // Light red bg
+                border: 'none',
+                mb: 4,
+                overflow: 'hidden'
+              }}>
+                <Box sx={{ p: 4 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                    <Chip label={selectedNotification.id || 'NOTIF_001'} size="small" sx={{ backgroundColor: '#FECACA', color: colors.brandRed, fontWeight: 700, borderRadius: '4px', height: 20, fontSize: 10, mb: 2 }} />
+                    <Chip label="SENT" size="small" sx={{ backgroundColor: '#DCFCE7', color: '#166534', fontWeight: 700, borderRadius: '4px', height: 20, fontSize: 10 }} />
+                  </Box>
+
+                  <Typography variant="h4" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 1.5 }}>
+                    {selectedNotification.title}
+                  </Typography>
+                  <Typography variant="body1" sx={{ color: '#4B5563', mb: 3 }}>
+                    {selectedNotification.body}
+                  </Typography>
+
+                  <Box sx={{ display: 'flex', gap: 1.5 }}>
+                    <Chip
+                      icon={<Notifications sx={{ fontSize: 14 }} />}
+                      label={selectedNotification.type}
+                      size="small"
+                      sx={{ backgroundColor: '#E0F2FE', color: '#0369A1', fontWeight: 600, borderRadius: '6px', '& .MuiChip-icon': { color: '#0369A1' } }}
+                    />
+                    <Chip
+                      icon={<Person sx={{ fontSize: 14 }} />}
+                      label={selectedNotification.audience}
+                      size="small"
+                      sx={{ backgroundColor: '#FEF3C7', color: '#B45309', fontWeight: 600, borderRadius: '6px', '& .MuiChip-icon': { color: '#B45309' } }}
+                    />
+                  </Box>
+                </Box>
+              </Card>
+
+              {/* Stats Grid */}
+              <Grid container spacing={3} sx={{ mb: 6 }}>
+                <Grid item xs={12} md={3}>
+                  <Card sx={{ p: 4, borderRadius: '20px', height: '100%', boxShadow: 'none', backgroundColor: colors.brandWhite }}>
+                    <Box sx={{ width: 48, height: 48, borderRadius: '12px', backgroundColor: '#FEF2F2', display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 13 }}>
+                      <Send sx={{ color: colors.brandRed, transform: 'rotate(-45deg)', fontSize: 24 }} />
+                    </Box>
+                    <Typography variant="h3" sx={{ fontWeight: 700, mb: 0.5 }}>
+                      {selectedNotification.sentCount?.toLocaleString() || 0}
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: colors.textSecondary }}>Sent</Typography>
+                  </Card>
+                </Grid>
+                <Grid item xs={12} md={3}>
+                  <Card sx={{ p: 4, borderRadius: '20px', height: '100%', boxShadow: 'none', backgroundColor: colors.brandWhite }}>
+                    <Box sx={{ width: 48, height: 48, borderRadius: '12px', backgroundColor: '#ECFDF5', display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 13 }}>
+                      <CheckCircle sx={{ color: '#10B981', fontSize: 24 }} />
+                    </Box>
+                    <Typography variant="h3" sx={{ fontWeight: 700, mb: 0.5 }}>
+                      {selectedNotification.deliveredCount?.toLocaleString() || 0}
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: colors.textSecondary }}>Delivered</Typography>
+                  </Card>
+                </Grid>
+                <Grid item xs={12} md={3}>
+                  <Card sx={{ p: 4, borderRadius: '20px', height: '100%', boxShadow: 'none', backgroundColor: colors.brandWhite }}>
+                    <Box sx={{ width: 48, height: 48, borderRadius: '12px', backgroundColor: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 13 }}>
+                      <Visibility sx={{ color: '#3B82F6', fontSize: 24 }} />
+                    </Box>
+                    <Typography variant="h3" sx={{ fontWeight: 700, mb: 0.5 }}>
+                      {selectedNotification.openedCount?.toLocaleString() || 0}
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: colors.textSecondary }}>Opened</Typography>
+                  </Card>
+                </Grid>
+                <Grid item xs={12} md={3}>
+                  <Card sx={{ p: 4, borderRadius: '20px', height: '100%', boxShadow: 'none', backgroundColor: colors.brandWhite }}>
+                    <Box sx={{ width: 48, height: 48, borderRadius: '12px', backgroundColor: '#FFF7ED', display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 13 }}>
+                      <BarChart sx={{ color: '#F59E0B', fontSize: 24 }} />
+                    </Box>
+                    <Typography variant="h3" sx={{ fontWeight: 700, mb: 0.5 }}>
+                      {selectedNotification.openedPercentage || 0}%
+                    </Typography>
+                    <Typography variant="body2" sx={{ color: colors.textSecondary }}>Open Rate</Typography>
+                  </Card>
+                </Grid>
+              </Grid>
+
+              {/* Details Section */}
+              <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Details</Typography>
+              <Card sx={{ p: 4, borderRadius: '20px', boxShadow: 'none', backgroundColor: colors.brandWhite, mb: 4 }}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <Box sx={{ display: 'flex', gap: 2 }}>
+                    <Person sx={{ color: '#9CA3AF', fontSize: 20, mt: 0.5 }} />
+                    <Box>
+                      <Typography variant="caption" sx={{ color: '#9CA3AF', fontWeight: 600, display: 'block', mb: 0.5 }}>Created By</Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>{selectedNotification.creator || 'ADMIN_001'}</Typography>
+                    </Box>
+                  </Box>
+
+                  <Box sx={{ display: 'flex', gap: 2 }}>
+                    <EventNote sx={{ color: '#9CA3AF', fontSize: 20, mt: 0.5 }} />
+                    <Box>
+                      <Typography variant="caption" sx={{ color: '#9CA3AF', fontWeight: 600, display: 'block', mb: 0.5 }}>Created At</Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {selectedNotification.createdAt ? format(selectedNotification.createdAt?.toDate ? selectedNotification.createdAt.toDate() : new Date(selectedNotification.createdAt), 'MMM dd, yyyy - hh:mm a') : 'N/A'}
+                      </Typography>
+                    </Box>
+                  </Box>
+
+                  <Box sx={{ display: 'flex', gap: 2 }}>
+                    <Send sx={{ color: '#9CA3AF', fontSize: 20, mt: 0.5, transform: 'rotate(-45deg)' }} />
+                    <Box>
+                      <Typography variant="caption" sx={{ color: '#9CA3AF', fontWeight: 600, display: 'block', mb: 0.5 }}>Sent At</Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {selectedNotification.createdAt ? format(selectedNotification.createdAt?.toDate ? selectedNotification.createdAt.toDate() : new Date(selectedNotification.createdAt), 'MMM dd, yyyy - hh:mm a') : 'N/A'}
+                      </Typography>
+                    </Box>
+                  </Box>
+                </Box>
+              </Card>
+
+            </Box>
+          </Box>
+        )
+      )}
     </Box>
   );
 };

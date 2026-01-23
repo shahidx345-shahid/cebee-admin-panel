@@ -30,6 +30,10 @@ import {
   CalendarToday,
   Person,
   Star,
+  SportsSoccer,
+  VerifiedUser,
+  HighlightOff,
+  Description,
 } from '@mui/icons-material';
 import { colors } from '../config/theme';
 import SearchBar from '../components/common/SearchBar';
@@ -52,12 +56,14 @@ const PollsPage = () => {
   const [selectedPoll, setSelectedPoll] = useState(null);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [pollDetails, setPollDetails] = useState(null);
+  const [closePollDialogOpen, setClosePollDialogOpen] = useState(false);
+  const [pollToClose, setPollToClose] = useState(null);
 
   useEffect(() => {
     const loadPolls = async () => {
       try {
         setLoading(true);
-        
+
         // Static demo data
         const demoPolls = [
           {
@@ -91,7 +97,7 @@ const PollsPage = () => {
             createdAt: new Date('2025-12-26T15:59:00'),
           },
         ];
-        
+
         setPolls(demoPolls);
         setFilteredPolls(demoPolls);
       } catch (error) {
@@ -166,16 +172,25 @@ const PollsPage = () => {
     setSelectedPoll(null);
   };
 
-  const handleClosePoll = async (poll) => {
+  const handleClosePoll = (poll) => {
+    setPollToClose(poll);
+    setClosePollDialogOpen(true);
+    handleMenuClose();
+  };
+
+  const confirmClosePoll = async () => {
+    if (!pollToClose) return;
+
     try {
       // Update local state
       const updatedPolls = polls.map((p) =>
-        p.id === poll.id ? { ...p, status: 'closed' } : p
+        p.id === pollToClose.id ? { ...p, status: 'closed' } : p
       );
       setPolls(updatedPolls);
       setFilteredPolls(updatedPolls);
-      handleMenuClose();
-      alert('Poll closed successfully!');
+      setClosePollDialogOpen(false);
+      setPollToClose(null);
+      alert('Poll closed successfully!'); // Keep alert for final feedback or remove if desired
     } catch (error) {
       console.error('Error closing poll:', error);
       alert('Failed to close poll');
@@ -483,132 +498,69 @@ const PollsPage = () => {
         </Grid>
       </Grid>
 
-      {/* Filter Buttons */}
-      <Box sx={{ mb: 3, display: 'flex', gap: 2.5, flexWrap: 'wrap' }}>
-        <Button
-          disableRipple
-          onClick={() => setStatusFilter('all')}
-          startIcon={<ViewModule />}
-          sx={{
-            minWidth: 240,
-            borderRadius: '20px',
-            textTransform: 'none',
-            fontWeight: 600,
-            fontSize: 15,
-            px: 3.5,
-            py: 2,
-            backgroundColor: statusFilter === 'all' ? colors.brandRed : colors.brandWhite,
-            color: statusFilter === 'all' ? colors.brandWhite : colors.brandRed,
-            border: statusFilter === 'all' ? 'none' : '1px solid #E5E7EB',
-            boxShadow: 'none !important',
-            '& .MuiButton-startIcon': {
-              color: statusFilter === 'all' ? colors.brandWhite : colors.brandRed,
-            },
-            '&:hover': {
-              backgroundColor: statusFilter === 'all' ? colors.brandDarkRed : '#F9FAFB',
-              boxShadow: 'none !important',
-            },
-            '&:active': {
-              backgroundColor: statusFilter === 'all' ? colors.brandDarkRed : '#F9FAFB',
-            },
-          }}
-        >
-          All Polls
-        </Button>
-        <Button
-          disableRipple
-          onClick={() => setStatusFilter('active')}
-          startIcon={<PieChart />}
-          sx={{
-            flex: 1,
-            minWidth: 180,
-            borderRadius: '20px',
-            textTransform: 'none',
-            fontWeight: 600,
-            fontSize: 15,
-            px: 3.5,
-            py: 2,
-            backgroundColor: statusFilter === 'active' ? '#10B981' : colors.brandWhite,
-            color: statusFilter === 'active' ? colors.brandWhite : '#10B981',
-            border: statusFilter === 'active' ? 'none' : '1px solid #E5E7EB',
-            boxShadow: 'none !important',
-            '& .MuiButton-startIcon': {
-              color: statusFilter === 'active' ? colors.brandWhite : '#10B981',
-            },
-            '&:hover': {
-              backgroundColor: statusFilter === 'active' ? '#059669' : '#F9FAFB',
-              boxShadow: 'none !important',
-            },
-            '&:active': {
-              backgroundColor: statusFilter === 'active' ? '#059669' : '#F9FAFB',
-            },
-          }}
-        >
-          Active
-        </Button>
-        <Button
-          disableRipple
-          onClick={() => setStatusFilter('scheduled')}
-          startIcon={<Schedule />}
-          sx={{
-            flex: 1,
-            minWidth: 180,
-            borderRadius: '20px',
-            textTransform: 'none',
-            fontWeight: 600,
-            fontSize: 15,
-            px: 3.5,
-            py: 2,
-            backgroundColor: statusFilter === 'scheduled' ? '#F59E0B' : colors.brandWhite,
-            color: statusFilter === 'scheduled' ? colors.brandWhite : '#F59E0B',
-            border: statusFilter === 'scheduled' ? 'none' : '1px solid #E5E7EB',
-            boxShadow: 'none !important',
-            '& .MuiButton-startIcon': {
-              color: statusFilter === 'scheduled' ? colors.brandWhite : '#F59E0B',
-            },
-            '&:hover': {
-              backgroundColor: statusFilter === 'scheduled' ? '#D97706' : '#F9FAFB',
-              boxShadow: 'none !important',
-            },
-            '&:active': {
-              backgroundColor: statusFilter === 'scheduled' ? '#D97706' : '#F9FAFB',
-            },
-          }}
-        >
-          Pending
-        </Button>
-        <Button
-          disableRipple
-          onClick={() => setStatusFilter('closed')}
-          startIcon={<CheckCircle />}
-          sx={{
-            flex: 1,
-            minWidth: 180,
-            borderRadius: '20px',
-            textTransform: 'none',
-            fontWeight: 600,
-            fontSize: 15,
-            px: 3.5,
-            py: 2,
-            backgroundColor: statusFilter === 'closed' ? '#6B7280' : colors.brandWhite,
-            color: statusFilter === 'closed' ? colors.brandWhite : '#6B7280',
-            border: statusFilter === 'closed' ? 'none' : '1px solid #E5E7EB',
-            boxShadow: 'none !important',
-            '& .MuiButton-startIcon': {
-              color: statusFilter === 'closed' ? colors.brandWhite : '#6B7280',
-            },
-            '&:hover': {
-              backgroundColor: statusFilter === 'closed' ? '#4B5563' : '#F9FAFB',
-              boxShadow: 'none !important',
-            },
-            '&:active': {
-              backgroundColor: statusFilter === 'closed' ? '#4B5563' : '#F9FAFB',
-            },
-          }}
-        >
-          Closed
-        </Button>
-      </Box>
+      {/* Filter Strip */}
+      <Card
+        sx={{
+          mb: 3,
+          p: 1,
+          borderRadius: '20px',
+          backgroundColor: colors.brandWhite,
+          border: 'none',
+          boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)',
+          display: 'flex',
+          gap: 1,
+          overflowX: 'auto',
+        }}
+      >
+        {[
+          { id: 'all', label: 'All Polls', icon: <ViewModule />, color: colors.brandRed, bgColor: '#FEE2E2' },
+          { id: 'active', label: 'Active', icon: <PieChart />, color: '#10B981', bgColor: '#D1FAE5' },
+          { id: 'scheduled', label: 'Pending', icon: <Schedule />, color: '#F59E0B', bgColor: '#FEF3C7' },
+          { id: 'closed', label: 'Closed', icon: <CheckCircle />, color: '#6B7280', bgColor: '#F3F4F6' },
+        ].map((item) => {
+          const isSelected = statusFilter === item.id;
+          return (
+            <Button
+              key={item.id}
+              onClick={() => setStatusFilter(item.id)}
+              disableRipple
+              sx={{
+                flex: 1,
+                minWidth: 120,
+                borderRadius: '16px',
+                textTransform: 'none',
+                fontWeight: 700,
+                fontSize: 15,
+                py: 1.5,
+                backgroundColor: isSelected ? item.color : 'transparent',
+                color: isSelected ? colors.brandWhite : colors.brandBlack,
+                transition: 'all 0.2s',
+                '&:hover': {
+                  backgroundColor: isSelected ? item.color : item.bgColor,
+                },
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <Box
+                  sx={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: '8px',
+                    backgroundColor: isSelected ? 'rgba(255, 255, 255, 0.2)' : item.bgColor,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: isSelected ? colors.brandWhite : item.color,
+                  }}
+                >
+                  {React.cloneElement(item.icon, { sx: { fontSize: 18 } })}
+                </Box>
+                {item.label}
+              </Box>
+            </Button>
+          );
+        })}
+      </Card>
 
       {/* Search Bar and Create Button */}
       <Card
@@ -814,7 +766,7 @@ const PollsPage = () => {
                 <Typography variant="h6" sx={{ fontWeight: 600, fontSize: 16, mb: 2, color: colors.brandBlack }}>
                   Poll Information
                 </Typography>
-                
+
                 <Box sx={{ display: 'flex', flexDirection: 'column' }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 2, borderBottom: `1px solid #E5E7EB` }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
@@ -871,7 +823,7 @@ const PollsPage = () => {
                 <Typography variant="h6" sx={{ fontWeight: 600, fontSize: 16, mb: 2, color: colors.brandBlack }}>
                   Timing
                 </Typography>
-                
+
                 <Box sx={{ display: 'flex', flexDirection: 'column' }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 2, borderBottom: `1px solid #E5E7EB` }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
@@ -904,7 +856,7 @@ const PollsPage = () => {
                 <Typography variant="h6" sx={{ fontWeight: 600, fontSize: 16, mb: 2, color: colors.brandBlack }}>
                   Admin Details
                 </Typography>
-                
+
                 <Box sx={{ display: 'flex', flexDirection: 'column' }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 2, borderBottom: `1px solid #E5E7EB` }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
@@ -974,6 +926,190 @@ const PollsPage = () => {
             </DialogContent>
           </>
         )}
+      </Dialog>
+
+      {/* Close Poll Confirmation Dialog */}
+      <Dialog
+        open={closePollDialogOpen}
+        onClose={() => setClosePollDialogOpen(false)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: '20px',
+            overflow: 'hidden',
+            maxWidth: '700px',
+          },
+        }}
+      >
+        <Box sx={{ p: 0 }}>
+          {/* Header */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, p: 3, pb: 1 }}>
+            <HighlightOff sx={{ color: colors.brandRed, fontSize: 28 }} />
+            <Typography variant="h5" sx={{ fontWeight: 700, color: colors.brandBlack }}>
+              Close Poll Manually
+            </Typography>
+          </Box>
+
+          <DialogContent sx={{ p: 3, pt: 1 }}>
+            {/* Header Info Card */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 4 }}>
+              <Box
+                sx={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: '12px',
+                  backgroundColor: '#FEF2F2',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: '1px solid #FECACA',
+                }}
+              >
+                <SportsSoccer sx={{ fontSize: 24, color: colors.brandRed }} />
+              </Box>
+              <Box>
+                <Typography variant="h6" sx={{ fontWeight: 700, fontSize: 18, lineHeight: 1.2 }}>
+                  {pollToClose?.leagueName || 'League Name'}
+                </Typography>
+                <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 14 }}>
+                  {pollToClose?.voteCount?.toLocaleString() || 0} total votes
+                </Typography>
+              </Box>
+            </Box>
+
+            {/* Results Section */}
+            <Typography variant="subtitle2" sx={{ color: colors.textSecondary, mb: 1.5, fontWeight: 600 }}>
+              Current Results (Admin Only)
+            </Typography>
+            <Box
+              sx={{
+                backgroundColor: '#FEF2F2',
+                borderRadius: '16px',
+                p: 2,
+                mb: 3,
+                border: '1px solid #FECACA',
+              }}
+            >
+              {/* Mock Data Matching Screenshot */}
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Star sx={{ fontSize: 16, color: '#F59E0B' }} />
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: colors.brandRed, fontSize: 14 }}>
+                    Real Madrid
+                  </Typography>
+                </Box>
+                <Typography variant="body2" sx={{ fontWeight: 700, color: colors.brandRed, fontSize: 14 }}>
+                  38.2%
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5, pl: 2.5 }}>
+                <Typography variant="body2" sx={{ fontWeight: 500, color: colors.brandBlack, fontSize: 14 }}>
+                  Barcelona
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 500, color: colors.brandBlack, fontSize: 14 }}>
+                  32.1%
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5, pl: 2.5 }}>
+                <Typography variant="body2" sx={{ fontWeight: 500, color: colors.brandBlack, fontSize: 14 }}>
+                  Atletico Madrid
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 500, color: colors.brandBlack, fontSize: 14 }}>
+                  18.5%
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pl: 2.5 }}>
+                <Typography variant="body2" sx={{ fontWeight: 500, color: colors.brandBlack, fontSize: 14 }}>
+                  Sevilla
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 500, color: colors.brandBlack, fontSize: 14 }}>
+                  11.2%
+                </Typography>
+              </Box>
+            </Box>
+
+            {/* Featured Match Banner */}
+            <Box
+              sx={{
+                backgroundColor: '#ECFDF5',
+                borderRadius: '12px',
+                p: 1.5,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.5,
+                border: '1px solid #6EE7B7',
+                mb: 3
+              }}
+            >
+              <VerifiedUser sx={{ color: '#10B981', fontSize: 20 }} />
+              <Typography variant="body2" sx={{ color: '#065F46', fontWeight: 600, fontSize: 14 }}>
+                Featured Match: Real Madrid vs Barcelona
+              </Typography>
+            </Box>
+
+            {/* Log Warning */}
+            <Box
+              sx={{
+                backgroundColor: '#FFF7ED',
+                borderRadius: '16px',
+                p: 2,
+                border: '1px solid #FED7AA',
+                display: 'flex',
+                gap: 2
+              }}
+            >
+              <Description sx={{ color: '#F59E0B', fontSize: 24, mt: 0.5 }} />
+              <Box>
+                <Typography variant="subtitle2" sx={{ color: '#F97316', fontWeight: 700, mb: 0.5 }}>
+                  This action will be logged:
+                </Typography>
+                <Typography variant="caption" sx={{ color: colors.textSecondary, display: 'block', lineHeight: 1.6 }}>
+                  • Close Type: Manual <br />
+                  • Closed By: Super Admin <br />
+                  • Closed At: {format(new Date(), 'MMM dd, yyyy HH:mm')}
+                </Typography>
+              </Box>
+            </Box>
+
+          </DialogContent>
+
+          <Box sx={{ p: 3, pt: 0, display: 'flex', justifyContent: 'flex-end', gap: 1.5 }}>
+            <Button
+              onClick={() => setClosePollDialogOpen(false)}
+              variant="text"
+              sx={{
+                color: colors.textSecondary,
+                fontWeight: 600,
+                textTransform: 'none',
+                fontSize: 15,
+                '&:hover': { backgroundColor: '#F3F4F6' }
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={confirmClosePoll}
+              variant="contained"
+              sx={{
+                backgroundColor: '#DC2626',
+                color: 'white',
+                fontWeight: 700,
+                textTransform: 'none',
+                borderRadius: '8px',
+                px: 3,
+                fontSize: 15,
+                boxShadow: 'none',
+                '&:hover': {
+                  backgroundColor: '#B91C1C',
+                  boxShadow: 'none',
+                }
+              }}
+            >
+              Close Poll
+            </Button>
+          </Box>
+        </Box>
       </Dialog>
     </Box>
   );

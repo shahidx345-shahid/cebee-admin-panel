@@ -13,6 +13,7 @@ import {
   Button,
   IconButton,
   Menu,
+  Tooltip,
 } from '@mui/material';
 import {
   CardGiftcard,
@@ -24,10 +25,21 @@ import {
   Public,
   MoreVert,
   CalendarToday,
+  ArrowUpward,
+  ArrowDownward,
+  Check,
+  Flag,
+  Navigation,
+  Sort,
+  CheckCircleOutline,
+  Campaign,
+  Warning,
+  EmojiEvents,
 } from '@mui/icons-material';
 import { colors, constants } from '../config/theme';
 import SearchBar from '../components/common/SearchBar';
 import DataTable from '../components/common/DataTable';
+import ReferralDetailsView from '../components/referrals/ReferralDetailsView';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { format } from 'date-fns';
@@ -46,6 +58,24 @@ const ReferralsPage = () => {
   const [dateMenuAnchor, setDateMenuAnchor] = useState(null);
   const [statusMenuAnchor, setStatusMenuAnchor] = useState(null);
   const [countryMenuAnchor, setCountryMenuAnchor] = useState(null);
+  const [selectedReferral, setSelectedReferral] = useState(null);
+  const [actionMenuAnchor, setActionMenuAnchor] = useState(null);
+  const [selectedRowForAction, setSelectedRowForAction] = useState(null);
+
+  const handleActionMenuOpen = (event, row) => {
+    setActionMenuAnchor(event.currentTarget);
+    setSelectedRowForAction(row);
+  };
+
+  const handleActionMenuClose = () => {
+    setActionMenuAnchor(null);
+    setSelectedRowForAction(null);
+  };
+
+  const handleViewDetails = () => {
+    setSelectedReferral(selectedRowForAction);
+    handleActionMenuClose();
+  };
 
   useEffect(() => {
     loadReferrals();
@@ -58,15 +88,19 @@ const ReferralsPage = () => {
   const loadReferrals = async () => {
     try {
       setLoading(true);
-      const referralsRef = collection(db, 'referrals');
-      const q = query(referralsRef, orderBy('referralDate', 'desc'));
-      const snapshot = await getDocs(q);
-      const referralsData = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setReferrals(referralsData);
-      setFilteredReferrals(referralsData);
+      // Mock Data matching screenshot with Phase 1 refinements
+      const mockReferrals = [
+        { id: '1', referrerId: 'USR_1001', referrerUsername: 'PredictionMaster', referrerEmail: 'predmaster@example.com', referrerCountry: 'Nigeria', referredId: 'USR_2001', referredUsername: 'FootballFan2025', referredEmail: 'footballfan2025@example.com', referredCountry: 'Algeria', cpAwarded: 10, status: 'valid', referralDate: new Date('2025-12-15'), source: 'Invite Link', risk: false },
+        { id: '2', referrerId: 'USR_1002', referrerUsername: 'AfricanLegend', referrerEmail: 'legend@example.com', referrerCountry: 'Ghana', referredId: 'USR_2002', referredUsername: 'MatchMaster', referredEmail: 'matchmaster@example.com', referredCountry: 'Ivory Coast', cpAwarded: 10, status: 'valid', referralDate: new Date('2025-12-12'), source: 'Manual Code', risk: false },
+        { id: '3', referrerId: 'USR_1003', referrerUsername: 'GoalMachine', referrerEmail: 'goalmachine@example.com', referrerCountry: 'Kenya', referredId: 'USR_2003', referredUsername: 'TopScorer', referredEmail: 'topscorer@example.com', referredCountry: 'Senegal', cpAwarded: 10, status: 'valid', referralDate: new Date('2025-12-10'), source: 'Campaign', risk: false },
+        { id: '4', referrerId: 'USR_1004', referrerUsername: 'ScoreKing', referrerEmail: 'scoreking@example.com', referrerCountry: 'South Africa', referredId: 'USR_2004', referredUsername: 'ProPredictor', referredEmail: 'propredictor@example.com', referredCountry: 'Uganda', cpAwarded: 0, status: 'flagged', statusReason: 'Duplicate device detected', referralDate: new Date('2025-12-08'), source: 'Invite Link', risk: true, riskReason: 'Duplicate IP' },
+        { id: '5', referrerId: 'USR_1005', referrerUsername: 'ChiefPredictor', referrerEmail: 'chief@example.com', referrerCountry: 'Egypt', referredId: 'USR_2005', referredUsername: 'WinnerTakes', referredEmail: 'winnertakes@example.com', referredCountry: 'Tanzania', cpAwarded: 10, status: 'valid', referralDate: new Date('2025-12-05'), source: 'Invite Link', risk: false },
+        { id: '6', referrerId: 'USR_1006', referrerUsername: 'FootballWizard', referrerEmail: 'wizard@example.com', referrerCountry: 'Morocco', referredId: 'USR_2006', referredUsername: 'BetKing', referredEmail: 'betking@example.com', referredCountry: 'Cameroon', cpAwarded: 10, status: 'valid', referralDate: new Date('2025-12-01'), source: 'Manual Code', risk: false },
+        { id: '7', referrerId: 'USR_1007', referrerUsername: 'KingOfPredictions', referrerEmail: 'kingpred@example.com', referrerCountry: 'Nigeria', referredId: 'USR_2007', referredUsername: 'MatchDay', referredEmail: 'matchday@example.com', referredCountry: 'Morocco', cpAwarded: 0, status: 'invalid', statusReason: 'Self-referral', referralDate: new Date('2025-11-28'), source: 'Invite Link', risk: true, riskReason: 'Self-referral' },
+      ];
+
+      setReferrals(mockReferrals);
+      setFilteredReferrals(mockReferrals);
     } catch (error) {
       console.error('Error loading referrals:', error);
     } finally {
@@ -135,7 +169,16 @@ const ReferralsPage = () => {
 
   const validReferrals = referrals.filter((r) => (r.status || r.referralStatus) === 'valid' || (r.status || r.referralStatus) === 'completed');
   const totalCPIssued = referrals.reduce((sum, r) => sum + (r.cpAwarded || r.cpEarned || 0), 0);
-  const uniqueReferrers = new Set(referrals.map((r) => r.referrerUsername || r.referrerId)).size;
+
+  // Phase 1 Breakdown Calculations
+  const currentMonth = new Date().getMonth();
+  const currentYear = new Date().getFullYear();
+  const monthlyReferrals = referrals.filter(r => {
+    const d = r.referralDate instanceof Date ? r.referralDate : new Date(r.referralDate);
+    return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+  });
+  const cpIssuedThisMonth = monthlyReferrals.reduce((sum, r) => sum + (r.cpAwarded || 0), 0);
+
 
   const getDateSortLabel = () => {
     switch (selectedSort) {
@@ -173,25 +216,31 @@ const ReferralsPage = () => {
     setCountryMenuAnchor(null);
   };
 
-  const getStatusChip = (status) => {
+  const getStatusChip = (status, reason) => {
     const isValid = status === 'valid' || status === 'completed';
+    const isFlagged = status === 'flagged' || status === 'invalid';
+
     return (
-      <Chip
-        icon={<CheckCircle sx={{ fontSize: 14 }} />}
-        label="VALID"
-        size="small"
-        sx={{
-          backgroundColor: colors.success,
-          color: colors.brandWhite,
-          fontWeight: 700,
-          fontSize: 11,
-          borderRadius: '20px',
-          height: 24,
-          '& .MuiChip-icon': {
-            color: colors.brandWhite,
-          },
-        }}
-      />
+      <Tooltip title={reason || (isValid ? 'Valid Referral' : 'Status info')} arrow>
+        <Chip
+          icon={isValid ? <CheckCircle sx={{ fontSize: 14 }} /> : <Flag sx={{ fontSize: 14 }} />}
+          label={status.toUpperCase()}
+          size="small"
+          variant="outlined"
+          sx={{
+            backgroundColor: isValid ? '#F0FDF4' : '#FEF2F2',
+            borderColor: isValid ? colors.success : colors.error,
+            color: isValid ? colors.success : colors.error,
+            fontWeight: 700,
+            fontSize: 11,
+            borderRadius: '6px',
+            height: 24,
+            '& .MuiChip-icon': {
+              color: isValid ? colors.success : colors.error,
+            },
+          }}
+        />
+      </Tooltip>
     );
   };
 
@@ -200,9 +249,16 @@ const ReferralsPage = () => {
       id: 'referrer',
       label: 'Referrer',
       render: (_, row) => (
-        <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack }}>
             {row.referrerUsername || 'N/A'}
           </Typography>
+          {row.risk && (
+            <Tooltip title="Flagged for internal review" arrow>
+              <Warning sx={{ fontSize: 16, color: colors.warning }} />
+            </Tooltip>
+          )}
+        </Box>
       ),
     },
     {
@@ -210,8 +266,24 @@ const ReferralsPage = () => {
       label: 'Referred User',
       render: (_, row) => (
         <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack }}>
-            {row.referredUsername || 'N/A'}
-          </Typography>
+          {row.referredUsername || 'N/A'}
+        </Typography>
+      ),
+    },
+    {
+      id: 'source',
+      label: 'Source',
+      render: (value) => (
+        <Chip
+          label={value || 'Invite Link'}
+          size="small"
+          sx={{
+            height: 20,
+            fontSize: 10,
+            bgcolor: '#F3F4F6',
+            color: colors.textSecondary
+          }}
+        />
       ),
     },
     {
@@ -240,11 +312,11 @@ const ReferralsPage = () => {
           label={`${value || 0} CP`}
           size="small"
           sx={{
-            backgroundColor: colors.warning,
-            color: colors.brandWhite,
+            backgroundColor: '#FFF7ED',
+            color: '#EA580C',
             fontWeight: 700,
             fontSize: 11,
-            borderRadius: '20px',
+            borderRadius: '6px',
             height: 24,
           }}
         />
@@ -253,7 +325,7 @@ const ReferralsPage = () => {
     {
       id: 'status',
       label: 'Status',
-      render: (_, row) => getStatusChip(row.status || row.referralStatus),
+      render: (_, row) => getStatusChip(row.status || row.referralStatus, row.statusReason),
     },
     {
       id: 'referralDate',
@@ -271,16 +343,18 @@ const ReferralsPage = () => {
     {
       id: 'actions',
       label: 'Actions',
-      render: () => (
+      render: (_, row) => (
         <IconButton
           size="small"
+          onClick={(e) => handleActionMenuOpen(e, row)}
           sx={{
-            backgroundColor: colors.brandRed,
-            color: colors.brandWhite,
+            backgroundColor: '#FFEBEE',
+            color: colors.brandRed,
             width: 32,
             height: 32,
+            borderRadius: '8px',
             '&:hover': {
-              backgroundColor: colors.brandDarkRed,
+              backgroundColor: '#FFCDD2',
             },
           }}
         >
@@ -295,16 +369,53 @@ const ReferralsPage = () => {
     page * rowsPerPage + rowsPerPage
   );
 
+  if (selectedReferral) {
+    return <ReferralDetailsView referral={selectedReferral} onBack={() => setSelectedReferral(null)} />;
+  }
+
   return (
     <Box sx={{ width: '100%', maxWidth: '100%' }}>
+      {/* View Only Mode Banner */}
+      <Box
+        sx={{
+          mb: 3,
+          p: 2,
+          borderRadius: '12px',
+          backgroundColor: '#E3F2FD',
+          border: '1px solid #BBDEFB',
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 1.5,
+        }}
+      >
+        <Box
+          sx={{
+            color: '#1976D2',
+            mt: 0.25,
+          }}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" />
+          </svg>
+        </Box>
+        <Box sx={{ flex: 1 }}>
+          <Typography sx={{ fontWeight: 600, fontSize: 14, color: '#1976D2', mb: 0.5 }}>
+            View Only Mode (Phase 1)
+          </Typography>
+          <Typography sx={{ fontSize: 13, color: '#1976D2', lineHeight: 1.5 }}>
+            CP values are system-defined. Engagement and Campaign CP sources are coming in Phase 2.
+          </Typography>
+        </Box>
+      </Box>
+
       {/* Header */}
       <Box sx={{ mb: 3 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 0.5 }}>
           <Box
-        sx={{
+            sx={{
               width: 48,
               height: 48,
-          borderRadius: '12px',
+              borderRadius: '12px',
               background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
               display: 'flex',
               alignItems: 'center',
@@ -313,216 +424,177 @@ const ReferralsPage = () => {
           >
             <CardGiftcard sx={{ fontSize: 28, color: colors.brandWhite }} />
           </Box>
-      <Typography
-        variant="h4"
-        sx={{
-          fontWeight: 700,
-          color: colors.brandBlack,
-          fontSize: { xs: 24, md: 28 },
-        }}
-      >
-        Referral Management
-      </Typography>
+          <Typography
+            variant="h4"
+            sx={{
+              fontWeight: 700,
+              color: colors.brandBlack,
+              fontSize: { xs: 20, md: 22 },
+            }}
+          >
+            Referral Management
+          </Typography>
         </Box>
         <Typography
           variant="body2"
           sx={{
             color: colors.textSecondary,
-            fontSize: 14,
-            ml: 8.5,
+            fontSize: 13,
+            ml: 8,
           }}
         >
           Monitor referral activity and audit CP issued from referrals
         </Typography>
       </Box>
 
-      {/* Stats Cards */}
-      <Grid container spacing={2.5} sx={{ mb: 3 }}>
-        {/* Total Referrals */}
+      {/* CP Breakdown Stats Cards (Phase 1) */}
+      <Grid container spacing={2} sx={{ mb: 3 }}>
+        {/* Referral CP - Total */}
         <Grid item xs={6} md={3}>
           <Card
             sx={{
-              padding: 2.5,
+              padding: 3,
               borderRadius: '16px',
-              boxShadow: `0 4px 12px ${colors.shadow}14`,
-              backgroundColor: colors.brandWhite,
+              boxShadow: 'none',
+              backgroundColor: '#FFFBEB',
+              height: '100%',
+              minHeight: 180,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
             }}
           >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1.5 }}>
-              <Box
-                sx={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: '12px',
-                  backgroundColor: colors.brandRed,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <CardGiftcard sx={{ fontSize: 24, color: colors.brandWhite }} />
+            <Box sx={{ mb: 2, flexDirection: 'row', display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Box sx={{ width: 40, height: 40, borderRadius: '10px', backgroundColor: '#FEF3C7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Star sx={{ fontSize: 20, color: '#D97706' }} />
               </Box>
-              <Box sx={{ flexGrow: 1 }}>
-                <Typography variant="h4" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.25 }}>
-                  {referrals.length}
-                </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack, fontSize: 14 }}>
-                  Total Referrals
-                </Typography>
-              </Box>
+              <Typography sx={{ fontSize: 14, fontWeight: 600, color: colors.textSecondary }}>Referral CP (Total)</Typography>
             </Box>
-            <Typography variant="caption" sx={{ color: colors.textSecondary, fontSize: 12 }}>
-              All referrals recorded
+            <Typography sx={{ fontWeight: 700, color: colors.brandBlack, fontSize: 28, mb: 0.5 }}>
+              {totalCPIssued}
             </Typography>
+            <Typography sx={{ color: colors.textSecondary, fontSize: 12 }}>Lifetime Earned</Typography>
           </Card>
         </Grid>
 
-        {/* Valid Referrals */}
+        {/* Referral CP - This Month */}
         <Grid item xs={6} md={3}>
           <Card
             sx={{
-              padding: 2.5,
+              padding: 3,
               borderRadius: '16px',
-              boxShadow: `0 4px 12px ${colors.shadow}14`,
-              backgroundColor: colors.brandWhite,
+              boxShadow: 'none',
+              backgroundColor: '#FFFBEB',
+              height: '100%',
+              minHeight: 180,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
             }}
           >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1.5 }}>
-              <Box
-                sx={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: '12px',
-                  backgroundColor: colors.success,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <CheckCircle sx={{ fontSize: 24, color: colors.brandWhite }} />
+            <Box sx={{ mb: 2, flexDirection: 'row', display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Box sx={{ width: 40, height: 40, borderRadius: '10px', backgroundColor: '#FEF3C7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Star sx={{ fontSize: 20, color: '#D97706' }} />
               </Box>
-              <Box sx={{ flexGrow: 1 }}>
-                <Typography variant="h4" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.25 }}>
-                  {validReferrals.length}
-                </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack, fontSize: 14 }}>
-                  Valid Referrals
-                </Typography>
-              </Box>
+              <Typography sx={{ fontSize: 14, fontWeight: 600, color: colors.textSecondary }}>Referral CP (Month)</Typography>
             </Box>
-            <Typography variant="caption" sx={{ color: colors.textSecondary, fontSize: 12 }}>
-              CP successfully issued
+            <Typography sx={{ fontWeight: 700, color: colors.brandBlack, fontSize: 28, mb: 0.5 }}>
+              {cpIssuedThisMonth}
             </Typography>
+            <Typography sx={{ color: colors.textSecondary, fontSize: 12 }}>Current Month</Typography>
           </Card>
         </Grid>
 
-        {/* CP Issued (Total) */}
+        {/* Engagement CP - Phase 2 */}
         <Grid item xs={6} md={3}>
           <Card
             sx={{
-              padding: 2.5,
+              padding: 3,
               borderRadius: '16px',
-              boxShadow: `0 4px 12px ${colors.shadow}14`,
-              backgroundColor: colors.brandWhite,
+              boxShadow: 'none',
+              backgroundColor: '#F3F4F6', // Grey for inactive
+              height: '100%',
+              minHeight: 180,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              border: '1px dashed #D1D5DB'
             }}
           >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1.5 }}>
-              <Box
-                sx={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: '12px',
-                  backgroundColor: colors.warning,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Star sx={{ fontSize: 24, color: colors.brandWhite }} />
+            <Box sx={{ mb: 2, flexDirection: 'row', display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Box sx={{ width: 40, height: 40, borderRadius: '10px', backgroundColor: '#E5E7EB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <EmojiEvents sx={{ fontSize: 20, color: '#9CA3AF' }} />
               </Box>
-              <Box sx={{ flexGrow: 1 }}>
-                <Typography variant="h4" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.25 }}>
-                  {totalCPIssued}
-                </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack, fontSize: 14 }}>
-                  CP Issued (Total)
-                </Typography>
-              </Box>
+              <Typography sx={{ fontSize: 14, fontWeight: 600, color: '#9CA3AF' }}>Engagement CP</Typography>
             </Box>
-            <Typography variant="caption" sx={{ color: colors.textSecondary, fontSize: 12 }}>
-              CeBee Points awarded
+            <Typography sx={{ fontWeight: 700, color: '#9CA3AF', fontSize: 20, mb: 0.5 }}>
+              Phase 2
             </Typography>
+            <Chip label="Coming Soon" size="small" sx={{ alignSelf: 'flex-start', height: 20, fontSize: 10, bgcolor: '#E5E7EB', color: '#6B7280' }} />
           </Card>
         </Grid>
 
-        {/* Unique Referrers */}
+        {/* Campaign CP - Phase 2 */}
         <Grid item xs={6} md={3}>
-            <Card
-              sx={{
-              padding: 2.5,
-                borderRadius: '16px',
-              boxShadow: `0 4px 12px ${colors.shadow}14`,
-              backgroundColor: colors.brandWhite,
+          <Card
+            sx={{
+              padding: 3,
+              borderRadius: '16px',
+              boxShadow: 'none',
+              backgroundColor: '#F3F4F6', // Grey for inactive
+              height: '100%',
+              minHeight: 180,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              border: '1px dashed #D1D5DB'
             }}
           >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1.5 }}>
-              <Box
-                sx={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: '12px',
-                  backgroundColor: colors.info,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <PersonAdd sx={{ fontSize: 24, color: colors.brandWhite }} />
+            <Box sx={{ mb: 2, flexDirection: 'row', display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Box sx={{ width: 40, height: 40, borderRadius: '10px', backgroundColor: '#E5E7EB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Campaign sx={{ fontSize: 20, color: '#9CA3AF' }} />
               </Box>
-              <Box sx={{ flexGrow: 1 }}>
-                <Typography variant="h4" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.25 }}>
-                  {uniqueReferrers}
-                </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack, fontSize: 14 }}>
-                  Unique Referrers
-              </Typography>
-              </Box>
+              <Typography sx={{ fontSize: 14, fontWeight: 600, color: '#9CA3AF' }}>Campaign CP</Typography>
             </Box>
-            <Typography variant="caption" sx={{ color: colors.textSecondary, fontSize: 12 }}>
-              Users who referred others
-              </Typography>
-            </Card>
-          </Grid>
+            <Typography sx={{ fontWeight: 700, color: '#9CA3AF', fontSize: 20, mb: 0.5 }}>
+              Phase 2
+            </Typography>
+            <Chip label="Coming Soon" size="small" sx={{ alignSelf: 'flex-start', height: 20, fontSize: 10, bgcolor: '#E5E7EB', color: '#6B7280' }} />
+          </Card>
+        </Grid>
       </Grid>
 
       {/* Search and Filter Bar */}
       <Box sx={{ mb: 3, display: 'flex', gap: 1.5, flexWrap: 'wrap', alignItems: 'center' }}>
         <Box sx={{ flexGrow: 1, minWidth: 300 }}>
-            <SearchBar
-              value={searchQuery}
-              onChange={setSearchQuery}
+          <SearchBar
+            value={searchQuery}
+            onChange={setSearchQuery}
             placeholder="Search by referrer, referred user, email, or ID..."
           />
         </Box>
         <Button
           variant="outlined"
           onClick={(e) => setDateMenuAnchor(e.currentTarget)}
-          endIcon={<ArrowDropDown sx={{ color: colors.brandRed }} />}
+          endIcon={<ArrowDropDown sx={{ fontSize: 20, color: colors.brandRed }} />}
           startIcon={
-            <Box sx={{ color: colors.brandRed }}>
+            <Box sx={{ color: colors.brandRed, display: 'flex', alignItems: 'center' }}>
               <CalendarToday sx={{ fontSize: 18 }} />
             </Box>
           }
           sx={{
-            borderRadius: '20px',
+            borderRadius: '12px',
             textTransform: 'none',
             fontWeight: 600,
-            px: 3,
-            py: 1.5,
+            px: 2.5,
+            py: 1.2,
+            fontSize: 14,
             color: colors.brandRed,
-            borderColor: `${colors.divider}66`,
+            backgroundColor: '#FFF5F5',
+            borderColor: '#FFCDD2',
+            borderWidth: '1px',
             '&:hover': {
-              backgroundColor: `${colors.divider}0D`,
+              backgroundColor: '#FFEBEE',
               borderColor: colors.brandRed,
             },
           }}
@@ -532,22 +604,25 @@ const ReferralsPage = () => {
         <Button
           variant="outlined"
           onClick={(e) => setStatusMenuAnchor(e.currentTarget)}
-          endIcon={<ArrowDropDown sx={{ color: colors.brandRed }} />}
+          endIcon={<ArrowDropDown sx={{ fontSize: 20, color: colors.brandRed }} />}
           startIcon={
-            <Box sx={{ color: colors.brandRed }}>
+            <Box sx={{ color: colors.brandRed, display: 'flex', alignItems: 'center' }}>
               <ViewModule sx={{ fontSize: 18 }} />
             </Box>
           }
           sx={{
-            borderRadius: '20px',
+            borderRadius: '12px',
             textTransform: 'none',
             fontWeight: 600,
-            px: 3,
-            py: 1.5,
+            px: 2.5,
+            py: 1.2,
+            fontSize: 14,
             color: colors.brandRed,
-            borderColor: `${colors.divider}66`,
+            backgroundColor: '#FFF5F5',
+            borderColor: '#FFCDD2',
+            borderWidth: '1px',
             '&:hover': {
-              backgroundColor: `${colors.divider}0D`,
+              backgroundColor: '#FFEBEE',
               borderColor: colors.brandRed,
             },
           }}
@@ -557,29 +632,31 @@ const ReferralsPage = () => {
         <Button
           variant="outlined"
           onClick={(e) => setCountryMenuAnchor(e.currentTarget)}
-          endIcon={<ArrowDropDown sx={{ color: colors.brandRed }} />}
+          endIcon={<ArrowDropDown sx={{ fontSize: 20, color: colors.brandRed }} />}
           startIcon={
-            <Box sx={{ color: colors.brandRed }}>
+            <Box sx={{ color: colors.brandRed, display: 'flex', alignItems: 'center' }}>
               <Public sx={{ fontSize: 18 }} />
             </Box>
           }
           sx={{
-            borderRadius: '20px',
+            borderRadius: '12px',
             textTransform: 'none',
             fontWeight: 600,
-            px: 3,
-            py: 1.5,
+            px: 2.5,
+            py: 1.2,
+            fontSize: 14,
             color: colors.brandRed,
-            borderColor: `${colors.divider}66`,
+            backgroundColor: '#FFF5F5',
+            borderColor: '#FFCDD2',
+            borderWidth: '1px',
             '&:hover': {
-              backgroundColor: `${colors.divider}0D`,
+              backgroundColor: '#FFEBEE',
               borderColor: colors.brandRed,
             },
           }}
         >
           {getCountryLabel()}
         </Button>
-
         {/* Date Menu */}
         <Menu
           anchorEl={dateMenuAnchor}
@@ -587,14 +664,77 @@ const ReferralsPage = () => {
           onClose={() => handleDateMenuClose(null)}
           PaperProps={{
             sx: {
-              borderRadius: '12px',
+              borderRadius: '16px',
               mt: 1,
-              minWidth: 200,
+              minWidth: 240,
+              boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+              p: 1,
             },
           }}
         >
-          <MenuItem onClick={() => handleDateMenuClose('dateNewest')}>Newest</MenuItem>
-          <MenuItem onClick={() => handleDateMenuClose('dateOldest')}>Oldest</MenuItem>
+          {[
+            { value: 'dateNewest', label: 'Date: Newest First', icon: <ArrowDownward sx={{ fontSize: 18 }} /> },
+            { value: 'dateOldest', label: 'Date: Oldest First', icon: <ArrowUpward sx={{ fontSize: 18 }} /> },
+            { value: 'referrerAZ', label: 'Referrer: A-Z', icon: <Sort sx={{ fontSize: 18 }} /> },
+            { value: 'referrerZA', label: 'Referrer: Z-A', icon: <Sort sx={{ fontSize: 18, transform: 'scaleY(-1)' }} /> },
+          ].map((option) => (
+            <MenuItem
+              key={option.value}
+              onClick={() => handleDateMenuClose(option.value)}
+              sx={{
+                mb: 0.5,
+                borderRadius: '12px',
+                py: 1.5,
+                px: 2,
+                backgroundColor: selectedSort === option.value ? '#FFEBEE' : 'transparent',
+                border: selectedSort === option.value ? `1px solid ${colors.brandRed}40` : '1px solid transparent',
+                '&:hover': {
+                  backgroundColor: selectedSort === option.value ? '#FFEBEE' : colors.backgroundLight,
+                },
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 1, gap: 2 }}>
+                <Box
+                  sx={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: '10px',
+                    backgroundColor: selectedSort === option.value ? '#FFCDD2' : '#F5F5F5',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: selectedSort === option.value ? colors.brandRed : colors.textSecondary,
+                  }}
+                >
+                  {option.icon}
+                </Box>
+                <Typography
+                  sx={{
+                    fontWeight: selectedSort === option.value ? 700 : 500,
+                    color: selectedSort === option.value ? colors.brandBlack : colors.textPrimary,
+                    fontSize: 14,
+                  }}
+                >
+                  {option.label}
+                </Typography>
+              </Box>
+              {selectedSort === option.value && (
+                <Box
+                  sx={{
+                    width: 24,
+                    height: 24,
+                    borderRadius: '50%',
+                    backgroundColor: '#FFCDD2',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Check sx={{ fontSize: 14, color: colors.brandRed }} />
+                </Box>
+              )}
+            </MenuItem>
+          ))}
         </Menu>
 
         {/* Status Menu */}
@@ -604,17 +744,76 @@ const ReferralsPage = () => {
           onClose={() => handleStatusMenuClose(null)}
           PaperProps={{
             sx: {
-              borderRadius: '12px',
+              borderRadius: '16px',
               mt: 1,
-              minWidth: 200,
+              minWidth: 240,
+              boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+              p: 1,
             },
           }}
         >
-          <MenuItem onClick={() => handleStatusMenuClose('all')}>All Statuses</MenuItem>
-          <MenuItem onClick={() => handleStatusMenuClose('valid')}>Valid</MenuItem>
-          <MenuItem onClick={() => handleStatusMenuClose('completed')}>Completed</MenuItem>
-          <MenuItem onClick={() => handleStatusMenuClose('pending')}>Pending</MenuItem>
-          <MenuItem onClick={() => handleStatusMenuClose('failed')}>Failed</MenuItem>
+          {[
+            { value: 'all', label: 'All Statuses', icon: <ViewModule sx={{ fontSize: 18 }} /> },
+            { value: 'valid', label: 'Valid', icon: <CheckCircleOutline sx={{ fontSize: 18 }} /> },
+            { value: 'flagged', label: 'Flagged', icon: <Flag sx={{ fontSize: 18 }} /> },
+          ].map((option) => (
+            <MenuItem
+              key={option.value}
+              onClick={() => handleStatusMenuClose(option.value)}
+              sx={{
+                mb: 0.5,
+                borderRadius: '12px',
+                py: 1.5,
+                px: 2,
+                backgroundColor: statusFilter === option.value ? '#FFEBEE' : 'transparent',
+                border: statusFilter === option.value ? `1px solid ${colors.brandRed}40` : '1px solid transparent',
+                '&:hover': {
+                  backgroundColor: statusFilter === option.value ? '#FFEBEE' : colors.backgroundLight,
+                },
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 1, gap: 2 }}>
+                <Box
+                  sx={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: '10px',
+                    backgroundColor: statusFilter === option.value ? '#FFCDD2' : '#F5F5F5',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: statusFilter === option.value ? colors.brandRed : colors.textSecondary,
+                  }}
+                >
+                  {option.icon}
+                </Box>
+                <Typography
+                  sx={{
+                    fontWeight: statusFilter === option.value ? 700 : 500,
+                    color: statusFilter === option.value ? colors.brandBlack : colors.textPrimary,
+                    fontSize: 14,
+                  }}
+                >
+                  {option.label}
+                </Typography>
+              </Box>
+              {statusFilter === option.value && (
+                <Box
+                  sx={{
+                    width: 24,
+                    height: 24,
+                    borderRadius: '50%',
+                    backgroundColor: '#FFCDD2',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Check sx={{ fontSize: 14, color: colors.brandRed }} />
+                </Box>
+              )}
+            </MenuItem>
+          ))}
         </Menu>
 
         {/* Country Menu */}
@@ -624,18 +823,132 @@ const ReferralsPage = () => {
           onClose={() => handleCountryMenuClose(null)}
           PaperProps={{
             sx: {
-              borderRadius: '12px',
+              borderRadius: '16px',
               mt: 1,
-              minWidth: 200,
+              minWidth: 240,
+              maxHeight: 400,
+              boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+              p: 1,
             },
           }}
         >
-          <MenuItem onClick={() => handleCountryMenuClose('all')}>All Countries</MenuItem>
-          {[...new Set(referrals.map((r) => r.referredCountry).filter(Boolean))].map((country) => (
-            <MenuItem key={country} onClick={() => handleCountryMenuClose(country)}>
-                    {country}
-                  </MenuItem>
-                ))}
+          <MenuItem
+            onClick={() => handleCountryMenuClose('all')}
+            sx={{
+              mb: 0.5,
+              borderRadius: '12px',
+              py: 1.5,
+              px: 2,
+              backgroundColor: countryFilter === 'all' ? '#FFEBEE' : 'transparent',
+              border: countryFilter === 'all' ? `1px solid ${colors.brandRed}40` : '1px solid transparent',
+              '&:hover': {
+                backgroundColor: countryFilter === 'all' ? '#FFEBEE' : colors.backgroundLight,
+              },
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 1, gap: 2 }}>
+              <Box
+                sx={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: '10px',
+                  backgroundColor: countryFilter === 'all' ? '#FFCDD2' : '#F5F5F5',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: countryFilter === 'all' ? colors.brandRed : colors.textSecondary,
+                }}
+              >
+                <Public sx={{ fontSize: 18 }} />
+              </Box>
+              <Typography
+                sx={{
+                  fontWeight: countryFilter === 'all' ? 700 : 500,
+                  color: countryFilter === 'all' ? colors.brandBlack : colors.textPrimary,
+                  fontSize: 14,
+                }}
+              >
+                All Countries
+              </Typography>
+            </Box>
+            {countryFilter === 'all' && (
+              <Box
+                sx={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: '50%',
+                  backgroundColor: '#FFCDD2',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Check sx={{ fontSize: 14, color: colors.brandRed }} />
+              </Box>
+            )}
+          </MenuItem>
+          {[
+            'Algeria', 'Cameroon', 'Egypt', 'Ghana', 'Ivory Coast',
+            'Kenya', 'Morocco', 'Nigeria', 'Senegal', 'South Africa',
+            'Tanzania', 'Uganda'
+          ].map((country) => (
+            <MenuItem
+              key={country}
+              onClick={() => handleCountryMenuClose(country)}
+              sx={{
+                mb: 0.5,
+                borderRadius: '12px',
+                py: 1.5,
+                px: 2,
+                backgroundColor: countryFilter === country ? '#FFEBEE' : 'transparent',
+                border: countryFilter === country ? `1px solid ${colors.brandRed}40` : '1px solid transparent',
+                '&:hover': {
+                  backgroundColor: countryFilter === country ? '#FFEBEE' : colors.backgroundLight,
+                },
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 1, gap: 2 }}>
+                <Box
+                  sx={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: '10px',
+                    backgroundColor: countryFilter === country ? '#FFCDD2' : '#F5F5F5',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: countryFilter === country ? colors.brandRed : colors.textSecondary,
+                  }}
+                >
+                  <Navigation sx={{ fontSize: 16, transform: 'rotate(45deg)' }} />
+                </Box>
+                <Typography
+                  sx={{
+                    fontWeight: countryFilter === country ? 700 : 500,
+                    color: countryFilter === country ? colors.brandBlack : colors.textPrimary,
+                    fontSize: 14,
+                  }}
+                >
+                  {country}
+                </Typography>
+              </Box>
+              {countryFilter === country && (
+                <Box
+                  sx={{
+                    width: 24,
+                    height: 24,
+                    borderRadius: '50%',
+                    backgroundColor: '#FFCDD2',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Check sx={{ fontSize: 14, color: colors.brandRed }} />
+                </Box>
+              )}
+            </MenuItem>
+          ))}
         </Menu>
       </Box>
 
@@ -663,7 +976,7 @@ const ReferralsPage = () => {
           </Typography>
         </Box>
         <FormControl size="small" sx={{ minWidth: 100 }}>
-              <Select
+          <Select
             value={rowsPerPage}
             onChange={(e) => {
               setRowsPerPage(parseInt(e.target.value, 10));
@@ -678,8 +991,8 @@ const ReferralsPage = () => {
             <MenuItem value={25}>25</MenuItem>
             <MenuItem value={50}>50</MenuItem>
             <MenuItem value={100}>100</MenuItem>
-              </Select>
-            </FormControl>
+          </Select>
+        </FormControl>
       </Box>
 
       {/* Data Table */}
@@ -697,6 +1010,25 @@ const ReferralsPage = () => {
         }}
         emptyMessage="No referrals found"
       />
+
+      {/* Action Menu */}
+      <Menu
+        anchorEl={actionMenuAnchor}
+        open={Boolean(actionMenuAnchor)}
+        onClose={handleActionMenuClose}
+        PaperProps={{
+          sx: {
+            borderRadius: '12px',
+            mt: 1,
+            minWidth: 160,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+          },
+        }}
+      >
+        <MenuItem onClick={handleViewDetails} sx={{ fontSize: 14, fontWeight: 500 }}>
+          View Details
+        </MenuItem>
+      </Menu>
     </Box>
   );
 };

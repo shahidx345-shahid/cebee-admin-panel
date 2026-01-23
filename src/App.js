@@ -27,6 +27,8 @@ import PollFormPage from './pages/PollFormPage';
 import FaqFormPage from './pages/FaqFormPage';
 import PlaceholderPage from './pages/PlaceholderPage';
 import PredictionDetailsPage from './pages/PredictionDetailsPage';
+import LeaderboardDetailsPage from './pages/LeaderboardDetailsPage';
+import RewardDetailsPage from './pages/RewardDetailsPage';
 
 // Protected Route component
 const ProtectedRoute = ({ children }) => {
@@ -34,11 +36,11 @@ const ProtectedRoute = ({ children }) => {
 
   if (loading) {
     return (
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        height: '100vh' 
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh'
       }}>
         <div>Loading...</div>
       </div>
@@ -53,11 +55,11 @@ function App() {
 
   if (loading) {
     return (
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
-        height: '100vh' 
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '100vh'
       }}>
         <div>Loading...</div>
       </div>
@@ -66,9 +68,9 @@ function App() {
 
   return (
     <Routes>
-      <Route 
-        path={constants.routes.login} 
-        element={isAuthenticated ? <Navigate to={constants.routes.dashboard} /> : <LoginPage />} 
+      <Route
+        path={constants.routes.login}
+        element={isAuthenticated ? <Navigate to={constants.routes.dashboard} /> : <LoginPage />}
       />
       <Route
         path="/*"
@@ -89,11 +91,11 @@ function App() {
                 <Route path={constants.routes.predictions} element={<PredictionsPage />} />
                 <Route path="/predictions/details/:id" element={<PredictionDetailsPage />} />
                 <Route path={constants.routes.leaderboard} element={<LeaderboardPage />} />
-                <Route path="/leaderboard/details/:id" element={<PlaceholderPage title="Leaderboard Details" />} />
+                <Route path="/leaderboard/details/:id" element={<LeaderboardDetailsPage />} />
                 <Route path={constants.routes.rewards} element={<RewardsPage />} />
                 <Route path="/rewards/add" element={<RewardFormPage />} />
                 <Route path="/rewards/edit/:id" element={<RewardFormPage />} />
-                <Route path="/rewards/details/:id" element={<PlaceholderPage title="Reward Details" />} />
+                <Route path="/rewards/details/:id" element={<RewardDetailsPage />} />
                 <Route path={constants.routes.notifications} element={<NotificationsPage />} />
                 <Route path="/notifications/create" element={<NotificationFormPage />} />
                 <Route path="/notifications/edit/:id" element={<NotificationFormPage />} />
