@@ -40,8 +40,6 @@ import {
   Build,
 } from '@mui/icons-material';
 import { colors, constants } from '../config/theme';
-import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../config/firebase';
 import { format } from 'date-fns';
 
 const MAINTENANCE_DEFAULTS = {
@@ -88,17 +86,11 @@ const SettingsPage = () => {
   const loadSettings = async () => {
     try {
       setLoading(true);
-      const settingsRef = doc(db, 'settings', 'app');
-      const settingsDoc = await getDoc(settingsRef);
-      if (settingsDoc.exists()) {
-        const data = settingsDoc.data();
-        setSettings({
-          ...settings,
-          ...data,
-          maintenanceStartedAt: data.maintenanceStartedAt?.toDate?.() || null,
-          lastVersionUpdate: data.lastVersionUpdate?.toDate?.() || null,
-        });
-      }
+      // Simulating network delay
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      // Data is already in initial state, but we could set it explicitly if needed
+      // Just creating a mock effect here
     } catch (error) {
       console.error('Error loading settings:', error);
     } finally {
@@ -117,16 +109,12 @@ const SettingsPage = () => {
 
   const performSave = async () => {
     try {
-      const settingsRef = doc(db, 'settings', 'app');
-      await updateDoc(settingsRef, {
-        ...settings,
-        updatedAt: serverTimestamp(),
-        lastModified: serverTimestamp(),
-        lastModifiedBy: 'Admin', // TODO: Get from auth context
-      });
+      // Mock save operation
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
       setHasUnsavedChanges(false);
       setSaveDialogOpen(false);
-      alert('Settings saved successfully!');
+      alert('Settings saved successfully! (Local Mock)');
     } catch (error) {
       console.error('Error saving settings:', error);
       alert('Failed to save settings');

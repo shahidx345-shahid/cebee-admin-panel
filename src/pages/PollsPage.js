@@ -38,8 +38,7 @@ import {
 import { colors } from '../config/theme';
 import SearchBar from '../components/common/SearchBar';
 import DataTable from '../components/common/DataTable';
-import { collection, getDocs, query, orderBy, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../config/firebase';
+
 import { format } from 'date-fns';
 
 const PollsPage = () => {

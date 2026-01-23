@@ -40,8 +40,7 @@ import { colors, constants } from '../config/theme';
 import SearchBar from '../components/common/SearchBar';
 import DataTable from '../components/common/DataTable';
 import ReferralDetailsView from '../components/referrals/ReferralDetailsView';
-import { collection, getDocs, query, orderBy } from 'firebase/firestore';
-import { db } from '../config/firebase';
+
 import { format } from 'date-fns';
 
 const ReferralsPage = () => {

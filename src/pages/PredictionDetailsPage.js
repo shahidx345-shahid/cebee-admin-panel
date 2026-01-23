@@ -24,8 +24,6 @@ import {
   Diamond,
 } from '@mui/icons-material';
 import { colors, constants } from '../config/theme';
-import { collection, getDocs, query, where } from 'firebase/firestore';
-import { db } from '../config/firebase';
 import { format } from 'date-fns';
 
 const PredictionDetailsPage = () => {
@@ -87,32 +85,16 @@ const PredictionDetailsPage = () => {
     const loadPredictionGroup = async () => {
       try {
         setLoading(true);
+        // Simulate network
+        await new Promise(resolve => setTimeout(resolve, 800));
+
         const decodedId = decodeURIComponent(id);
         const [userId, matchId] = decodedId.split('_');
 
-        // Try to load from Firebase
-        let predictionsData = [];
-        try {
-          const predictionsRef = collection(db, 'predictions');
-          const q = query(
-            predictionsRef,
-            where('userId', '==', userId),
-            where('fixtureId', '==', matchId)
-          );
-          const snapshot = await getDocs(q);
-          predictionsData = snapshot.docs.map((doc) => ({
-            id: doc.id,
-            ...doc.data(),
-          }));
-        } catch (error) {
-          console.log('Firebase query error, using dummy data:', error);
-        }
+        const dummyPred = generateDummyPredictionData(userId, matchId);
 
-        // Use dummy data if no Firebase data exists
-        if (predictionsData.length === 0) {
-          const dummyPred = generateDummyPredictionData(userId, matchId);
-          predictionsData = [dummyPred];
-        }
+        // Use dummy data
+        const predictionsData = [dummyPred];
 
         if (predictionsData.length > 0) {
           const firstPred = predictionsData[0];

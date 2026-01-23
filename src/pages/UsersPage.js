@@ -36,7 +36,7 @@ import { colors, constants } from '../config/theme';
 import SearchBar from '../components/common/SearchBar';
 import DataTable from '../components/common/DataTable';
 // Firebase imports removed
-import { db } from '../config/firebase';
+
 import { format } from 'date-fns';
 
 const UsersPage = () => {

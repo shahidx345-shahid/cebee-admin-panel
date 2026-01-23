@@ -50,8 +50,6 @@ import {
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { colors, constants } from '../config/theme';
-import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection } from 'firebase/firestore';
-import { db } from '../config/firebase';
 import { DateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 
@@ -121,18 +119,19 @@ const NotificationFormPage = () => {
     const loadNotificationData = async () => {
       try {
         setLoading(true);
-        const notificationRef = doc(db, 'notifications', id);
-        const notificationDoc = await getDoc(notificationRef);
-        if (notificationDoc.exists()) {
-          const data = notificationDoc.data();
+        // Simulate network delay
+        await new Promise(resolve => setTimeout(resolve, 800));
+
+        // Mock data for edit mode
+        if (isEditMode) {
           setFormData({
-            title: data.title || '',
-            body: data.body || '',
-            type: data.type || 'important-announcement',
-            audience: data.audience || 'all',
-            scheduleForLater: !!data.scheduledAt,
-            scheduledAt: data.scheduledAt?.toDate || null,
-            deepLink: data.deepLink || '',
+            title: 'Mock Announcement',
+            body: 'This is a mock announcement body for testing purposes.',
+            type: 'important-announcement',
+            audience: 'all',
+            scheduleForLater: false,
+            scheduledAt: null,
+            deepLink: '/home',
           });
         }
       } catch (error) {
@@ -156,28 +155,9 @@ const NotificationFormPage = () => {
   const handleSaveAsDraft = async () => {
     try {
       setSaving(true);
-      const notificationData = {
-        title: formData.title,
-        body: formData.body,
-        type: formData.type,
-        audience: formData.audience,
-        status: 'draft',
-        scheduledAt: null,
-        deepLink: formData.deepLink || '',
-        updatedAt: serverTimestamp(),
-      };
-
-      if (isEditMode) {
-        const notificationRef = doc(db, 'notifications', id);
-        await updateDoc(notificationRef, notificationData);
-      } else {
-        const notificationRef = doc(collection(db, 'notifications'));
-        await setDoc(notificationRef, {
-          ...notificationData,
-          createdAt: serverTimestamp(),
-        });
-      }
-      alert('Notification saved as draft');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      console.log('Saved as draft:', formData);
+      alert('Notification saved as draft (Mock)');
       navigate(constants.routes.notifications);
     } catch (error) {
       console.error('Error saving notification:', error);
@@ -200,32 +180,13 @@ const NotificationFormPage = () => {
 
     try {
       setSaving(true);
-      const notificationData = {
-        title: formData.title,
-        body: formData.body,
-        type: formData.type,
-        audience: formData.audience,
-        status: formData.scheduleForLater ? 'scheduled' : 'sent',
-        scheduledAt: formData.scheduleForLater ? formData.scheduledAt : null,
-        sentAt: formData.scheduleForLater ? null : serverTimestamp(),
-        deepLink: formData.deepLink || '',
-        updatedAt: serverTimestamp(),
-      };
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      console.log('Sent/Scheduled:', formData);
 
-      if (isEditMode) {
-        const notificationRef = doc(db, 'notifications', id);
-        await updateDoc(notificationRef, notificationData);
-      } else {
-        const notificationRef = doc(collection(db, 'notifications'));
-        await setDoc(notificationRef, {
-          ...notificationData,
-          createdAt: serverTimestamp(),
-        });
-      }
       alert(
         formData.scheduleForLater
-          ? 'Notification scheduled successfully'
-          : 'Notification sent successfully'
+          ? 'Notification scheduled successfully (Mock)'
+          : 'Notification sent successfully (Mock)'
       );
       navigate(constants.routes.notifications);
     } catch (error) {

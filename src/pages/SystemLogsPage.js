@@ -35,8 +35,7 @@ import {
 import { colors, constants } from '../config/theme';
 import SearchBar from '../components/common/SearchBar';
 import DataTable from '../components/common/DataTable';
-import { collection, getDocs, query, orderBy, where } from 'firebase/firestore';
-import { db } from '../config/firebase';
+
 import { format } from 'date-fns';
 import ResolveLogModal from '../components/logs/ResolveLogModal';
 

@@ -29,8 +29,8 @@ import {
 } from '@mui/icons-material';
 import { colors, constants } from '../config/theme';
 import SearchBar from '../components/common/SearchBar';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../config/firebase';
+
+
 import { format } from 'date-fns';
 import { VerifiedUser, Security, Edit, Gavel, TimerOff, AssignmentInd } from '@mui/icons-material';
 import { MockDataService } from '../services/mockDataService';
@@ -102,16 +102,8 @@ const UserDetailsPage = () => {
 
       let userData = null;
 
-      // Try to load from Firebase (mock logic kept for structure)
-      try {
-        const userRef = doc(db, 'users', id);
-        const userDoc = await getDoc(userRef);
-        if (userDoc.exists()) {
-          userData = { id: userDoc.id, ...userDoc.data() };
-        }
-      } catch (error) {
-        console.log('Using dummy data:', error);
-      }
+      // Firebase data fetching removed. Using dummy data.
+
 
       // Use dummy data if no real data exists
       if (!userData) {

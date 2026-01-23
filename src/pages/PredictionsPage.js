@@ -37,8 +37,6 @@ import {
 import { colors, constants } from '../config/theme';
 import SearchBar from '../components/common/SearchBar';
 import DataTable from '../components/common/DataTable';
-import { collection, getDocs, query, orderBy, where } from 'firebase/firestore';
-import { db } from '../config/firebase';
 import { format } from 'date-fns';
 
 const PredictionsPage = () => {
@@ -56,7 +54,7 @@ const PredictionsPage = () => {
 
   const totalPredictions = predictions.length;
   const ongoingCount = predictions.filter((p) => (p.status || p.predictionStatus) === 'ongoing').length;
-  const completedCount = predictions.filter((p) => 
+  const completedCount = predictions.filter((p) =>
     (p.status || p.predictionStatus) === 'correct' || (p.status || p.predictionStatus) === 'incorrect'
   ).length;
   const correctCount = predictions.filter((p) => (p.status || p.predictionStatus) === 'correct').length;
@@ -142,40 +140,20 @@ const PredictionsPage = () => {
   const loadPredictions = async () => {
     try {
       setLoading(true);
-      // Add dummy data for demonstration
+      // Data loading simulation
+      await new Promise(resolve => setTimeout(resolve, 800));
+
       const dummyData = generateDummyPredictions();
-      
-      // Try to load from Firebase, but use dummy data if empty
-      let predictionsData = [];
-      try {
-        const predictionsRef = collection(db, 'predictions');
-        const q = query(predictionsRef, orderBy('predictionTime', 'desc'));
-        const snapshot = await getDocs(q);
-        predictionsData = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-      } catch (error) {
-        console.log('Using dummy data:', error);
-      }
-      
-      // Use dummy data if no real data exists
-      if (predictionsData.length === 0) {
-        predictionsData = dummyData;
-      }
-      
-      setPredictions(predictionsData);
-      
+      setPredictions(dummyData);
+
       // Group predictions by user + match combination
-      const grouped = groupPredictionsByUserMatch(predictionsData);
+      const grouped = groupPredictionsByUserMatch(dummyData);
       setFilteredPredictions(grouped);
     } catch (error) {
       console.error('Error loading predictions:', error);
-      // Fallback to dummy data
-      const dummyData = generateDummyPredictions();
-      setPredictions(dummyData);
-      const grouped = groupPredictionsByUserMatch(dummyData);
-      setFilteredPredictions(grouped);
+      // Fallback
+      setPredictions([]);
+      setFilteredPredictions([]);
     } finally {
       setLoading(false);
     }
@@ -184,12 +162,12 @@ const PredictionsPage = () => {
   // Group predictions by user + match combination
   const groupPredictionsByUserMatch = (predictions) => {
     const groupedMap = new Map();
-    
+
     predictions.forEach((pred) => {
       const userId = pred.userId || pred.userEmail || 'unknown';
       const matchId = pred.fixtureId || pred.matchId || 'unknown';
       const key = `${userId}_${matchId}`;
-      
+
       if (!groupedMap.has(key)) {
         groupedMap.set(key, {
           id: key,
@@ -206,11 +184,11 @@ const PredictionsPage = () => {
           status: 'mixed', // Will be calculated based on individual predictions
         });
       }
-      
+
       const group = groupedMap.get(key);
       group.predictions.push(pred);
       group.totalPredictions = group.predictions.length;
-      
+
       // Determine overall status
       const statuses = group.predictions.map(p => p.status || p.predictionStatus || 'ongoing');
       if (statuses.every(s => s === 'ongoing')) {
@@ -223,7 +201,7 @@ const PredictionsPage = () => {
         group.status = 'mixed';
       }
     });
-    
+
     return Array.from(groupedMap.values());
   };
 
@@ -247,7 +225,7 @@ const PredictionsPage = () => {
     if (selectedStatus === 'ongoing') {
       filtered = filtered.filter((group) => group.status === 'ongoing');
     } else if (selectedStatus === 'completed') {
-      filtered = filtered.filter((group) => 
+      filtered = filtered.filter((group) =>
         group.status === 'all_correct' || group.status === 'all_incorrect' || group.status === 'mixed'
       );
     }
@@ -302,7 +280,7 @@ const PredictionsPage = () => {
       pending: 'PENDING',
     };
     const label = statusMap[status] || 'ONGOING';
-    
+
     return (
       <Chip
         label={label}
@@ -327,7 +305,7 @@ const PredictionsPage = () => {
       'match_result': { label: 'Match Result', icon: TrendingUp },
       'both_teams_score': { label: 'Both Teams Score', icon: CheckCircle },
     };
-    
+
     const config = typeMap[type] || typeMap['correct_score'];
     const Icon = config.icon === 'arrows' ? null : config.icon;
 
@@ -692,9 +670,9 @@ const PredictionsPage = () => {
       </Grid>
 
       {/* Status Toggle Buttons - Tabs Container */}
-      <Box 
-        sx={{ 
-          mb: 3, 
+      <Box
+        sx={{
+          mb: 3,
           width: '100%',
           backgroundColor: colors.brandWhite,
           borderRadius: '20px',
@@ -718,11 +696,11 @@ const PredictionsPage = () => {
                   justifyContent: 'center',
                 }}
               >
-                <PlayArrow 
-                  sx={{ 
-                    fontSize: 14, 
-                    color: selectedStatus === 'ongoing' ? colors.brandRed : colors.brandWhite 
-                  }} 
+                <PlayArrow
+                  sx={{
+                    fontSize: 14,
+                    color: selectedStatus === 'ongoing' ? colors.brandRed : colors.brandWhite
+                  }}
                 />
               </Box>
             }
@@ -768,11 +746,11 @@ const PredictionsPage = () => {
                   justifyContent: 'center',
                 }}
               >
-                <CheckCircle 
-                  sx={{ 
-                    fontSize: 14, 
-                    color: selectedStatus === 'completed' ? colors.success : colors.brandWhite 
-                  }} 
+                <CheckCircle
+                  sx={{
+                    fontSize: 14,
+                    color: selectedStatus === 'completed' ? colors.success : colors.brandWhite
+                  }}
                 />
               </Box>
             }

@@ -32,8 +32,6 @@ import {
   SportsSoccer,
 } from '@mui/icons-material';
 import { colors, constants } from '../config/theme';
-import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, getDocs, query, where } from 'firebase/firestore';
-import { db } from '../config/firebase';
 import { DateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { format, differenceInHours, differenceInDays } from 'date-fns';
@@ -55,61 +53,41 @@ const PollFormPage = () => {
   });
 
   useEffect(() => {
-    const loadLeagues = async () => {
-      try {
-        const leaguesRef = collection(db, 'leagues');
-        const snapshot = await getDocs(leaguesRef);
-        const leaguesData = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        setLeagues(leaguesData.filter((l) => l.isActive));
-      } catch (error) {
-        console.error('Error loading leagues:', error);
-      }
-    };
-
-    const loadPolls = async () => {
-      try {
-        const pollsRef = collection(db, 'polls');
-        const snapshot = await getDocs(pollsRef);
-        const pollsData = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        setPolls(pollsData);
-      } catch (error) {
-        console.error('Error loading polls:', error);
-      }
-    };
-
-    const loadPollData = async () => {
+    const loadData = async () => {
       try {
         setLoading(true);
-        const pollRef = doc(db, 'polls', id);
-        const pollDoc = await getDoc(pollRef);
-        if (pollDoc.exists()) {
-          const data = pollDoc.data();
+        // Simulate network
+        await new Promise(resolve => setTimeout(resolve, 600));
+
+        // Mock Leagues
+        setLeagues([
+          { id: 'premier_league', name: 'Premier League', isActive: true },
+          { id: 'la_liga', name: 'La Liga', isActive: true },
+          { id: 'ligue_1', name: 'Ligue 1', isActive: true },
+        ]);
+
+        // Mock Polls
+        setPolls([
+          { id: '1', leagueId: 'la_liga', status: 'active' },
+          { id: '2', leagueId: 'premier_league', status: 'closed' }
+        ]);
+
+        if (isEditMode) {
+          // Mock existing poll data
           setFormData({
-            leagueId: data.leagueId || '',
-            startTime: data.startTime?.toDate ? data.startTime.toDate() : new Date(data.startTime),
-            closeTime: data.closeTime?.toDate ? data.closeTime.toDate() : new Date(data.closeTime),
+            leagueId: 'premier_league',
+            startTime: new Date(),
+            closeTime: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
           });
         }
       } catch (error) {
-        console.error('Error loading poll:', error);
+        console.error('Error loading data:', error);
       } finally {
         setLoading(false);
       }
     };
 
-    loadLeagues();
-    loadPolls();
-    if (isEditMode) {
-      loadPollData();
-    } else {
-      setLoading(false);
-    }
+    loadData();
   }, [id, isEditMode]);
 
   useEffect(() => {
@@ -119,14 +97,12 @@ const PollFormPage = () => {
         return;
       }
       try {
-        const fixturesRef = collection(db, 'fixtures');
-        const q = query(fixturesRef, where('leagueId', '==', leagueId));
-        const snapshot = await getDocs(q);
-        const fixturesData = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        setLeagueFixtures(fixturesData);
+        // Mock fixtures
+        const fixtures = [
+          { id: 'f1', homeTeam: 'Team A', awayTeam: 'Team B' },
+          { id: 'f2', homeTeam: 'Team C', awayTeam: 'Team D' },
+        ];
+        setLeagueFixtures(fixtures);
       } catch (error) {
         console.error('Error loading fixtures:', error);
         setLeagueFixtures([]);
@@ -147,28 +123,13 @@ const PollFormPage = () => {
   const handleSave = async () => {
     try {
       setSaving(true);
-      const league = leagues.find((l) => l.id === formData.leagueId);
 
-      const pollData = {
-        leagueId: formData.leagueId,
-        leagueName: league?.name || '',
-        startTime: formData.startTime,
-        closeTime: formData.closeTime,
-        status: 'active',
-        updatedAt: serverTimestamp(),
-      };
+      // Mock save
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
-      if (isEditMode) {
-        const pollRef = doc(db, 'polls', id);
-        await updateDoc(pollRef, pollData);
-      } else {
-        const pollRef = doc(collection(db, 'polls'));
-        await setDoc(pollRef, {
-          ...pollData,
-          voteCount: 0,
-          createdAt: serverTimestamp(),
-        });
-      }
+      console.log('Poll saved:', formData);
+      alert('Poll saved successfully (Mock)!');
+
       navigate(constants.routes.polls);
     } catch (error) {
       console.error('Error saving poll:', error);

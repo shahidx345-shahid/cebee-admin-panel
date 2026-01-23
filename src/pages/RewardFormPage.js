@@ -15,8 +15,7 @@ import {
 } from '@mui/material';
 import { ArrowBack, Save } from '@mui/icons-material';
 import { colors, constants } from '../config/theme';
-import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection } from 'firebase/firestore';
-import { db } from '../config/firebase';
+
 
 const RewardFormPage = () => {
   const navigate = useNavigate();
@@ -50,24 +49,23 @@ const RewardFormPage = () => {
   const loadRewardData = async () => {
     try {
       setLoading(true);
-      const rewardRef = doc(db, 'rewards', id);
-      const rewardDoc = await getDoc(rewardRef);
-      if (rewardDoc.exists()) {
-        const data = rewardDoc.data();
-        setFormData({
-          name: data.name || '',
-          description: data.description || '',
-          type: data.type || 'points',
-          pointsRequired: data.pointsRequired || 1000,
-          cashValue: data.cashValue || 0,
-          quantityAvailable: data.quantityAvailable || 100,
-          minRankRequired: data.minRankRequired || 0,
-          tier: data.tier || 'bronze',
-          status: data.status || 'inactive',
-          isLimited: data.isLimited !== undefined ? data.isLimited : true,
-          expiryDate: data.expiryDate?.toDate || null,
-        });
-      }
+      // Simulate network
+      await new Promise(resolve => setTimeout(resolve, 800));
+
+      // Mock data replacement
+      setFormData({
+        name: 'Mock Reward',
+        description: 'This is a mock reward description.',
+        type: 'points',
+        pointsRequired: 500,
+        cashValue: 0,
+        quantityAvailable: 50,
+        minRankRequired: 1,
+        tier: 'silver',
+        status: 'active',
+        isLimited: true,
+        expiryDate: null,
+      });
     } catch (error) {
       console.error('Error loading reward:', error);
     } finally {
@@ -82,21 +80,12 @@ const RewardFormPage = () => {
   const handleSave = async () => {
     try {
       setSaving(true);
-      const rewardData = {
-        ...formData,
-        updatedAt: serverTimestamp(),
-      };
+      // Mock save
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
-      if (isEditMode) {
-        const rewardRef = doc(db, 'rewards', id);
-        await updateDoc(rewardRef, rewardData);
-      } else {
-        const rewardRef = doc(collection(db, 'rewards'));
-        await setDoc(rewardRef, {
-          ...rewardData,
-          createdAt: serverTimestamp(),
-        });
-      }
+      console.log('Reward saved:', formData);
+      alert('Reward saved (Mock)!');
+
       navigate(constants.routes.rewards);
     } catch (error) {
       console.error('Error saving reward:', error);
