@@ -35,8 +35,6 @@ import {
   CheckCircle,
 } from '@mui/icons-material';
 import { colors, constants } from '../config/theme';
-import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection } from 'firebase/firestore';
-import { db } from '../config/firebase';
 
 const LeagueFormPage = () => {
   const navigate = useNavigate();
@@ -60,20 +58,18 @@ const LeagueFormPage = () => {
     const loadLeagueData = async () => {
       try {
         setLoading(true);
-        const leagueRef = doc(db, 'leagues', id);
-        const leagueDoc = await getDoc(leagueRef);
-        if (leagueDoc.exists()) {
-          const data = leagueDoc.data();
+        // Simulate network
+        await new Promise(resolve => setTimeout(resolve, 800));
+
+        // Mock data
+        if (id) {
           setFormData({
-            name: data.name || '',
-            type: data.type || 'domestic',
-            logoUrl: data.logoUrl || '',
-            isActive: data.isActive || false,
-            priority: data.priority || '',
+            name: 'Mock Premier League',
+            type: 'domestic',
+            logoUrl: '',
+            isActive: true,
+            priority: '1',
           });
-          if (data.logoUrl) {
-            setLogoPreview(data.logoUrl);
-          }
         }
       } catch (error) {
         console.error('Error loading league:', error);
@@ -129,23 +125,11 @@ const LeagueFormPage = () => {
   const handleSave = async () => {
     try {
       setSaving(true);
-      const leagueData = {
-        ...formData,
-        updatedAt: serverTimestamp(),
-      };
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
-      if (isEditMode) {
-        const leagueRef = doc(db, 'leagues', id);
-        await updateDoc(leagueRef, leagueData);
-      } else {
-        const leagueRef = doc(collection(db, 'leagues'));
-        await setDoc(leagueRef, {
-          ...leagueData,
-          isActive: false, // New leagues are inactive by default
-          priority: formData.priority ? parseInt(formData.priority) : null,
-          createdAt: serverTimestamp(),
-        });
-      }
+      console.log('League saved:', formData);
+      alert('League saved successfully (Mock)');
+
       navigate('/leagues');
     } catch (error) {
       console.error('Error saving league:', error);

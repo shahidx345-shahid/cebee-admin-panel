@@ -15,8 +15,6 @@ import {
 } from '@mui/material';
 import { ArrowBack, Save } from '@mui/icons-material';
 import { colors, constants } from '../config/theme';
-import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection } from 'firebase/firestore';
-import { db } from '../config/firebase';
 
 const FaqFormPage = () => {
   const navigate = useNavigate();
@@ -37,16 +35,17 @@ const FaqFormPage = () => {
     const loadFaqData = async () => {
       try {
         setLoading(true);
-        const faqRef = doc(db, 'content', 'faq', 'items', id);
-        const faqDoc = await getDoc(faqRef);
-        if (faqDoc.exists()) {
-          const data = faqDoc.data();
+        // Simulate network
+        await new Promise(resolve => setTimeout(resolve, 800));
+
+        // Mock data
+        if (id) {
           setFormData({
-            question: data.question || '',
-            answer: data.answer || '',
-            category: data.category || 'gettingStarted',
-            status: data.status || 'draft',
-            order: data.order || 0,
+            question: 'How do I start?',
+            answer: 'Just sign up and play.',
+            category: 'gettingStarted',
+            status: 'published',
+            order: 1,
           });
         }
       } catch (error) {
@@ -72,21 +71,11 @@ const FaqFormPage = () => {
   const handleSave = async () => {
     try {
       setSaving(true);
-      const faqData = {
-        ...formData,
-        updatedAt: serverTimestamp(),
-      };
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
-      if (isEditMode) {
-        const faqRef = doc(db, 'content', 'faq', 'items', id);
-        await updateDoc(faqRef, faqData);
-      } else {
-        const faqRef = doc(collection(db, 'content', 'faq', 'items'));
-        await setDoc(faqRef, {
-          ...faqData,
-          createdAt: serverTimestamp(),
-        });
-      }
+      console.log('FAQ saved:', formData);
+      alert('FAQ saved successfully (Mock)');
+
       navigate(constants.routes.content);
     } catch (error) {
       console.error('Error saving FAQ:', error);

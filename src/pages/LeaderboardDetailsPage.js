@@ -32,11 +32,9 @@ import {
     AccessTime,
     CalendarToday,
 } from '@mui/icons-material';
+import { format } from 'date-fns';
 import { colors, constants } from '../config/theme';
 import SearchBar from '../components/common/SearchBar';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../config/firebase';
-import { format } from 'date-fns';
 
 const LeaderboardDetailsPage = () => {
     const navigate = useNavigate();
@@ -84,22 +82,9 @@ const LeaderboardDetailsPage = () => {
     const loadUserData = async () => {
         try {
             setLoading(true);
-            let userData = null;
+            await new Promise(resolve => setTimeout(resolve, 600)); // Simulate delay
 
-            try {
-                const userRef = doc(db, 'users', id);
-                const userDoc = await getDoc(userRef);
-                if (userDoc.exists()) {
-                    userData = { id: userDoc.id, ...userDoc.data() };
-                }
-            } catch (error) {
-                console.log('Using dummy data:', error);
-            }
-
-            if (!userData) {
-                userData = generateDummyUserData(id);
-            }
-
+            const userData = generateDummyUserData(id);
             setUser(userData);
             setActivities([]);
         } catch (error) {

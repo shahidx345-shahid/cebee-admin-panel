@@ -29,12 +29,10 @@ import {
   ArrowUpward,
   Person,
 } from '@mui/icons-material';
+import { format } from 'date-fns';
 import { colors, constants } from '../config/theme';
 import SearchBar from '../components/common/SearchBar';
 import DataTable from '../components/common/DataTable';
-import { doc, getDoc, collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '../config/firebase';
-import { format } from 'date-fns';
 
 const FixtureDetailsPage = () => {
   const navigate = useNavigate();
@@ -51,53 +49,22 @@ const FixtureDetailsPage = () => {
     const loadFixtureData = async () => {
       try {
         setLoading(true);
+        // Simulate loading time
+        await new Promise(resolve => setTimeout(resolve, 600));
+
         let fixtureData = null;
 
-        // Try to load from Firebase
-        try {
-          const fixtureRef = doc(db, 'fixtures', id);
-          const fixtureDoc = await getDoc(fixtureRef);
-          if (fixtureDoc.exists()) {
-            fixtureData = { id: fixtureDoc.id, ...fixtureDoc.data() };
-          }
-        } catch (error) {
-          console.log('Firebase load failed, using sample data:', error);
-        }
-
-        // If not found in Firebase, use sample data
-        if (!fixtureData) {
-          const sampleFixtures = getSampleFixtures();
-          fixtureData = sampleFixtures.find(f => f.id === id);
-        }
+        // Use sample data directly
+        const sampleFixtures = getSampleFixtures();
+        fixtureData = sampleFixtures.find(f => f.id === id);
 
         if (fixtureData) {
           setFixture(fixtureData);
 
-          // Load predictions for this fixture (or use sample data for demo)
-          try {
-            const predictionsRef = collection(db, 'predictions');
-            const q = query(predictionsRef, where('fixtureId', '==', id));
-            const snapshot = await getDocs(q);
-            const predictionsData = snapshot.docs.map((doc) => ({
-              id: doc.id,
-              ...doc.data(),
-            }));
-
-            // If no predictions found, use sample data
-            if (predictionsData.length === 0) {
-              const samplePredictions = getSamplePredictions(id);
-              setPredictions(samplePredictions);
-              setFilteredPredictions(samplePredictions);
-            } else {
-              setPredictions(predictionsData);
-              setFilteredPredictions(predictionsData);
-            }
-          } catch (error) {
-            // If error, use sample data
-            const samplePredictions = getSamplePredictions(id);
-            setPredictions(samplePredictions);
-            setFilteredPredictions(samplePredictions);
-          }
+          // Return sample predictions 
+          const samplePredictions = getSamplePredictions(id);
+          setPredictions(samplePredictions);
+          setFilteredPredictions(samplePredictions);
         }
       } catch (error) {
         console.error('Error loading fixture:', error);

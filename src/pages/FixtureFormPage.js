@@ -29,8 +29,6 @@ import {
   Send,
 } from '@mui/icons-material';
 import { colors, constants } from '../config/theme';
-import { doc, getDoc, setDoc, updateDoc, serverTimestamp, collection, getDocs } from 'firebase/firestore';
-import { db } from '../config/firebase';
 import { DateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 
@@ -53,53 +51,33 @@ const FixtureFormPage = () => {
   });
 
   useEffect(() => {
-    const loadLeagues = async () => {
-      try {
-        const leaguesRef = collection(db, 'leagues');
-        const snapshot = await getDocs(leaguesRef);
-        const leaguesData = snapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
-        setLeagues(leaguesData.filter((l) => l.isActive));
-      } catch (error) {
-        console.error('Error loading leagues:', error);
-      } finally {
-        if (!isEditMode) {
-          setLoading(false);
-        }
-      }
-    };
-
-    const loadFixtureData = async () => {
+    const initialize = async () => {
       try {
         setLoading(true);
-        const fixtureRef = doc(db, 'fixtures', id);
-        const fixtureDoc = await getDoc(fixtureRef);
-        if (fixtureDoc.exists()) {
-          const data = fixtureDoc.data();
+        // Simulate network
+        await new Promise(resolve => setTimeout(resolve, 800));
+
+        // Mock Leagues
+        setLeagues([
+          { id: 'premier_league', name: 'Premier League', isActive: true },
+          { id: 'la_liga', name: 'La Liga', isActive: true },
+          { id: 'champions_league', name: 'Champions League', isActive: true },
+        ]);
+
+        // Mock Fixture Data if Edit Mode
+        if (isEditMode) {
           setFormData({
-            homeTeam: data.homeTeam || '',
-            awayTeam: data.awayTeam || '',
-            leagueId: data.leagueId || '',
-            venue: data.venue || '',
-            kickoffTime: data.kickoffTime?.toDate ? data.kickoffTime.toDate() : new Date(data.kickoffTime),
-            matchStatus: data.matchStatus || data.status || 'scheduled',
+            homeTeam: 'Team A',
+            awayTeam: 'Team B',
+            leagueId: 'premier_league',
+            venue: 'wembley',
+            kickoffTime: new Date(),
+            matchStatus: 'scheduled',
           });
         }
       } catch (error) {
-        console.error('Error loading fixture:', error);
+        console.error('Error loading data:', error);
       } finally {
-        setLoading(false);
-      }
-    };
-
-    const initialize = async () => {
-      setLoading(true);
-      await loadLeagues();
-      if (isEditMode) {
-        await loadFixtureData();
-      } else {
         setLoading(false);
       }
     };
@@ -113,21 +91,11 @@ const FixtureFormPage = () => {
   const handleSave = async () => {
     try {
       setSaving(true);
-      const fixtureData = {
-        ...formData,
-        updatedAt: serverTimestamp(),
-      };
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
-      if (isEditMode) {
-        const fixtureRef = doc(db, 'fixtures', id);
-        await updateDoc(fixtureRef, fixtureData);
-      } else {
-        const fixtureRef = doc(collection(db, 'fixtures'));
-        await setDoc(fixtureRef, {
-          ...fixtureData,
-          createdAt: serverTimestamp(),
-        });
-      }
+      console.log('Fixture saved:', formData);
+      alert('Fixture saved successfully (Mock)');
+
       navigate(constants.routes.fixtures);
     } catch (error) {
       console.error('Error saving fixture:', error);
