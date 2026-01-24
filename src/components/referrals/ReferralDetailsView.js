@@ -68,12 +68,20 @@ const DetailRow = ({ label, value, isLink, color }) => (
     </Box>
 );
 
-const ReferralDetailsView = ({ referral, onBack }) => {
+const ReferralDetailsView = ({ referral, onBack, referrerStats }) => {
     if (!referral) return null;
 
     const date = referral.referralDate instanceof Date ? referral.referralDate : new Date(referral.referralDate);
     const formattedDate = format(date, 'MMM dd, yyyy');
     const formattedTime = format(date, 'HH:mm');
+
+    // Default stats if not provided
+    const stats = referrerStats || {
+        totalReferrals: 0,
+        monthlyReferrals: 0,
+        totalCP: 0,
+        monthlyCP: 0
+    };
 
     return (
         <Box sx={{ animation: 'fadeIn 0.3s ease-in-out' }}>
@@ -147,7 +155,7 @@ const ReferralDetailsView = ({ referral, onBack }) => {
                         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
                             <CardGiftcard sx={{ color: colors.textSecondary, fontSize: 24 }} />
                             <Typography sx={{ fontSize: 12, color: colors.textSecondary }}>CP Awarded</Typography>
-                            <Typography sx={{ fontSize: 20, fontWeight: 700, color: colors.brandRed }}>10 CP</Typography>
+                            <Typography sx={{ fontSize: 20, fontWeight: 700, color: colors.brandRed }}>{(referral.cpAwarded || 0)} CP</Typography>
                         </Box>
                     </Grid>
                     <Grid item xs={3} sx={{ textAlign: 'center', borderRight: `1px solid ${colors.divider}` }}>
@@ -247,17 +255,16 @@ const ReferralDetailsView = ({ referral, onBack }) => {
                 <Grid item xs={12} md={6}>
                     <InfoCard
                         icon={<Star sx={{ color: '#FFC107' }} />}
-                        title="Referrer Performance Estimate"
+                        title="Referrer Performance Summary"
                     >
-                        {/* Mock Performance Data for Phase 1 view-only */}
-                        <DetailRow label="Total Referrals (Lifetime)" value="1" />
-                        <DetailRow label="Referrals this Month" value="1" />
-                        <DetailRow label="Total CP Earned" value="10 CP" />
-                        <DetailRow label="CP Earned (Month)" value="10 CP" />
+                        <DetailRow label="Total Referrals (Lifetime)" value={stats.totalReferrals} />
+                        <DetailRow label="Referrals this Month" value={stats.monthlyReferrals} />
+                        <DetailRow label="Total CP Earned" value={`${stats.totalCP} CP`} />
+                        <DetailRow label="CP Earned (Month)" value={`${stats.monthlyCP} CP`} />
                         <Box sx={{ mt: 2, p: 1.5, bgcolor: '#FFFBEB', borderRadius: '8px' }}>
                             <Typography variant="caption" sx={{ color: '#D97706', display: 'flex', alignItems: 'center', gap: 1 }}>
                                 <InfoOutlined fontSize="small" />
-                                Snapshot at time of referral
+                                Current Referrer Performance
                             </Typography>
                         </Box>
                     </InfoCard>

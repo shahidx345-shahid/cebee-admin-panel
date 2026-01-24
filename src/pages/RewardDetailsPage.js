@@ -27,6 +27,7 @@ import {
     Warning,
     Info,
     CalendarToday,
+    AssignmentInd,
 } from '@mui/icons-material';
 import { colors, constants } from '../config/theme';
 import { format } from 'date-fns';
@@ -185,6 +186,50 @@ const RewardDetailsPage = () => {
                 </Box>
             </Box>
 
+            {/* Risk Warning Banner */}
+            {reward.risk && (
+                <Box sx={{
+                    mb: 3,
+                    p: 2.5,
+                    borderRadius: '12px',
+                    backgroundColor: '#FEF2F2',
+                    border: '2px solid #EF4444',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 2
+                }}>
+                    <Box sx={{
+                        width: 48,
+                        height: 48,
+                        backgroundColor: '#EF4444',
+                        borderRadius: '12px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                    }}>
+                        <Warning sx={{ fontSize: 28, color: 'white' }} />
+                    </Box>
+                    <Box sx={{ flex: 1 }}>
+                        <Typography variant="h6" sx={{ fontWeight: 700, color: '#DC2626', mb: 0.5 }}>
+                            Risk Indicator - Review Required
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: '#7F1D1D' }}>
+                            This reward has been flagged for potential risk. Please review the user's activity, KYC verification, and betting patterns before processing payment.
+                        </Typography>
+                    </Box>
+                    <Chip
+                        label="INFORMATIONAL ONLY"
+                        size="small"
+                        sx={{
+                            bgcolor: '#7F1D1D',
+                            color: 'white',
+                            fontWeight: 700,
+                            fontSize: 11
+                        }}
+                    />
+                </Box>
+            )}
+
             <Grid container spacing={3}>
                 {/* Left Column */}
                 <Grid item xs={12} md={8}>
@@ -204,6 +249,55 @@ const RewardDetailsPage = () => {
                                 <Typography variant="caption" sx={{ color: colors.textSecondary }}>Rank</Typography>
                                 <Typography variant="h6" sx={{ fontWeight: 600 }}>#{reward.rank}</Typography>
                             </Grid>
+                            <Grid item xs={6} md={3}>
+                                <Typography variant="caption" sx={{ color: colors.textSecondary }}>Reward Month</Typography>
+                                <Typography variant="h6" sx={{ fontWeight: 600 }}>{reward.rewardMonth || '-'}</Typography>
+                            </Grid>
+                        </Grid>
+                    </Card>
+
+                    {/* Payout Information */}
+                    <Card sx={{ p: 3, mb: 3, borderRadius: '16px' }}>
+                        <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Payout Information</Typography>
+                        <Grid container spacing={2}>
+                            <Grid item xs={6} md={3}>
+                                <Typography variant="caption" sx={{ color: colors.textSecondary }}>Payout Method</Typography>
+                                <Chip label={reward.payoutMethod || 'USDT'} size="small" sx={{ mt: 0.5, fontWeight: 600, bgcolor: '#F3F4F6' }} />
+                            </Grid>
+                            <Grid item xs={6} md={3}>
+                                <Typography variant="caption" sx={{ color: colors.textSecondary }}>Amount</Typography>
+                                <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                                    {reward.payoutMethod === 'USDT' ? `${reward.usdAmount} USDT` : `$${reward.usdAmount}`}
+                                </Typography>
+                            </Grid>
+                            <Grid item xs={6} md={3}>
+                                <Typography variant="caption" sx={{ color: colors.textSecondary }}>Gateway</Typography>
+                                <Typography variant="body1" sx={{ fontWeight: 600 }}>{reward.payoutGateway || '-'}</Typography>
+                            </Grid>
+                            <Grid item xs={6} md={3}>
+                                <Typography variant="caption" sx={{ color: colors.textSecondary }}>Status</Typography>
+                                <Chip
+                                    label={(reward.status || 'pending').toUpperCase()}
+                                    size="small"
+                                    sx={{
+                                        mt: 0.5,
+                                        fontWeight: 700,
+                                        backgroundColor: getStatusBg(reward.status),
+                                        color: getStatusColor(reward.status)
+                                    }}
+                                />
+                            </Grid>
+                            {reward.payoutMethod === 'USDT' && (
+                                <Grid item xs={12}>
+                                    <Typography variant="caption" sx={{ color: colors.textSecondary }}>Wallet Address</Typography>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5, bgcolor: '#F9FAFB', p: 1.5, borderRadius: '8px', border: '1px dashed #D1D5DB' }}>
+                                        <AccountBalanceWallet sx={{ fontSize: 18, color: colors.textSecondary }} />
+                                        <Typography variant="body2" sx={{ fontFamily: 'monospace', fontWeight: 500, flex: 1, wordBreak: 'break-all', color: colors.brandBlack }}>
+                                            {reward.walletAddress || 'No address provided'}
+                                        </Typography>
+                                    </Box>
+                                </Grid>
+                            )}
                         </Grid>
                     </Card>
 
@@ -238,10 +332,21 @@ const RewardDetailsPage = () => {
 
                     {/* KYC Snapshot */}
                     <Card sx={{ p: 3, mb: 3, borderRadius: '16px', backgroundColor: '#F8FAFC' }}>
-                        <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-                            KYC Snapshot
-                            <VerifiedUser sx={{ fontSize: 20, color: reward.kycStatus === 'verified' ? colors.success : colors.textSecondary }} />
-                        </Typography>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                            <Typography variant="h6" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                KYC Snapshot
+                                <VerifiedUser sx={{ fontSize: 20, color: reward.kycStatus === 'verified' ? colors.success : colors.textSecondary }} />
+                            </Typography>
+                            <Button
+                                size="small"
+                                variant="outlined"
+                                startIcon={reward.kycStatus === 'not_submitted' ? <AssignmentInd /> : <Person />}
+                                onClick={() => navigate(`${constants.routes.users}/${reward.userId || 'USR_1001'}`)}
+                                sx={{ borderRadius: '8px', textTransform: 'none' }}
+                            >
+                                {reward.kycStatus === 'not_submitted' ? 'Request KYC' : 'View KYC Profile'}
+                            </Button>
+                        </Box>
                         <Grid container spacing={2}>
                             <Grid item xs={6} md={4}>
                                 <Typography variant="caption" sx={{ color: colors.textSecondary }}>Status</Typography>
@@ -259,17 +364,30 @@ const RewardDetailsPage = () => {
                     </Card>
 
                     {/* Testimonial Consent */}
+                    {/* Consent Tracking */}
                     <Card sx={{ p: 3, mb: 3, borderRadius: '16px' }}>
                         <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Consent Tracking</Typography>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                            <CheckCircle sx={{ color: reward.consentOptIn ? colors.success : colors.textSecondary }} />
-                            <Box>
-                                <Typography variant="body1" sx={{ fontWeight: 600 }}>Video/Testimonial Opt-In</Typography>
-                                <Typography variant="caption" sx={{ color: colors.textSecondary }}>
-                                    Timestamp: {reward.consentTimestamp ? format(reward.consentTimestamp, 'MMM dd, yyyy HH:mm') : '-'}
+                        <Grid container spacing={2}>
+                            <Grid item xs={12} sm={4}>
+                                <Typography variant="caption" sx={{ color: colors.textSecondary }}>Video/Testimonial Consent</Typography>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                                    {reward.consentOptIn ? <CheckCircle sx={{ fontSize: 18, color: colors.success }} /> : <Cancel sx={{ fontSize: 18, color: colors.textSecondary }} />}
+                                    <Typography variant="body1" sx={{ fontWeight: 600, color: reward.consentOptIn ? colors.success : colors.textSecondary }}>
+                                        {reward.consentOptIn ? 'Yes' : 'No'}
+                                    </Typography>
+                                </Box>
+                            </Grid>
+                            <Grid item xs={12} sm={4}>
+                                <Typography variant="caption" sx={{ color: colors.textSecondary }}>Captured At</Typography>
+                                <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                                    {reward.consentTimestamp ? format(reward.consentTimestamp, 'MMM dd, yyyy HH:mm') : '-'}
                                 </Typography>
-                            </Box>
-                        </Box>
+                            </Grid>
+                            <Grid item xs={12} sm={4}>
+                                <Typography variant="caption" sx={{ color: colors.textSecondary }}>Source</Typography>
+                                <Typography variant="body1" sx={{ fontWeight: 600 }}>{reward.consentSource || 'Reward Claim Flow'}</Typography>
+                            </Grid>
+                        </Grid>
                     </Card>
 
                     {/* Decline Reason (Visible if Declined) */}

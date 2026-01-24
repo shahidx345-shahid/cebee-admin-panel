@@ -146,6 +146,9 @@ const SettingsPage = () => {
     setHasUnsavedChanges(true);
     setMaintenanceDialogOpen(false);
 
+    // Mock System Log
+    console.log(`[SYSTEM LOG] Maintenance mode ${isEnablingMaintenance ? 'ENABLED' : 'DISABLED'} by Super Admin at ${new Date().toISOString()}`);
+
     alert(isEnablingMaintenance ? 'Maintenance mode enabled' : 'Platform is now online');
   };
 
@@ -155,30 +158,14 @@ const SettingsPage = () => {
 
   const performReset = () => {
     setSettings({
-      platformStatus: 'online',
-      appName: 'CeBee Predict',
-      maintenanceTitle: MAINTENANCE_DEFAULTS.defaultTitle,
-      maintenanceMessage: MAINTENANCE_DEFAULTS.defaultMessage,
-      maintenanceStartedAt: null,
-      maintenanceStartedBy: null,
+      ...settings,
       dateFormat: 'ddMmYyyy',
       timeFormat: 'hour12',
-      androidAppVersion: '1.0.0',
-      iosAppVersion: '1.0.0',
-      releaseNotes: `### Version 1.2.3 - Released on Jan 15, 2025
-
-**New Features:**
-- Enhanced prediction interface
-- Improved leaderboard performance
-- New notification system
-
-**Bug Fixes:**
-- Fixed SP calculation edge cases`,
-      lastVersionUpdate: null,
       displayTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     });
     setHasUnsavedChanges(true);
     setResetDialogOpen(false);
+    console.log(`[SYSTEM LOG] Settings reset to defaults by Super Admin at ${new Date().toISOString()}`);
     alert('Settings reset to defaults (logged)');
   };
 
@@ -211,6 +198,26 @@ const SettingsPage = () => {
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%' }}>
+      {/* Super Admin Info Banner */}
+      <Box
+        sx={{
+          width: '100%',
+          padding: 1.5,
+          background: `${colors.info}1A`,
+          color: colors.info,
+          mb: 2,
+          borderRadius: '12px',
+          border: `1px solid ${colors.info}33`,
+        }}
+      >
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 1 }}>
+          <Info sx={{ fontSize: 18 }} />
+          <Typography sx={{ fontWeight: 600, fontSize: 13 }}>
+            Settings page is accessible to Super Admins only.
+          </Typography>
+        </Box>
+      </Box>
+
       {/* Maintenance Mode Active Banner */}
       {isMaintenanceMode && (
         <Box
@@ -492,6 +499,7 @@ const SettingsPage = () => {
               value={settings.maintenanceMessage}
               onChange={(e) => handleChange('maintenanceMessage', e.target.value)}
               placeholder="We are currently performing scheduled maintenance..."
+              helperText="Message is only shown when maintenance mode is active."
               sx={{
                 '& .MuiOutlinedInput-root': {
                   borderRadius: '12px',
@@ -700,6 +708,38 @@ const SettingsPage = () => {
             </Select>
           </FormControl>
         </Box>
+
+        {/* Timezone Handling */}
+        <Box sx={{ mt: 4 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1.5 }}>
+            <Box sx={{
+              width: 32, height: 32, borderRadius: '8px', backgroundColor: '#F3E8FF',
+              display: 'flex', alignItems: 'center', justifyContent: 'center'
+            }}>
+              <Public sx={{ fontSize: 18, color: '#9333EA' }} />
+            </Box>
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, fontSize: 15, color: colors.brandBlack }}>
+                Timezone Handling
+              </Typography>
+              <Typography variant="caption" sx={{ color: colors.textSecondary, fontSize: 13 }}>
+                Display time uses the user’s device timezone while system storage uses UTC.
+              </Typography>
+            </Box>
+          </Box>
+          <TextField
+            fullWidth
+            value={settings.displayTimezone || 'UTC'}
+            disabled
+            helperText="System Default (UTC) - Auto-detected from user device on client-side"
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                borderRadius: '12px',
+                backgroundColor: '#F3F4F6'
+              }
+            }}
+          />
+        </Box>
       </Card>
 
       {/* App Updates Section */}
@@ -758,21 +798,14 @@ const SettingsPage = () => {
           <TextField
             fullWidth
             value={settings.iosAppVersion}
-            onChange={(e) => handleChange('iosAppVersion', e.target.value)}
+            disabled
+            helperText="Syncs with deployments. Not editable in Admin Panel."
             sx={{
               '& .MuiOutlinedInput-root': {
                 borderRadius: '12px',
                 borderColor: '#BFDBFE',
-                '& fieldset': { borderColor: '#BFDBFE' },
-                '&:hover fieldset': { borderColor: '#93C5FD' },
-                '&.Mui-focused fieldset': { borderColor: '#3B82F6' },
-                backgroundColor: 'white',
+                backgroundColor: '#F3F4F6', // Grayed out
               },
-              '& .MuiInputBase-input': {
-                padding: '14px 16px',
-                fontSize: 15,
-                fontWeight: 500
-              }
             }}
           />
         </Box>
@@ -798,21 +831,14 @@ const SettingsPage = () => {
           <TextField
             fullWidth
             value={settings.androidAppVersion}
-            onChange={(e) => handleChange('androidAppVersion', e.target.value)}
+            disabled
+            helperText="Syncs with deployments. Not editable in Admin Panel."
             sx={{
               '& .MuiOutlinedInput-root': {
                 borderRadius: '12px',
                 borderColor: '#86EFAC',
-                '& fieldset': { borderColor: '#86EFAC' },
-                '&:hover fieldset': { borderColor: '#4ADE80' },
-                '&.Mui-focused fieldset': { borderColor: '#22C55E' },
-                backgroundColor: 'white',
+                backgroundColor: '#F3F4F6', // Grayed out
               },
-              '& .MuiInputBase-input': {
-                padding: '14px 16px',
-                fontSize: 15,
-                fontWeight: 500
-              }
             }}
           />
         </Box>
@@ -830,6 +856,9 @@ const SettingsPage = () => {
               Updated: {format(new Date('2026-01-18'), 'MMM dd, yyyy')}
             </Typography>
           </Box>
+          <Typography variant="caption" sx={{ display: 'block', mb: 1, color: colors.info, fontWeight: 500 }}>
+            Display only. Managed in Content & App Updates.
+          </Typography>
           <Box
             sx={{
               padding: 3,

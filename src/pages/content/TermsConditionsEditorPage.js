@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Button, Card, CircularProgress, Alert } from '@mui/material';
+import { Box, Typography, Button, Card, CircularProgress, Alert, Chip } from '@mui/material';
 import { CheckCircle, Info } from '@mui/icons-material';
 import { colors } from '../../config/theme';
 import ReactQuill from 'react-quill';
@@ -19,7 +19,7 @@ const TermsConditionsEditorPage = () => {
       setLoading(true);
       // Load from localStorage if available
       const savedContent = localStorage.getItem('termsConditionsContent');
-      
+
       if (savedContent) {
         setContent(savedContent);
       } else {
@@ -40,7 +40,7 @@ const TermsConditionsEditorPage = () => {
       localStorage.setItem('termsConditionsContent', content);
       const newDate = new Date();
       localStorage.setItem('termsConditionsUpdatedAt', newDate.toISOString());
-      
+
       alert('Content saved successfully!');
     } catch (error) {
       console.error('Error saving content:', error);
@@ -112,6 +112,13 @@ const TermsConditionsEditorPage = () => {
           boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)',
         }}
       >
+        {/* Metadata */}
+        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: 3 }}>
+          <Chip label="Version: 1.0" size="small" sx={{ backgroundColor: '#2196F3', color: 'white', fontWeight: 600 }} />
+          <Chip label={`Updated: ${new Date().toLocaleDateString()}`} size="small" sx={{ backgroundColor: '#4CAF50', color: 'white', fontWeight: 600 }} />
+          <Chip label="PUBLISHED" size="small" sx={{ backgroundColor: '#F44336', color: 'white', fontWeight: 600 }} />
+        </Box>
+
         {/* Info Banner */}
         <Box sx={{ maxWidth: '1400px', margin: '0 auto' }}>
           <Alert

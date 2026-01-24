@@ -319,11 +319,23 @@ const staticLeaderboardData = [
 
 const LeaderboardPage = () => {
   const navigate = useNavigate();
-  const [entries, setEntries] = useState(staticLeaderboardData);
-  const [filteredEntries, setFilteredEntries] = useState(staticLeaderboardData);
+  // Generate monthly data from static data for demo purposes
+  const [entries, setEntries] = useState(() => {
+    const monthlyData = staticLeaderboardData.map(entry => ({
+      ...entry,
+      id: `${entry.id}_monthly`,
+      period: 'monthly',
+      points: Math.floor(entry.points / 10), // Simulate monthly points
+      spTotal: Math.floor(entry.spTotal / 10),
+      totalPredictions: Math.floor(entry.totalPredictions / 10),
+    }));
+    return [...staticLeaderboardData, ...monthlyData];
+  });
+
+  const [filteredEntries, setFilteredEntries] = useState([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedPeriod, setSelectedPeriod] = useState('allTime');
+  const [selectedPeriod, setSelectedPeriod] = useState('monthly'); // Default to Monthly
   const [selectedSort, setSelectedSort] = useState('rankAsc');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -333,12 +345,15 @@ const LeaderboardPage = () => {
   const [actionsAnchor, setActionsAnchor] = useState(null);
   const [selectedEntry, setSelectedEntry] = useState(null);
 
-  const totalParticipants = entries.length;
-  const topScorer = entries[0]?.username || 'N/A';
-  const averageAccuracy = entries.length > 0
-    ? ((entries.reduce((sum, e) => sum + (e.accuracyRate || 0), 0) / entries.length)).toFixed(1)
+  // Stats derived from filteredEntries (affected by period selection)
+  const totalParticipants = filteredEntries.length;
+  const topScorer = filteredEntries.length > 0
+    ? filteredEntries.reduce((max, entry) => (entry.spTotal > max.spTotal ? entry : max), filteredEntries[0]).username
+    : 'N/A';
+  const averageAccuracy = filteredEntries.length > 0
+    ? ((filteredEntries.reduce((sum, e) => sum + (e.accuracyRate || 0), 0) / filteredEntries.length)).toFixed(1)
     : '0.0';
-  const totalPoints = entries.reduce((sum, e) => sum + (e.spTotal || e.points || 0), 0);
+  const totalPoints = filteredEntries.reduce((sum, e) => sum + (e.spTotal || e.points || 0), 0);
 
   useEffect(() => {
     const filterAndSortEntries = () => {
@@ -1147,7 +1162,10 @@ const LeaderboardPage = () => {
           setRowsPerPage(parseInt(e.target.value, 10));
           setPage(0);
         }}
-        onRowClick={(row) => navigate(`/leaderboard/details/${row.id}`)}
+        onRowClick={(row) => {
+          const realId = row.id.toString().replace('_monthly', '');
+          navigate(`/leaderboard/details/${realId}?period=${selectedPeriod}`);
+        }}
         emptyMessage="No leaderboard entries found"
       />
 
@@ -1172,7 +1190,8 @@ const LeaderboardPage = () => {
         <MenuItem
           onClick={() => {
             if (selectedEntry) {
-              navigate(`/leaderboard/details/${selectedEntry.id}`);
+              const realId = selectedEntry.id.toString().replace('_monthly', '');
+              navigate(`/leaderboard/details/${realId}?period=${selectedPeriod}`);
             }
             handleActionsClose();
           }}

@@ -17,6 +17,7 @@ import {
   ListItemIcon,
   ListItemText,
   Alert,
+  Chip,
 } from '@mui/material';
 import {
   ArrowBack,
@@ -343,24 +344,36 @@ const PollFormPage = () => {
                     </Typography>
                   </Box>
                   {leagueFixtures.length > 0 ? (
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                       {leagueFixtures.slice(0, 5).map((fixture) => (
-                        <Box
+                        <Card
                           key={fixture.id}
+                          elevation={0}
                           sx={{
-                            padding: 1,
-                            borderRadius: '8px',
+                            padding: 2,
+                            borderRadius: '12px',
                             backgroundColor: colors.brandWhite,
-                            border: `1px solid ${colors.divider}33`,
+                            border: `1px solid ${colors.divider}`,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'flex-start',
+                            justifyContent: 'center',
+                            '&:hover': {
+                              borderColor: colors.info,
+                              backgroundColor: '#F8FAFC'
+                            }
                           }}
                         >
-                          <Typography variant="body2" sx={{ fontWeight: 500, color: colors.brandBlack }}>
-                            {fixture.homeTeam || 'TBD'} vs {fixture.awayTeam || 'TBD'}
+                          <Typography variant="subtitle1" sx={{ fontWeight: 700, color: colors.brandBlack, lineHeight: 1.2, mb: 0.5 }}>
+                            {fixture.homeTeam || 'TBD'}
                           </Typography>
-                        </Box>
+                          <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13 }}>
+                            vs {fixture.awayTeam || 'TBD'}
+                          </Typography>
+                        </Card>
                       ))}
                       {leagueFixtures.length > 5 && (
-                        <Typography variant="caption" sx={{ color: colors.textSecondary, mt: 0.5 }}>
+                        <Typography variant="caption" sx={{ color: colors.textSecondary, mt: 0.5, textAlign: 'center', display: 'block' }}>
                           + {leagueFixtures.length - 5} more matches
                         </Typography>
                       )}

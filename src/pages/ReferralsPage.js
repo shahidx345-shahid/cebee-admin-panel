@@ -60,6 +60,8 @@ const ReferralsPage = () => {
   const [selectedReferral, setSelectedReferral] = useState(null);
   const [actionMenuAnchor, setActionMenuAnchor] = useState(null);
   const [selectedRowForAction, setSelectedRowForAction] = useState(null);
+  const [timePeriod, setTimePeriod] = useState('allTime'); // 'allTime' or 'monthly'
+  const [timePeriodMenuAnchor, setTimePeriodMenuAnchor] = useState(null);
 
   const handleActionMenuOpen = (event, row) => {
     setActionMenuAnchor(event.currentTarget);
@@ -82,20 +84,22 @@ const ReferralsPage = () => {
 
   useEffect(() => {
     filterAndSortReferrals();
-  }, [referrals, searchQuery, statusFilter, countryFilter, selectedSort]);
+  }, [referrals, searchQuery, statusFilter, countryFilter, selectedSort, timePeriod]);
 
   const loadReferrals = async () => {
     try {
       setLoading(true);
       // Mock Data matching screenshot with Phase 1 refinements
       const mockReferrals = [
-        { id: '1', referrerId: 'USR_1001', referrerUsername: 'PredictionMaster', referrerEmail: 'predmaster@example.com', referrerCountry: 'Nigeria', referredId: 'USR_2001', referredUsername: 'FootballFan2025', referredEmail: 'footballfan2025@example.com', referredCountry: 'Algeria', cpAwarded: 10, status: 'valid', referralDate: new Date('2025-12-15'), source: 'Invite Link', risk: false },
-        { id: '2', referrerId: 'USR_1002', referrerUsername: 'AfricanLegend', referrerEmail: 'legend@example.com', referrerCountry: 'Ghana', referredId: 'USR_2002', referredUsername: 'MatchMaster', referredEmail: 'matchmaster@example.com', referredCountry: 'Ivory Coast', cpAwarded: 10, status: 'valid', referralDate: new Date('2025-12-12'), source: 'Manual Code', risk: false },
-        { id: '3', referrerId: 'USR_1003', referrerUsername: 'GoalMachine', referrerEmail: 'goalmachine@example.com', referrerCountry: 'Kenya', referredId: 'USR_2003', referredUsername: 'TopScorer', referredEmail: 'topscorer@example.com', referredCountry: 'Senegal', cpAwarded: 10, status: 'valid', referralDate: new Date('2025-12-10'), source: 'Campaign', risk: false },
-        { id: '4', referrerId: 'USR_1004', referrerUsername: 'ScoreKing', referrerEmail: 'scoreking@example.com', referrerCountry: 'South Africa', referredId: 'USR_2004', referredUsername: 'ProPredictor', referredEmail: 'propredictor@example.com', referredCountry: 'Uganda', cpAwarded: 0, status: 'flagged', statusReason: 'Duplicate device detected', referralDate: new Date('2025-12-08'), source: 'Invite Link', risk: true, riskReason: 'Duplicate IP' },
+        { id: '1', referrerId: 'USR_1001', referrerUsername: 'PredictionMaster', referrerEmail: 'predmaster@example.com', referrerCountry: 'Nigeria', referredId: 'USR_2001', referredUsername: 'FootballFan2025', referredEmail: 'footballfan2025@example.com', referredCountry: 'Algeria', cpAwarded: 10, status: 'valid', referralDate: new Date('2026-01-15'), source: 'Invite Link', risk: false },
+        { id: '2', referrerId: 'USR_1002', referrerUsername: 'AfricanLegend', referrerEmail: 'legend@example.com', referrerCountry: 'Ghana', referredId: 'USR_2002', referredUsername: 'MatchMaster', referredEmail: 'matchmaster@example.com', referredCountry: 'Ivory Coast', cpAwarded: 10, status: 'valid', referralDate: new Date('2026-01-12'), source: 'Manual Code', risk: false },
+        { id: '3', referrerId: 'USR_1003', referrerUsername: 'GoalMachine', referrerEmail: 'goalmachine@example.com', referrerCountry: 'Kenya', referredId: 'USR_2003', referredUsername: 'TopScorer', referredEmail: 'topscorer@example.com', referredCountry: 'Senegal', cpAwarded: 10, status: 'valid', referralDate: new Date('2026-01-10'), source: 'Campaign', risk: false },
+        { id: '4', referrerId: 'USR_1004', referrerUsername: 'ScoreKing', referrerEmail: 'scoreking@example.com', referrerCountry: 'South Africa', referredId: 'USR_2004', referredUsername: 'ProPredictor', referredEmail: 'propredictor@example.com', referredCountry: 'Uganda', cpAwarded: 0, status: 'flagged', statusReason: 'Duplicate device detected', referralDate: new Date('2026-01-08'), source: 'Invite Link', risk: true, riskReason: 'Duplicate IP' },
         { id: '5', referrerId: 'USR_1005', referrerUsername: 'ChiefPredictor', referrerEmail: 'chief@example.com', referrerCountry: 'Egypt', referredId: 'USR_2005', referredUsername: 'WinnerTakes', referredEmail: 'winnertakes@example.com', referredCountry: 'Tanzania', cpAwarded: 10, status: 'valid', referralDate: new Date('2025-12-05'), source: 'Invite Link', risk: false },
         { id: '6', referrerId: 'USR_1006', referrerUsername: 'FootballWizard', referrerEmail: 'wizard@example.com', referrerCountry: 'Morocco', referredId: 'USR_2006', referredUsername: 'BetKing', referredEmail: 'betking@example.com', referredCountry: 'Cameroon', cpAwarded: 10, status: 'valid', referralDate: new Date('2025-12-01'), source: 'Manual Code', risk: false },
         { id: '7', referrerId: 'USR_1007', referrerUsername: 'KingOfPredictions', referrerEmail: 'kingpred@example.com', referrerCountry: 'Nigeria', referredId: 'USR_2007', referredUsername: 'MatchDay', referredEmail: 'matchday@example.com', referredCountry: 'Morocco', cpAwarded: 0, status: 'invalid', statusReason: 'Self-referral', referralDate: new Date('2025-11-28'), source: 'Invite Link', risk: true, riskReason: 'Self-referral' },
+        // Added another referral for PredictionMaster (USR_1001) to test aggregation
+        { id: '8', referrerId: 'USR_1001', referrerUsername: 'PredictionMaster', referrerEmail: 'predmaster@example.com', referrerCountry: 'Nigeria', referredId: 'USR_2008', referredUsername: 'SoccerStar', referredEmail: 'soccerstar@example.com', referredCountry: 'Nigeria', cpAwarded: 10, status: 'valid', referralDate: new Date('2026-01-20'), source: 'Share Button', risk: false },
       ];
 
       setReferrals(mockReferrals);
@@ -109,6 +113,16 @@ const ReferralsPage = () => {
 
   const filterAndSortReferrals = () => {
     let filtered = [...referrals];
+
+    // Apply time period filter first
+    if (timePeriod === 'monthly') {
+      const currentMonth = new Date().getMonth();
+      const currentYear = new Date().getFullYear();
+      filtered = filtered.filter(r => {
+        const d = r.referralDate instanceof Date ? r.referralDate : new Date(r.referralDate);
+        return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+      });
+    }
 
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
@@ -169,9 +183,31 @@ const ReferralsPage = () => {
   const validReferrals = referrals.filter((r) => (r.status || r.referralStatus) === 'valid' || (r.status || r.referralStatus) === 'completed');
   const totalCPIssued = referrals.reduce((sum, r) => sum + (r.cpAwarded || r.cpEarned || 0), 0);
 
-  // Phase 1 Breakdown Calculations
+  // Get current month/year
   const currentMonth = new Date().getMonth();
   const currentYear = new Date().getFullYear();
+
+  // Filter referrals based on time period
+  const getFilteredByTimePeriod = (refList) => {
+    if (timePeriod === 'monthly') {
+      return refList.filter(r => {
+        const d = r.referralDate instanceof Date ? r.referralDate : new Date(r.referralDate);
+        return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+      });
+    }
+    return refList; // All time
+  };
+
+  // Calculate stats based on time period
+  const periodReferrals = getFilteredByTimePeriod(referrals);
+  const periodValidReferrals = getFilteredByTimePeriod(validReferrals);
+  const periodCPIssued = periodReferrals.reduce((sum, r) => sum + (r.cpAwarded || 0), 0);
+
+  // Calculate unique referrers for the period
+  const uniqueReferrerIds = new Set(periodReferrals.map(r => r.referrerId));
+  const uniqueReferrersCount = uniqueReferrerIds.size;
+
+  // Always calculate monthly stats for display
   const monthlyReferrals = referrals.filter(r => {
     const d = r.referralDate instanceof Date ? r.referralDate : new Date(r.referralDate);
     return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
@@ -368,8 +404,34 @@ const ReferralsPage = () => {
     page * rowsPerPage + rowsPerPage
   );
 
+  const getReferrerStats = (referrerId) => {
+    if (!referrerId) return null;
+    const referrerReferrals = referrals.filter(r => r.referrerId === referrerId);
+
+    // Calculate stats
+    const totalReferrals = referrerReferrals.length;
+    const totalCP = referrerReferrals.reduce((sum, r) => sum + (r.cpAwarded || 0), 0);
+
+    const now = new Date();
+    const currentMonthData = referrerReferrals.filter(r => {
+      const d = r.referralDate instanceof Date ? r.referralDate : new Date(r.referralDate);
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    });
+
+    const monthlyReferralsCount = currentMonthData.length;
+    const monthlyCP = currentMonthData.reduce((sum, r) => sum + (r.cpAwarded || 0), 0);
+
+    return {
+      totalReferrals,
+      monthlyReferrals: monthlyReferralsCount,
+      totalCP,
+      monthlyCP
+    };
+  };
+
   if (selectedReferral) {
-    return <ReferralDetailsView referral={selectedReferral} onBack={() => setSelectedReferral(null)} />;
+    const stats = getReferrerStats(selectedReferral.referrerId);
+    return <ReferralDetailsView referral={selectedReferral} onBack={() => setSelectedReferral(null)} referrerStats={stats} />;
   }
 
   return (
@@ -446,9 +508,182 @@ const ReferralsPage = () => {
         </Typography>
       </Box>
 
-      {/* CP Breakdown Stats Cards (Phase 1) */}
+      {/* Time Period Filter */}
+      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'flex-end' }}>
+        <Button
+          variant="outlined"
+          onClick={(e) => setTimePeriodMenuAnchor(e.currentTarget)}
+          endIcon={<ArrowDropDown sx={{ fontSize: 20, color: colors.brandRed }} />}
+          startIcon={
+            <Box sx={{ color: colors.brandRed, display: 'flex', alignItems: 'center' }}>
+              <CalendarToday sx={{ fontSize: 18 }} />
+            </Box>
+          }
+          sx={{
+            borderRadius: '12px',
+            textTransform: 'none',
+            fontWeight: 600,
+            px: 3,
+            py: 1.5,
+            fontSize: 15,
+            color: colors.brandRed,
+            backgroundColor: '#FFF5F5',
+            borderColor: '#FFCDD2',
+            borderWidth: '1.5px',
+            '&:hover': {
+              backgroundColor: '#FFEBEE',
+              borderColor: colors.brandRed,
+            },
+          }}
+        >
+          {timePeriod === 'allTime' ? 'All Time' : 'This Month'}
+        </Button>
+        <Menu
+          anchorEl={timePeriodMenuAnchor}
+          open={Boolean(timePeriodMenuAnchor)}
+          onClose={() => setTimePeriodMenuAnchor(null)}
+          PaperProps={{
+            sx: {
+              borderRadius: '16px',
+              mt: 1,
+              minWidth: 200,
+              boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+              p: 1,
+            },
+          }}
+        >
+          {[
+            { value: 'allTime', label: 'All Time', icon: <Public sx={{ fontSize: 18 }} /> },
+            { value: 'monthly', label: 'This Month', icon: <CalendarToday sx={{ fontSize: 18 }} /> },
+          ].map((option) => (
+            <MenuItem
+              key={option.value}
+              onClick={() => {
+                setTimePeriod(option.value);
+                setTimePeriodMenuAnchor(null);
+              }}
+              sx={{
+                mb: 0.5,
+                borderRadius: '12px',
+                py: 1.5,
+                px: 2,
+                backgroundColor: timePeriod === option.value ? '#FFEBEE' : 'transparent',
+                border: timePeriod === option.value ? `1px solid ${colors.brandRed}40` : '1px solid transparent',
+                '&:hover': {
+                  backgroundColor: timePeriod === option.value ? '#FFEBEE' : colors.backgroundLight,
+                },
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', flexGrow: 1, gap: 2 }}>
+                <Box
+                  sx={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: '10px',
+                    backgroundColor: timePeriod === option.value ? '#FFCDD2' : '#F5F5F5',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: timePeriod === option.value ? colors.brandRed : colors.textSecondary,
+                  }}
+                >
+                  {option.icon}
+                </Box>
+                <Typography
+                  sx={{
+                    fontWeight: timePeriod === option.value ? 700 : 500,
+                    color: timePeriod === option.value ? colors.brandBlack : colors.textPrimary,
+                    fontSize: 14,
+                  }}
+                >
+                  {option.label}
+                </Typography>
+              </Box>
+              {timePeriod === option.value && (
+                <Box
+                  sx={{
+                    width: 24,
+                    height: 24,
+                    borderRadius: '50%',
+                    backgroundColor: '#FFCDD2',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Check sx={{ fontSize: 14, color: colors.brandRed }} />
+                </Box>
+              )}
+            </MenuItem>
+          ))}
+        </Menu>
+      </Box>
+
+      {/* Stats Cards */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
-        {/* Referral CP - Total */}
+        {/* This Month Referrals / Total Referrals */}
+        <Grid item xs={6} md={3}>
+          <Card
+            sx={{
+              padding: 3,
+              borderRadius: '16px',
+              boxShadow: 'none',
+              backgroundColor: '#F0F9FF',
+              height: '100%',
+              minHeight: 180,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+            }}
+          >
+            <Box sx={{ mb: 2, flexDirection: 'row', display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Box sx={{ width: 40, height: 40, borderRadius: '10px', backgroundColor: '#DBEAFE', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <PersonAdd sx={{ fontSize: 20, color: '#0284C7' }} />
+              </Box>
+              <Typography sx={{ fontSize: 14, fontWeight: 600, color: colors.textSecondary }}>
+                {timePeriod === 'monthly' ? 'This Month Referrals' : 'Total Referrals'}
+              </Typography>
+            </Box>
+            <Typography sx={{ fontWeight: 700, color: colors.brandBlack, fontSize: 28, mb: 0.5 }}>
+              {periodReferrals.length}
+            </Typography>
+            <Typography sx={{ color: colors.textSecondary, fontSize: 12 }}>
+              {timePeriod === 'monthly' ? 'Current Month' : 'All Time'}
+            </Typography>
+          </Card>
+        </Grid>
+
+        {/* Valid Referrals */}
+        <Grid item xs={6} md={3}>
+          <Card
+            sx={{
+              padding: 3,
+              borderRadius: '16px',
+              boxShadow: 'none',
+              backgroundColor: '#F0FDF4',
+              height: '100%',
+              minHeight: 180,
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+            }}
+          >
+            <Box sx={{ mb: 2, flexDirection: 'row', display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Box sx={{ width: 40, height: 40, borderRadius: '10px', backgroundColor: '#DCFCE7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <CheckCircle sx={{ fontSize: 20, color: '#16A34A' }} />
+              </Box>
+              <Typography sx={{ fontSize: 14, fontWeight: 600, color: colors.textSecondary }}>Valid Referrals</Typography>
+            </Box>
+            <Typography sx={{ fontWeight: 700, color: colors.brandBlack, fontSize: 28, mb: 0.5 }}>
+              {periodValidReferrals.length}
+            </Typography>
+            <Typography sx={{ color: colors.textSecondary, fontSize: 12 }}>
+              {timePeriod === 'monthly' ? 'Current Month' : 'All Time'}
+            </Typography>
+          </Card>
+        </Grid>
+
+        {/* This Month Referrals CP Issued / Total CP Issued */}
         <Grid item xs={6} md={3}>
           <Card
             sx={{
@@ -467,23 +702,27 @@ const ReferralsPage = () => {
               <Box sx={{ width: 40, height: 40, borderRadius: '10px', backgroundColor: '#FEF3C7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Star sx={{ fontSize: 20, color: '#D97706' }} />
               </Box>
-              <Typography sx={{ fontSize: 14, fontWeight: 600, color: colors.textSecondary }}>Referral CP (Total)</Typography>
+              <Typography sx={{ fontSize: 14, fontWeight: 600, color: colors.textSecondary }}>
+                {timePeriod === 'monthly' ? 'This Month CP Issued' : 'Total CP Issued'}
+              </Typography>
             </Box>
             <Typography sx={{ fontWeight: 700, color: colors.brandBlack, fontSize: 28, mb: 0.5 }}>
-              {totalCPIssued}
+              {periodCPIssued}
             </Typography>
-            <Typography sx={{ color: colors.textSecondary, fontSize: 12 }}>Lifetime Earned</Typography>
+            <Typography sx={{ color: colors.textSecondary, fontSize: 12 }}>
+              {timePeriod === 'monthly' ? 'Current Month' : 'Lifetime Earned'}
+            </Typography>
           </Card>
         </Grid>
 
-        {/* Referral CP - This Month */}
+        {/* Unique Referrers */}
         <Grid item xs={6} md={3}>
           <Card
             sx={{
               padding: 3,
               borderRadius: '16px',
               boxShadow: 'none',
-              backgroundColor: '#FFFBEB',
+              backgroundColor: '#FFF1F2',
               height: '100%',
               minHeight: 180,
               display: 'flex',
@@ -492,73 +731,17 @@ const ReferralsPage = () => {
             }}
           >
             <Box sx={{ mb: 2, flexDirection: 'row', display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Box sx={{ width: 40, height: 40, borderRadius: '10px', backgroundColor: '#FEF3C7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Star sx={{ fontSize: 20, color: '#D97706' }} />
+              <Box sx={{ width: 40, height: 40, borderRadius: '10px', backgroundColor: '#FFE4E6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <EmojiEvents sx={{ fontSize: 20, color: '#E11D48' }} />
               </Box>
-              <Typography sx={{ fontSize: 14, fontWeight: 600, color: colors.textSecondary }}>Referral CP (Month)</Typography>
+              <Typography sx={{ fontSize: 14, fontWeight: 600, color: colors.textSecondary }}>Unique Referrers</Typography>
             </Box>
             <Typography sx={{ fontWeight: 700, color: colors.brandBlack, fontSize: 28, mb: 0.5 }}>
-              {cpIssuedThisMonth}
+              {uniqueReferrersCount}
             </Typography>
-            <Typography sx={{ color: colors.textSecondary, fontSize: 12 }}>Current Month</Typography>
-          </Card>
-        </Grid>
-
-        {/* Engagement CP - Phase 2 */}
-        <Grid item xs={6} md={3}>
-          <Card
-            sx={{
-              padding: 3,
-              borderRadius: '16px',
-              boxShadow: 'none',
-              backgroundColor: '#F3F4F6', // Grey for inactive
-              height: '100%',
-              minHeight: 180,
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              border: '1px dashed #D1D5DB'
-            }}
-          >
-            <Box sx={{ mb: 2, flexDirection: 'row', display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Box sx={{ width: 40, height: 40, borderRadius: '10px', backgroundColor: '#E5E7EB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <EmojiEvents sx={{ fontSize: 20, color: '#9CA3AF' }} />
-              </Box>
-              <Typography sx={{ fontSize: 14, fontWeight: 600, color: '#9CA3AF' }}>Engagement CP</Typography>
-            </Box>
-            <Typography sx={{ fontWeight: 700, color: '#9CA3AF', fontSize: 20, mb: 0.5 }}>
-              Phase 2
+            <Typography sx={{ color: colors.textSecondary, fontSize: 12 }}>
+              {timePeriod === 'monthly' ? 'Current Month' : 'All Time'}
             </Typography>
-            <Chip label="Coming Soon" size="small" sx={{ alignSelf: 'flex-start', height: 20, fontSize: 10, bgcolor: '#E5E7EB', color: '#6B7280' }} />
-          </Card>
-        </Grid>
-
-        {/* Campaign CP - Phase 2 */}
-        <Grid item xs={6} md={3}>
-          <Card
-            sx={{
-              padding: 3,
-              borderRadius: '16px',
-              boxShadow: 'none',
-              backgroundColor: '#F3F4F6', // Grey for inactive
-              height: '100%',
-              minHeight: 180,
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'center',
-              border: '1px dashed #D1D5DB'
-            }}
-          >
-            <Box sx={{ mb: 2, flexDirection: 'row', display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Box sx={{ width: 40, height: 40, borderRadius: '10px', backgroundColor: '#E5E7EB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Campaign sx={{ fontSize: 20, color: '#9CA3AF' }} />
-              </Box>
-              <Typography sx={{ fontSize: 14, fontWeight: 600, color: '#9CA3AF' }}>Campaign CP</Typography>
-            </Box>
-            <Typography sx={{ fontWeight: 700, color: '#9CA3AF', fontSize: 20, mb: 0.5 }}>
-              Phase 2
-            </Typography>
-            <Chip label="Coming Soon" size="small" sx={{ alignSelf: 'flex-start', height: 20, fontSize: 10, bgcolor: '#E5E7EB', color: '#6B7280' }} />
           </Card>
         </Grid>
       </Grid>

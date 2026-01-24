@@ -415,6 +415,22 @@ const PredictionsPage = () => {
       render: (_, row) => getGroupStatusChip(row.status || 'ongoing'),
     },
     {
+      id: 'spWon',
+      label: 'Total SP Won',
+      render: (_, row) => {
+        // Calculate total SP for the group
+        const totalSP = row.predictions ? row.predictions.reduce((sum, p) => sum + (p.spAwarded || 0), 0) : 0;
+        return (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <Star sx={{ fontSize: 16, color: colors.warning }} />
+            <Typography variant="body2" sx={{ fontWeight: 700, color: colors.brandBlack }}>
+              {totalSP}
+            </Typography>
+          </Box>
+        );
+      },
+    },
+    {
       id: 'actions',
       label: 'Actions',
       render: (_, row) => (

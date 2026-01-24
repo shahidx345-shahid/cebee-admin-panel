@@ -47,6 +47,7 @@ import {
   Flag,
   SportsSoccer,
   Favorite,
+  Info as InfoIcon,
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { colors, constants } from '../config/theme';
@@ -279,6 +280,23 @@ const NotificationFormPage = () => {
                 </Typography>
               </Box>
 
+              {/* Admin Info Banner */}
+              <Box sx={{
+                mb: 4,
+                p: 2,
+                borderRadius: '12px',
+                backgroundColor: `${colors.info}1A`,
+                border: `1px solid ${colors.info}33`,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.5
+              }}>
+                <InfoIcon sx={{ color: colors.info, fontSize: 20 }} />
+                <Typography variant="body2" sx={{ color: colors.info, fontWeight: 500, fontSize: 13 }}>
+                  Notifications are one-way system announcements. Users cannot reply in Phase 1.
+                </Typography>
+              </Box>
+
               {/* Notification Type Selector */}
               <Box sx={{ mb: 4 }}>
                 <Typography variant="body2" sx={{ fontWeight: 600, mb: 1.5, fontSize: 14 }}>
@@ -449,7 +467,7 @@ const NotificationFormPage = () => {
                 </Typography>
                 <TextField
                   fullWidth
-                  placeholder="Optional: /polls/POLL_001"
+                  placeholder="Optional. Used to link users to a specific app screen (e.g. Match, Poll, Rewards)"
                   value={formData.deepLink}
                   onChange={(e) => handleChange('deepLink', e.target.value)}
                   InputProps={{
@@ -473,8 +491,11 @@ const NotificationFormPage = () => {
 
               {/* Target Audience Selector */}
               <Box sx={{ mb: 3 }}>
-                <Typography variant="body2" sx={{ fontWeight: 600, mb: 1.5, fontSize: 14 }}>
+                <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5, fontSize: 14 }}>
                   Target Audience
+                </Typography>
+                <Typography variant="caption" sx={{ color: colors.textSecondary, mb: 1.5, display: 'block', fontSize: 12 }}>
+                  Some audience filters are reserved for future targeting logic (Phase 2).
                 </Typography>
                 <Grid container spacing={1.5}>
                   {AUDIENCE_OPTIONS.map((audience) => {
@@ -568,6 +589,7 @@ const NotificationFormPage = () => {
                         slotProps={{
                           textField: {
                             sx: { borderRadius: '12px' },
+                            helperText: "Scheduled time is based on system timezone."
                           },
                         }}
                       />

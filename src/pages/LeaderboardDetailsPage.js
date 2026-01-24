@@ -1,32 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
     Box,
     Typography,
     Button,
     Card,
     Grid,
-    Chip,
-    Alert,
     CircularProgress,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
-    Paper,
-    IconButton,
 } from '@mui/material';
 import {
     ArrowBack,
     Person,
     CheckCircle,
-    Cancel,
-    Flag,
-    TrendingUp,
     BarChart,
-    EmojiEvents,
     LocationOn,
     Verified,
     AccessTime,
@@ -34,24 +20,49 @@ import {
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { colors, constants } from '../config/theme';
-import SearchBar from '../components/common/SearchBar';
 
 const LeaderboardDetailsPage = () => {
     const navigate = useNavigate();
     const { id } = useParams();
+    const location = useLocation();
+    const queryParams = new URLSearchParams(location.search);
+    const period = queryParams.get('period') || 'allTime';
+
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [activities, setActivities] = useState([]);
 
     useEffect(() => {
         loadUserData();
-    }, [id]);
+    }, [id, period]);
 
-    const generateDummyUserData = (userId) => {
+    const generateDummyUserData = (userId, selectedPeriod) => {
+        const isMonthly = selectedPeriod === 'monthly';
+        // Base stats (All Time)
+        const baseStats = {
+            spTotal: 22400,
+            spCurrent: 1200,
+            cpTotal: 350,
+            cpCurrent: 150,
+            totalPredictions: 780,
+            correctPredictions: 580,
+            predictionAccuracy: 74.4,
+        };
+
+        // Adjust for monthly view
+        const stats = isMonthly ? {
+            spTotal: Math.floor(baseStats.spTotal / 12),
+            spCurrent: baseStats.spCurrent, // Current usually implies relevant now
+            cpTotal: Math.floor(baseStats.cpTotal / 12),
+            cpCurrent: baseStats.cpCurrent,
+            totalPredictions: Math.floor(baseStats.totalPredictions / 12),
+            correctPredictions: Math.floor(baseStats.correctPredictions / 12),
+            predictionAccuracy: baseStats.predictionAccuracy - 2.1, // Slight variation
+        } : baseStats;
+
         const countries = ['United States', 'United Kingdom', 'Kenya', 'Australia', 'Germany', 'France', 'Spain', 'Italy', 'Brazil', 'India', 'Nigeria', 'South Africa', 'Ghana'];
         return {
             id: userId,
-            rank: 4,
+            rank: isMonthly ? 12 : 4, // Rank differs per period
             username: 'PredictionMaster',
             email: 'predictionmaster@example.com',
             fullName: 'Prediction Master',
@@ -62,18 +73,12 @@ const LeaderboardDetailsPage = () => {
             isDeleted: false,
             isDeactivated: false,
             fraudFlags: [],
-            spTotal: 22400,
-            spCurrent: 1200,
-            cpTotal: 350,
-            cpCurrent: 150,
-            totalPredictions: 780,
-            predictionAccuracy: 74.4,
-            correctPredictions: 580,
+            ...stats,
             totalPolls: 12,
             createdAt: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000),
             lastLogin: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-            spFromPredictions: 1800,
-            spFromDailyLogin: 650,
+            spFromPredictions: isMonthly ? 150 : 1800,
+            spFromDailyLogin: isMonthly ? 50 : 650,
             cpFromReferrals: 200,
             cpFromEngagement: 150,
         };
@@ -84,14 +89,12 @@ const LeaderboardDetailsPage = () => {
             setLoading(true);
             await new Promise(resolve => setTimeout(resolve, 600)); // Simulate delay
 
-            const userData = generateDummyUserData(id);
+            const userData = generateDummyUserData(id, period);
             setUser(userData);
-            setActivities([]);
         } catch (error) {
             console.error('Error loading user:', error);
-            const dummyData = generateDummyUserData(id);
+            const dummyData = generateDummyUserData(id, period);
             setUser(dummyData);
-            setActivities([]);
         } finally {
             setLoading(false);
         }
@@ -177,7 +180,7 @@ const LeaderboardDetailsPage = () => {
                     }}
                 >
                     <Typography sx={{ fontWeight: 700, fontSize: 13, color: colors.brandWhite }}>
-                        LBAT_{user.rank || 4}
+                        {period === 'monthly' ? `LBMO_${user.rank}` : `LBAT_${user.rank}`}
                     </Typography>
                 </Box>
 
@@ -197,7 +200,7 @@ const LeaderboardDetailsPage = () => {
                     }}
                 >
                     <Typography sx={{ fontWeight: 700, fontSize: 18, color: 'rgba(255,255,255,0.8)' }}>
-                        #{user.rank || 4}
+                        #{user.rank}
                     </Typography>
                 </Box>
 
@@ -288,7 +291,7 @@ const LeaderboardDetailsPage = () => {
                                 {(user.spTotal || 0).toLocaleString()}
                             </Typography>
                             <Typography variant="body2" sx={{ color: colors.textSecondary, fontWeight: 500 }}>
-                                Total Points
+                                {period === 'monthly' ? 'Monthly Points' : 'Total Points (All Time)'}
                             </Typography>
                         </Box>
                     </Card>
@@ -355,7 +358,7 @@ const LeaderboardDetailsPage = () => {
                         </Box>
                         <Box>
                             <Typography variant="h4" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.5 }}>
-                                {user.correctPredictions || 580}
+                                {user.correctPredictions || 0}
                             </Typography>
                             <Typography variant="body2" sx={{ color: colors.textSecondary, fontWeight: 500 }}>
                                 Correct Predictions
@@ -426,7 +429,7 @@ const LeaderboardDetailsPage = () => {
                         </Box>
                         <Box>
                             <Typography variant="h4" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.5 }}>
-                                {user.rank || 4}
+                                {user.rank || '-'}
                             </Typography>
                             <Typography variant="body2" sx={{ color: colors.textSecondary, fontWeight: 500 }}>
                                 Current Rank
@@ -461,22 +464,15 @@ const LeaderboardDetailsPage = () => {
                         </Box>
                         <Box>
                             <Typography variant="h4" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.5 }}>
-                                All Time
+                                {period === 'monthly' ? 'Monthly' : period === 'weekly' ? 'Weekly' : 'All Time'}
                             </Typography>
                             <Typography variant="body2" sx={{ color: colors.textSecondary, fontWeight: 500 }}>
-                                Period
+                                Selected Period
                             </Typography>
                         </Box>
                     </Card>
                 </Grid>
             </Grid>
-
-            {/* Breakdown and Logs skipped for brevity as screenshot only showed Stats cards; 
-          but usually we'd keep them. I'll omit them to match the screenshot focus and user request 
-          "add THIS details page". 
-          The screenshot ENDS after the 4th stat card. 
-          So I'll stop here. 
-      */}
         </Box >
     );
 };

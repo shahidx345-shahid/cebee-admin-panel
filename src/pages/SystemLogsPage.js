@@ -11,8 +11,11 @@ import {
   InputLabel,
   Button,
   IconButton,
+  Tooltip,
   Menu,
 } from '@mui/material';
+
+
 import {
   Shield,
   Description,
@@ -282,16 +285,24 @@ const SystemLogsPage = () => {
   };
 
   const getStatusChip = (status) => {
-    const statusValue = status?.toLowerCase() || 'unresolved';
+    // Check if status is the whole row object or just the string
+    let statusValue = 'unresolved';
+    if (typeof status === 'object' && status !== null) {
+      statusValue = status.status || status.logStatus || 'unresolved';
+    } else {
+      statusValue = status || 'unresolved';
+    }
+
+    statusValue = statusValue.toLowerCase();
     const isAck = statusValue === 'acknowledged' || statusValue === 'resolved';
 
-    return (
+    const chip = (
       <Chip
-        label={isAck ? 'ACKNOWLEDGED' : 'UNRESOLVED'}
+        label={statusValue === 'resolved' ? 'RESOLVED' : (isAck ? 'ACKNOWLEDGED' : 'UNRESOLVED')}
         size="small"
         sx={{
-          backgroundColor: isAck ? '#EFF6FF' : '#FEE2E2', // Light Blue vs Light Red
-          color: isAck ? '#3B82F6' : '#EF4444',
+          backgroundColor: statusValue === 'resolved' ? '#DCFCE7' : (isAck ? '#EFF6FF' : '#FEE2E2'), // Green vs Light Blue vs Light Red
+          color: statusValue === 'resolved' ? '#166534' : (isAck ? '#3B82F6' : '#EF4444'),
           fontWeight: 700,
           fontSize: 10,
           borderRadius: '4px',
@@ -301,6 +312,16 @@ const SystemLogsPage = () => {
         }}
       />
     );
+
+    if (statusValue === 'acknowledged') {
+      return (
+        <Tooltip title="Acknowledged = reviewed but not yet resolved" arrow>
+          {chip}
+        </Tooltip>
+      );
+    }
+
+    return chip;
   };
 
   const getUserChip = (username) => {
@@ -364,10 +385,62 @@ const SystemLogsPage = () => {
   };
 
   const handleConfirmResolve = (log, notes) => {
-    console.log('Resolving log:', log.id, 'Notes:', notes);
-    // Logic to actually resolve the log (e.g. update status in mock or backend)
-    // For now, just close
+    // Update local state to reflect resolution
+    const updatedLogs = logs.map(l => {
+      if (l.id === log.id) {
+        return {
+          ...l,
+          status: 'resolved',
+          resolutionNotes: notes,
+          resolvedAt: new Date(),
+          resolvedBy: 'Super Admin' // Mock
+        };
+      }
+      return l;
+    });
+
+    setLogs(updatedLogs);
+    // Also update filtered logs if needed, but the effect will handle it if logs changes
+    // setFilteredLogs ... (useEffect handles this)
+
+    console.log('Log resolved:', log.id, 'Notes:', notes);
     handleCloseResolveModal();
+    alert('Log marked as resolved (Phase 1 Mock)');
+  };
+
+  const handleExport = () => {
+    if (!filteredLogs.length) {
+      alert('No logs to export');
+      return;
+    }
+
+    const headers = ['Log ID', 'Event', 'Severity', 'Status', 'User', 'Admin', 'Timestamp', 'Resolution Notes'];
+    const csvContent = [
+      headers.join(','),
+      ...filteredLogs.map(log => {
+        const date = log.createdAt instanceof Date ? log.createdAt : new Date(log.createdAt);
+        return [
+          log.id,
+          `"${log.event.replace(/"/g, '""')}"`, // Escape quotes
+          log.severity || log.severityLevel,
+          log.status || log.logStatus || 'unresolved',
+          log.relatedUsername || 'N/A',
+          log.adminName || log.adminId || 'System',
+          format(date, 'yyyy-MM-dd HH:mm:ss'),
+          `"${(log.resolutionNotes || '').replace(/"/g, '""')}"`
+        ].join(',');
+      })
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `system_logs_export_${format(new Date(), 'yyyyMMdd_HHmm')}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const columns = [
@@ -435,7 +508,7 @@ const SystemLogsPage = () => {
     {
       id: 'status',
       label: 'Status',
-      render: (_, row) => getStatusChip(row.status || row.logStatus),
+      render: (_, row) => getStatusChip(row),
     },
     {
       id: 'actions',
@@ -925,6 +998,7 @@ const SystemLogsPage = () => {
         </Button>
         <Button
           variant="contained"
+          onClick={handleExport}
           startIcon={<FileDownload sx={{ fontSize: 18 }} />}
           sx={{
             borderRadius: '8px',

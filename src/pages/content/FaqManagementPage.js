@@ -11,7 +11,7 @@ import {
   Dialog,
   DialogContent,
 } from '@mui/material';
-import { Add, Help, MoreVert, List as ListIcon, ArrowDropDown } from '@mui/icons-material';
+import { Add, Help, MoreVert, List as ListIcon, ArrowDropDown, Search as SearchIcon } from '@mui/icons-material';
 import { colors } from '../../config/theme';
 import DataTable from '../../components/common/DataTable';
 import { useNavigate } from 'react-router-dom';
@@ -311,14 +311,44 @@ const staticFaqsData = [
 const FaqManagementPage = () => {
   const navigate = useNavigate();
   const [faqs] = useState(staticFaqsData);
+  const [filteredFaqs, setFilteredFaqs] = useState(staticFaqsData);
   const [loading] = useState(false);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedFaq, setSelectedFaq] = useState(null);
 
+  // Filter States
+  const [searchQuery, setSearchQuery] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [categoryAnchorEl, setCategoryAnchorEl] = useState(null);
+  const [statusAnchorEl, setStatusAnchorEl] = useState(null);
+
   const [openDialog, setOpenDialog] = useState(false);
   const [rowsPerPageMenuAnchor, setRowsPerPageMenuAnchor] = useState(null);
+
+  React.useEffect(() => {
+    let result = faqs;
+
+    if (searchQuery) {
+      result = result.filter(faq =>
+        faq.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        faq.answer.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    if (categoryFilter !== 'all') {
+      result = result.filter(faq => faq.category === categoryFilter);
+    }
+
+    if (statusFilter !== 'all') {
+      result = result.filter(faq => (faq.status || 'published') === statusFilter);
+    }
+
+    setFilteredFaqs(result);
+    setPage(0);
+  }, [faqs, searchQuery, categoryFilter, statusFilter]);
 
   const handleRowsPerPageMenuOpen = (event) => {
     setRowsPerPageMenuAnchor(event.currentTarget);
@@ -481,7 +511,7 @@ const FaqManagementPage = () => {
   return (
     <Box sx={{ width: '100%', maxWidth: '100%' }}>
       {/* FAQ Management Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4, width: '100%' }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, width: '100%' }}>
         <Box>
           <Typography variant="h5" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.75, fontSize: 24 }}>
             FAQ Management
@@ -511,6 +541,108 @@ const FaqManagementPage = () => {
         >
           Add FAQ
         </Button>
+      </Box>
+
+      {/* Filter Bar */}
+      <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap' }}>
+        <Box
+          sx={{
+            flex: 1,
+            minWidth: 240,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.5,
+            padding: '10px 16px',
+            backgroundColor: colors.brandWhite,
+            borderRadius: '12px',
+            border: `1.5px solid ${colors.divider}40`,
+          }}
+        >
+          <SearchIcon sx={{ color: colors.textSecondary }} />
+          <input
+            type="text"
+            placeholder="Search FAQs..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={{
+              border: 'none',
+              outline: 'none',
+              width: '100%',
+              fontSize: '14px',
+              color: colors.brandBlack,
+            }}
+          />
+        </Box>
+
+        <Box sx={{ minWidth: 180 }}>
+          <Button
+            onClick={(e) => setCategoryAnchorEl(e.currentTarget)}
+            endIcon={<ArrowDropDown />}
+            sx={{
+              width: '100%',
+              justifyContent: 'space-between',
+              padding: '10px 16px',
+              backgroundColor: colors.brandWhite,
+              borderRadius: '12px',
+              border: `1.5px solid ${colors.divider}40`,
+              color: categoryFilter === 'all' ? colors.textSecondary : colors.brandBlack,
+              textTransform: 'none',
+              fontSize: 14,
+              height: '46px',
+            }}
+          >
+            {categoryFilter === 'all' ? 'Category: All' : categoryFilter}
+          </Button>
+          <Menu
+            anchorEl={categoryAnchorEl}
+            open={Boolean(categoryAnchorEl)}
+            onClose={() => setCategoryAnchorEl(null)}
+            PaperProps={{ sx: { borderRadius: '12px', mt: 1, minWidth: 180 } }}
+          >
+            <MenuItem onClick={() => { setCategoryFilter('all'); setCategoryAnchorEl(null); }}>All Categories</MenuItem>
+            <MenuItem onClick={() => { setCategoryFilter('Getting Started'); setCategoryAnchorEl(null); }}>Getting Started</MenuItem>
+            <MenuItem onClick={() => { setCategoryFilter('Rewards'); setCategoryAnchorEl(null); }}>Rewards</MenuItem>
+            <MenuItem onClick={() => { setCategoryFilter('Payments'); setCategoryAnchorEl(null); }}>Payments</MenuItem>
+            <MenuItem onClick={() => { setCategoryFilter('Security'); setCategoryAnchorEl(null); }}>Security</MenuItem>
+            <MenuItem onClick={() => { setCategoryFilter('Predictions'); setCategoryAnchorEl(null); }}>Predictions</MenuItem>
+            <MenuItem onClick={() => { setCategoryFilter('Leaderboard'); setCategoryAnchorEl(null); }}>Leaderboard</MenuItem>
+            <MenuItem onClick={() => { setCategoryFilter('Account'); setCategoryAnchorEl(null); }}>Account</MenuItem>
+            <MenuItem onClick={() => { setCategoryFilter('Support'); setCategoryAnchorEl(null); }}>Support</MenuItem>
+            <MenuItem onClick={() => { setCategoryFilter('Matches'); setCategoryAnchorEl(null); }}>Matches</MenuItem>
+          </Menu>
+        </Box>
+
+        <Box sx={{ minWidth: 180 }}>
+          <Button
+            onClick={(e) => setStatusAnchorEl(e.currentTarget)}
+            endIcon={<ArrowDropDown />}
+            sx={{
+              width: '100%',
+              justifyContent: 'space-between',
+              padding: '10px 16px',
+              backgroundColor: colors.brandWhite,
+              borderRadius: '12px',
+              border: `1.5px solid ${colors.divider}40`,
+              color: statusFilter === 'all' ? colors.textSecondary : colors.brandBlack,
+              textTransform: 'none',
+              fontSize: 14,
+              height: '46px',
+            }}
+          >
+            {statusFilter === 'all' ? 'Status: All' : statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)}
+          </Button>
+          <Menu
+            anchorEl={statusAnchorEl}
+            open={Boolean(statusAnchorEl)}
+            onClose={() => setStatusAnchorEl(null)}
+            PaperProps={{ sx: { borderRadius: '12px', mt: 1, minWidth: 180 } }}
+          >
+            <MenuItem onClick={() => { setStatusFilter('all'); setStatusAnchorEl(null); }}>All Statuses</MenuItem>
+            <MenuItem onClick={() => { setStatusFilter('published'); setStatusAnchorEl(null); }}>Published</MenuItem>
+            <MenuItem onClick={() => { setStatusFilter('draft'); setStatusAnchorEl(null); }}>Draft</MenuItem>
+            <MenuItem onClick={() => { setStatusFilter('archived'); setStatusAnchorEl(null); }}>Archived</MenuItem>
+          </Menu>
+        </Box>
       </Box>
 
       {/* FAQs List Header */}
@@ -544,7 +676,7 @@ const FaqManagementPage = () => {
                 FAQs List
               </Typography>
               <Typography variant="body2" sx={{ color: '#9CA3AF', fontSize: 14 }}>
-                {faqs.length} FAQs found
+                {filteredFaqs.length} FAQs found
               </Typography>
             </Box>
           </Box>
@@ -605,7 +737,7 @@ const FaqManagementPage = () => {
         loading={loading}
         page={page}
         rowsPerPage={rowsPerPage}
-        totalCount={faqs.length}
+        totalCount={filteredFaqs.length}
         onPageChange={(e, newPage) => setPage(newPage)}
         onRowsPerPageChange={(e) => {
           setRowsPerPage(parseInt(e.target.value, 10));

@@ -35,6 +35,7 @@ import {
   BarChart,
   ArrowBack,
   ChevronRight,
+  Warning as WarningIcon,
 } from '@mui/icons-material';
 import { colors } from '../config/theme';
 import DataTable from '../components/common/DataTable';
@@ -1096,6 +1097,24 @@ const NotificationsPage = () => {
 
             {/* Main Content Area */}
             <Box sx={{ maxWidth: '1200px', mx: 'auto', mt: 4, px: 3 }}>
+
+              {/* Immutability Clarification */}
+              <Box sx={{
+                mb: 4,
+                p: 2,
+                borderRadius: '12px',
+                backgroundColor: '#FFF7ED',
+                border: '1px solid #FFEDD5',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.5
+              }}>
+                <WarningIcon sx={{ color: '#F97316', fontSize: 20 }} />
+                <Typography variant="body2" sx={{ color: '#9A3412', fontWeight: 500, fontSize: 13 }}>
+                  Title, message, audience, type, and deep link cannot be edited after send.
+                </Typography>
+              </Box>
+
               {/* Top Summary Card */}
               <Card sx={{
                 borderRadius: '24px',
@@ -1107,7 +1126,18 @@ const NotificationsPage = () => {
                 <Box sx={{ p: 4 }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
                     <Chip label={selectedNotification.id || 'NOTIF_001'} size="small" sx={{ backgroundColor: '#FECACA', color: colors.brandRed, fontWeight: 700, borderRadius: '4px', height: 20, fontSize: 10, mb: 2 }} />
-                    <Chip label="SENT" size="small" sx={{ backgroundColor: '#DCFCE7', color: '#166534', fontWeight: 700, borderRadius: '4px', height: 20, fontSize: 10 }} />
+                    <Chip
+                      label={(selectedNotification.status || selectedNotification.notificationStatus || 'sent').toUpperCase()}
+                      size="small"
+                      sx={{
+                        backgroundColor: (selectedNotification.status === 'failed' || selectedNotification.notificationStatus === 'failed') ? '#FEE2E2' : '#DCFCE7',
+                        color: (selectedNotification.status === 'failed' || selectedNotification.notificationStatus === 'failed') ? '#DC2626' : '#166534',
+                        fontWeight: 700,
+                        borderRadius: '4px',
+                        height: 20,
+                        fontSize: 10
+                      }}
+                    />
                   </Box>
 
                   <Typography variant="h4" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 1.5 }}>
@@ -1117,7 +1147,7 @@ const NotificationsPage = () => {
                     {selectedNotification.body}
                   </Typography>
 
-                  <Box sx={{ display: 'flex', gap: 1.5 }}>
+                  <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
                     <Chip
                       icon={<Notifications sx={{ fontSize: 14 }} />}
                       label={selectedNotification.type}
@@ -1131,6 +1161,18 @@ const NotificationsPage = () => {
                       sx={{ backgroundColor: '#FEF3C7', color: '#B45309', fontWeight: 600, borderRadius: '6px', '& .MuiChip-icon': { color: '#B45309' } }}
                     />
                   </Box>
+
+                  {/* Failure Reason Display */}
+                  {(selectedNotification.status === 'failed' || selectedNotification.notificationStatus === 'failed') && (
+                    <Box sx={{ mt: 3, p: 2, backgroundColor: '#FEF2F2', borderRadius: '12px', border: '1px solid #FECACA' }}>
+                      <Typography variant="subtitle2" sx={{ color: '#DC2626', fontWeight: 700, mb: 0.5, fontSize: 13 }}>
+                        Failure Reason (Read-Only)
+                      </Typography>
+                      <Typography variant="body2" sx={{ color: '#B91C1C', fontSize: 13 }}>
+                        {selectedNotification.failureReason || 'Delivery failed due to network timeout or invalid token.'}
+                      </Typography>
+                    </Box>
+                  )}
                 </Box>
               </Card>
 

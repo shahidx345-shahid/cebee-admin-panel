@@ -101,18 +101,21 @@ const AppFeaturesEditorPage = () => {
       const savedTitle = localStorage.getItem('appFeaturesTitle');
       const savedVersion = localStorage.getItem('appFeaturesVersion');
       const savedDate = localStorage.getItem('appFeaturesUpdatedAt');
-      
+      const savedStatus = localStorage.getItem('appFeaturesStatus');
+
       if (savedContent) {
         setContent(savedContent);
         setTitle(savedTitle || 'How CeBee Predict Works');
         setVersion(savedVersion || '1.0');
         setUpdatedAt(savedDate ? new Date(savedDate) : new Date('2026-01-14'));
+        setStatus(savedStatus || 'published');
       } else {
         // Use default content
         setContent(defaultContent);
         setTitle('How CeBee Predict Works');
         setVersion('1.0');
         setUpdatedAt(new Date('2026-01-14'));
+        setStatus('published');
       }
     } catch (error) {
       console.error('Error loading content:', error);
@@ -130,9 +133,10 @@ const AppFeaturesEditorPage = () => {
       localStorage.setItem('appFeaturesVersion', version);
       const newDate = new Date();
       localStorage.setItem('appFeaturesUpdatedAt', newDate.toISOString());
-      
+
       setUpdatedAt(newDate);
-      setStatus('published');
+      // setStatus('published'); // Status is now managed by state
+      localStorage.setItem('appFeaturesStatus', status); // Persist status
       setIsModalOpen(false);
       alert('Content saved successfully!');
     } catch (error) {
@@ -473,6 +477,29 @@ const AppFeaturesEditorPage = () => {
                   },
                 }}
               />
+            </Box>
+
+            {/* Status Field */}
+            <Box>
+              <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, fontSize: 14 }}>
+                Status
+              </Typography>
+              <TextField
+                select
+                fullWidth
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+                SelectProps={{ native: true }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '14px',
+                  },
+                }}
+              >
+                <option value="draft">Draft</option>
+                <option value="published">Published</option>
+                <option value="archived">Archived</option>
+              </TextField>
             </Box>
 
             {/* Content Field (Markdown supported) */}

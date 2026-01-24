@@ -41,6 +41,7 @@ import {
   ContentCopy,
   Timeline,
   Check,
+  Videocam,
 } from '@mui/icons-material';
 import { colors, constants } from '../config/theme';
 import DataTable from '../components/common/DataTable';
@@ -65,7 +66,9 @@ const RewardsPage = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [rankAnchor, setRankAnchor] = useState(null);
+  const [consentAnchor, setConsentAnchor] = useState(null);
   const [monthAnchor, setMonthAnchor] = useState(null);
+  const [consentFilter, setConsentFilter] = useState('all');
   const [statusAnchor, setStatusAnchor] = useState(null);
   const [actionsAnchor, setActionsAnchor] = useState(null);
   const [selectedReward, setSelectedReward] = useState(null);
@@ -110,7 +113,7 @@ const RewardsPage = () => {
 
   useEffect(() => {
     filterAndSortRewards();
-  }, [rewards, searchQuery, selectedMonth, statusFilter, rankFilter, selectedSort]);
+  }, [rewards, searchQuery, selectedMonth, statusFilter, rankFilter, consentFilter, selectedSort]);
 
   const filterAndSortRewards = () => {
     let filtered = [...rewards];
@@ -139,6 +142,14 @@ const RewardsPage = () => {
         if (rankFilter === '2nd') return rank === 2;
         if (rankFilter === '3rd') return rank === 3;
         if (rankFilter === '1st-3rd') return rank >= 1 && rank <= 3;
+        return true;
+      });
+    }
+
+    if (consentFilter !== 'all') {
+      filtered = filtered.filter((reward) => {
+        if (consentFilter === 'yes') return reward.consentOptIn === true;
+        if (consentFilter === 'no') return !reward.consentOptIn;
         return true;
       });
     }
@@ -284,7 +295,22 @@ const RewardsPage = () => {
             <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack, display: 'flex', alignItems: 'center', gap: 1 }}>
               {value || 'N/A'}
               {row.risk && (
-                <Chip label="RISK" size="small" sx={{ height: 16, fontSize: 9, fontWeight: 700, bgcolor: colors.error, color: 'white' }} />
+                <Chip
+                  icon={<Warning sx={{ fontSize: 12, color: 'white !important' }} />}
+                  label="RISK FLAGGED"
+                  size="small"
+                  sx={{
+                    height: 22,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    bgcolor: colors.error,
+                    color: 'white',
+                    border: '1px solid #D32F2F',
+                    '& .MuiChip-icon': {
+                      marginLeft: '4px'
+                    }
+                  }}
+                />
               )}
             </Typography>
             <Typography variant="caption" sx={{ color: colors.textSecondary, fontSize: 11 }}>
@@ -762,6 +788,78 @@ const RewardsPage = () => {
                 3rd
               </MenuItem>
             </Menu>
+
+            <Button
+              variant="outlined"
+              startIcon={
+                <Box
+                  sx={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: '10px',
+                    backgroundColor: '#E0F2F1', // Teal light
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    ml: -0.5,
+                  }}
+                >
+                  <Videocam sx={{ fontSize: 18, color: '#009688' }} />
+                </Box>
+              }
+              endIcon={
+                <Box sx={{
+                  width: 30, height: 30, borderRadius: '8px', backgroundColor: '#E0F2F1', // Teal light
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  mr: -0.5
+                }}>
+                  <ArrowDropDown sx={{ fontSize: 20, color: '#009688' }} />
+                </Box>
+              }
+              onClick={(e) => setConsentAnchor(e.currentTarget)}
+              sx={{
+                flex: 1,
+                borderColor: '#E0F2F1',
+                color: colors.brandBlack,
+                backgroundColor: '#F3FDFD', // Very light teal
+                borderRadius: '30px',
+                textTransform: 'none',
+                fontWeight: 500,
+                px: 3,
+                py: 1.75,
+                fontSize: 15,
+                border: '1.5px solid #E0F2F1',
+                width: '100%',
+                '&:hover': {
+                  borderColor: '#B2DFDB',
+                  backgroundColor: '#E0F2F1',
+                },
+              }}
+            >
+              Consent: {consentFilter === 'yes' ? 'Yes' : consentFilter === 'no' ? 'No' : 'All'}
+            </Button>
+            <Menu
+              anchorEl={consentAnchor}
+              open={Boolean(consentAnchor)}
+              onClose={() => setConsentAnchor(null)}
+              PaperProps={{
+                sx: {
+                  borderRadius: '12px',
+                  minWidth: 180,
+                  boxShadow: `0 4px 12px ${colors.shadow}33`,
+                },
+              }}
+            >
+              <MenuItem onClick={() => { setConsentFilter('all'); setConsentAnchor(null); }}>
+                All
+              </MenuItem>
+              <MenuItem onClick={() => { setConsentFilter('yes'); setConsentAnchor(null); }}>
+                Yes (Opted In)
+              </MenuItem>
+              <MenuItem onClick={() => { setConsentFilter('no'); setConsentAnchor(null); }}>
+                No (Opted Out)
+              </MenuItem>
+            </Menu>
             <Button
               variant="outlined"
               startIcon={
@@ -933,7 +1031,9 @@ const RewardsPage = () => {
               {statusFilter === 'all' ? 'All Statuses' :
                 statusFilter === 'pending' ? 'Pending' :
                   statusFilter === 'processing' ? 'Processing' :
-                    statusFilter === 'paid' ? 'Paid' : 'All Statuses'}
+                    statusFilter === 'paid' ? 'Paid' :
+                      statusFilter === 'cancelled' ? 'Cancelled' :
+                        statusFilter === 'unclaimed' ? 'Unclaimed' : 'All Statuses'}
             </Button>
             <Menu
               anchorEl={statusAnchor}
@@ -959,8 +1059,11 @@ const RewardsPage = () => {
               <MenuItem onClick={() => { setStatusFilter('paid'); setStatusAnchor(null); }}>
                 Paid
               </MenuItem>
-              <MenuItem onClick={() => { setStatusFilter('failed'); setStatusAnchor(null); }}>
-                Failed
+              <MenuItem onClick={() => { setStatusFilter('cancelled'); setStatusAnchor(null); }}>
+                Cancelled / Declined
+              </MenuItem>
+              <MenuItem onClick={() => { setStatusFilter('unclaimed'); setStatusAnchor(null); }}>
+                Unclaimed (Expired)
               </MenuItem>
             </Menu>
           </Card>

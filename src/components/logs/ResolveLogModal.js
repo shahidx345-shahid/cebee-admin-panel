@@ -24,7 +24,8 @@ import { format } from 'date-fns';
 import { colors } from '../../config/theme';
 
 const ResolveLogModal = ({ open, onClose, log, onResolve }) => {
-    const [notes, setNotes] = useState('');
+    const isResolved = log && log.status === 'resolved';
+    const [notes, setNotes] = useState((log && log.resolutionNotes) || '');
 
     if (!log) return null;
 
@@ -46,7 +47,7 @@ const ResolveLogModal = ({ open, onClose, log, onResolve }) => {
             {/* Header */}
             <Box
                 sx={{
-                    backgroundColor: colors.brandRed, // Red header
+                    backgroundColor: isResolved ? '#059669' : colors.brandRed, // Green if resolved, Red if not
                     p: 3,
                     display: 'flex',
                     alignItems: 'center',
@@ -65,14 +66,14 @@ const ResolveLogModal = ({ open, onClose, log, onResolve }) => {
                             justifyContent: 'center',
                         }}
                     >
-                        <VerifiedUser sx={{ color: 'white', fontSize: 24 }} />
+                        {isResolved ? <CheckCircle sx={{ color: 'white', fontSize: 24 }} /> : <VerifiedUser sx={{ color: 'white', fontSize: 24 }} />}
                     </Box>
                     <Box>
                         <Typography variant="h5" sx={{ fontWeight: 700, color: 'white' }}>
-                            Resolve Security Log
+                            {isResolved ? 'Log Details (Resolved)' : 'Resolve Security Log'}
                         </Typography>
                         <Typography variant="body2" sx={{ color: 'rgba(255, 255, 255, 0.8)' }}>
-                            Super Admin Action Required
+                            {isResolved ? 'Immutable Record' : 'Super Admin Action Required'}
                         </Typography>
                     </Box>
                 </Box>
@@ -82,29 +83,31 @@ const ResolveLogModal = ({ open, onClose, log, onResolve }) => {
             </Box>
 
             <DialogContent sx={{ p: 4 }}>
-                {/* Warning Banner */}
-                <Box
-                    sx={{
-                        backgroundColor: '#FFF8E1', // Amber 50
-                        border: '1px solid #FFE0B2', // Amber 200
-                        borderRadius: '12px',
-                        p: 2,
-                        mb: 4,
-                        display: 'flex',
-                        gap: 2,
-                    }}
-                >
-                    <Warning sx={{ color: '#F57C00', mt: 0.5 }} /> {/* Orange 700 */}
-                    <Box>
-                        <Typography sx={{ fontWeight: 700, color: '#F57C00', mb: 0.5 }}>
-                            Important
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: '#BF360C' }}> {/* Deep Orange 900 */}
-                            Resolution is permanent and will be recorded in the immutable audit
-                            trail. Provide detailed notes for compliance.
-                        </Typography>
+                {/* Warning Banner - Only for unresolved */}
+                {!isResolved && (
+                    <Box
+                        sx={{
+                            backgroundColor: '#FFF8E1', // Amber 50
+                            border: '1px solid #FFE0B2', // Amber 200
+                            borderRadius: '12px',
+                            p: 2,
+                            mb: 4,
+                            display: 'flex',
+                            gap: 2,
+                        }}
+                    >
+                        <Warning sx={{ color: '#F57C00', mt: 0.5 }} /> {/* Orange 700 */}
+                        <Box>
+                            <Typography sx={{ fontWeight: 700, color: '#F57C00', mb: 0.5 }}>
+                                Important
+                            </Typography>
+                            <Typography variant="body2" sx={{ color: '#BF360C' }}> {/* Deep Orange 900 */}
+                                Resolution is permanent and will be recorded in the immutable audit
+                                trail. Provide detailed notes for compliance.
+                            </Typography>
+                        </Box>
                     </Box>
-                </Box>
+                )}
 
                 {/* Log Summary */}
                 <Box
@@ -125,12 +128,13 @@ const ResolveLogModal = ({ open, onClose, log, onResolve }) => {
 
                     <Grid container spacing={2}>
                         {[
-                            { label: 'Log ID', value: 'LOG_CRIT_001' },
+                            { label: 'Log ID', value: log.id || 'LOG_CRIT_001' },
                             { label: 'Event', value: log.event },
                             { label: 'Severity', value: (log.severity || 'HIGH').toUpperCase() },
                             { label: 'Date', value: format(date, 'MMM dd, yyyy • HH:mm') },
                             { label: 'User', value: log.relatedUsername || 'N/A' },
                             { label: 'Admin', value: log.adminName || 'System' },
+                            ...(isResolved ? [{ label: 'Status', value: 'RESOLVED' }] : [])
                         ].map((item, index) => (
                             <React.Fragment key={item.label}>
                                 <Grid item xs={12}>
@@ -139,7 +143,7 @@ const ResolveLogModal = ({ open, onClose, log, onResolve }) => {
                                             display: 'flex',
                                             justifyContent: 'space-between',
                                             py: 1.5,
-                                            borderBottom: index !== 5 ? `1px solid ${colors.divider}` : 'none',
+                                            borderBottom: index !== (isResolved ? 6 : 5) ? `1px solid ${colors.divider}` : 'none',
                                         }}
                                     >
                                         <Typography sx={{ color: colors.textSecondary, fontWeight: 500, width: '120px', fontSize: 15 }}>
@@ -160,19 +164,20 @@ const ResolveLogModal = ({ open, onClose, log, onResolve }) => {
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
                         <Edit sx={{ color: colors.brandRed, fontSize: 20 }} />
                         <Typography sx={{ fontWeight: 700, fontSize: 16 }}>
-                            Resolution Notes
+                            {isResolved ? 'Resolution Notes (Immutable)' : 'Resolution Notes'}
                         </Typography>
-                        <Typography sx={{ color: colors.brandRed, fontWeight: 700 }}>*</Typography>
+                        {!isResolved && <Typography sx={{ color: colors.brandRed, fontWeight: 700 }}>*</Typography>}
                     </Box>
                     <TextField
                         fullWidth
                         multiline
                         rows={3}
-                        placeholder="Explain how this log was resolved, what actions were taken, and any..."
+                        placeholder={isResolved ? 'No notes provided.' : "Explain how this log was resolved, what actions were taken, and any..."}
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}
+                        disabled={isResolved}
                         sx={{
-                            backgroundColor: '#FAFAFA',
+                            backgroundColor: isResolved ? '#F3F4F6' : '#FAFAFA',
                             '& .MuiOutlinedInput-root': {
                                 borderRadius: '12px',
                             }
@@ -182,9 +187,9 @@ const ResolveLogModal = ({ open, onClose, log, onResolve }) => {
             </DialogContent>
 
             {/* Footer */}
-            <DialogActions sx={{ p: 4, pt: 0, justifyContent: 'space-between', gap: 2 }}>
+            <DialogActions sx={{ p: 4, pt: 0, justifyContent: isResolved ? 'flex-end' : 'space-between', gap: 2 }}>
                 <Button
-                    fullWidth
+                    fullWidth={!isResolved}
                     variant="contained"
                     onClick={onClose}
                     sx={{
@@ -196,29 +201,37 @@ const ResolveLogModal = ({ open, onClose, log, onResolve }) => {
                         textTransform: 'none',
                         borderRadius: '12px',
                         '&:hover': { backgroundColor: '#4B5563' },
+                        ...(isResolved && { width: 'auto', px: 4 })
                     }}
-                    startIcon={<Cancel sx={{ fontSize: 20 }} />}
+                    startIcon={isResolved ? null : <Cancel sx={{ fontSize: 20 }} />}
                 >
-                    Cancel
+                    {isResolved ? 'Close' : 'Cancel'}
                 </Button>
-                <Button
-                    fullWidth
-                    variant="contained"
-                    onClick={() => onResolve(log, notes)}
-                    sx={{
-                        backgroundColor: '#4CAF50', // Vibrant Green
-                        color: 'white',
-                        py: 1.5,
-                        fontSize: 16,
-                        fontWeight: 600,
-                        textTransform: 'none',
-                        borderRadius: '12px',
-                        '&:hover': { backgroundColor: '#059669' },
-                    }}
-                    startIcon={<CheckCircle sx={{ fontSize: 20 }} />}
-                >
-                    Resolve Log
-                </Button>
+                {!isResolved && (
+                    <Button
+                        fullWidth
+                        variant="contained"
+                        onClick={() => onResolve(log, notes)}
+                        disabled={!notes.trim()}
+                        sx={{
+                            backgroundColor: '#4CAF50', // Vibrant Green
+                            color: 'white',
+                            py: 1.5,
+                            fontSize: 16,
+                            fontWeight: 600,
+                            textTransform: 'none',
+                            borderRadius: '12px',
+                            '&:hover': { backgroundColor: '#059669' },
+                            '&:disabled': {
+                                backgroundColor: '#E5E7EB',
+                                color: '#9CA3AF',
+                            }
+                        }}
+                        startIcon={<CheckCircle sx={{ fontSize: 20 }} />}
+                    >
+                        Resolve Log
+                    </Button>
+                )}
             </DialogActions>
         </Dialog>
     );

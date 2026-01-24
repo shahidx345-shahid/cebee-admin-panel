@@ -5,6 +5,7 @@
 const initialRewards = [
     {
         id: '1',
+        userId: 'USR_1001',
         rank: 1,
         username: 'ChiefPredictor',
         userEmail: 'chief@example.com',
@@ -15,6 +16,8 @@ const initialRewards = [
         kycStatus: 'verified',
         status: 'processing',
         rewardMonth: '2025-09',
+        walletAddress: '0x71C7656EC7ab88b098defB751B7401B5f6d8976F',
+        payoutGateway: 'Fireblocks',
         risk: false,
         claimDeadline: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
         claimSubmittedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
@@ -23,6 +26,7 @@ const initialRewards = [
         kycVerifiedBy: 'Admin_001',
         riskLevel: 'none',
         consentOptIn: true,
+        consentSource: 'Reward Claim Flow',
         consentTimestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
         adminNotes: 'User is a consistent top performer.',
         events: [
@@ -33,6 +37,7 @@ const initialRewards = [
     },
     {
         id: '2',
+        userId: 'USR_1002',
         rank: 2,
         username: 'KingOfPredictions',
         userEmail: 'king@example.com',
@@ -44,29 +49,50 @@ const initialRewards = [
         status: 'pending',
         rewardMonth: '2025-09',
         risk: false,
+        riskLevel: 'none',
+        claimDeadline: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
+        claimSubmittedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+        kycSubmittedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
         consentOptIn: false,
         adminNotes: '',
-        events: []
+        events: [
+            { id: 1, action: 'Reward Generated', timestamp: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(), triggeredBy: 'System' },
+            { id: 2, action: 'User Claimed Reward', timestamp: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), triggeredBy: 'User' },
+            { id: 3, action: 'KYC Submitted', timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(), triggeredBy: 'User' }
+        ]
     },
     {
         id: '3',
+        userId: 'USR_1003',
         rank: 3,
         username: 'AfricanLegend',
         userEmail: 'legend@example.com',
         spTotal: 2650,
         usdAmount: 150,
         payoutMethod: 'USDT',
+        walletAddress: '0x82D7656EC7ab88b098defB751B7401B5f6d8923A',
+        payoutGateway: 'Fireblocks',
         kycVerified: false,
         kycStatus: 'under_review',
         status: 'pending',
         rewardMonth: '2025-09',
         risk: false,
+        riskLevel: 'low',
+        claimDeadline: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000).toISOString(),
+        claimSubmittedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+        kycSubmittedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
         consentOptIn: true,
+        consentSource: 'Reward Claim Flow',
+        consentTimestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
         adminNotes: '',
-        events: []
+        events: [
+            { id: 1, action: 'Reward Generated', timestamp: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), triggeredBy: 'System' },
+            { id: 2, action: 'User Claimed Reward', timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), triggeredBy: 'User' }
+        ]
     },
     {
         id: '4',
+        userId: 'USR_1004',
         rank: 4,
         username: 'GhostUser',
         userEmail: 'ghost@example.com',
@@ -78,12 +104,18 @@ const initialRewards = [
         status: 'unclaimed',
         rewardMonth: '2025-09',
         risk: false,
+        riskLevel: 'none',
+        claimDeadline: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
         consentOptIn: false,
-        adminNotes: '',
-        events: []
+        adminNotes: 'User did not claim within 7-day window.',
+        events: [
+            { id: 1, action: 'Reward Generated', timestamp: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(), triggeredBy: 'System' },
+            { id: 2, action: 'Claim Window Expired', timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), triggeredBy: 'System' }
+        ]
     },
     {
         id: '5',
+        userId: 'USR_1005',
         rank: 5,
         username: 'RiskyPlayer',
         userEmail: 'risk@example.com',
@@ -99,6 +131,65 @@ const initialRewards = [
         consentOptIn: true,
         adminNotes: 'Suspicious betting patterns detected.',
         events: []
+    },
+    {
+        id: '6',
+        userId: 'USR_1006',
+        rank: 1,
+        username: 'WinnerPaidOut',
+        userEmail: 'winner@example.com',
+        spTotal: 3100,
+        usdAmount: 500,
+        payoutMethod: 'USDT',
+        kycVerified: true,
+        kycStatus: 'verified',
+        status: 'paid',
+        rewardMonth: '2025-08',
+        risk: false,
+        claimDeadline: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+        claimSubmittedAt: new Date(Date.now() - 35 * 24 * 60 * 60 * 1000).toISOString(),
+        kycSubmittedAt: new Date(Date.now() - 40 * 24 * 60 * 60 * 1000).toISOString(),
+        kycVerifiedAt: new Date(Date.now() - 38 * 24 * 60 * 60 * 1000).toISOString(),
+        kycVerifiedBy: 'Admin_002',
+        riskLevel: 'none',
+        consentOptIn: true,
+        consentTimestamp: new Date(Date.now() - 35 * 24 * 60 * 60 * 1000).toISOString(),
+        adminNotes: 'Payment processed successfully.',
+        events: [
+            { id: 1, action: 'Reward Generated', timestamp: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString(), triggeredBy: 'System' },
+            { id: 2, action: 'User Claimed Reward', timestamp: new Date(Date.now() - 35 * 24 * 60 * 60 * 1000).toISOString(), triggeredBy: 'User' },
+            { id: 3, action: 'KYC Verified', timestamp: new Date(Date.now() - 38 * 24 * 60 * 60 * 1000).toISOString(), triggeredBy: 'Admin_002' },
+            { id: 4, action: 'Reward Paid', timestamp: new Date(Date.now() - 25 * 24 * 60 * 60 * 1000).toISOString(), triggeredBy: 'Admin_002' }
+        ]
+    },
+    {
+        id: '7',
+        userId: 'USR_1007',
+        rank: 2,
+        username: 'DeclinedUser',
+        userEmail: 'declined@example.com',
+        spTotal: 2900,
+        usdAmount: 300,
+        payoutMethod: 'Gift Card',
+        kycVerified: false,
+        kycStatus: 'rejected',
+        status: 'cancelled',
+        rewardMonth: '2025-08',
+        risk: true,
+        riskLevel: 'high',
+        claimDeadline: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(),
+        claimSubmittedAt: new Date(Date.now() - 25 * 24 * 60 * 60 * 1000).toISOString(),
+        kycSubmittedAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+        kycVerifiedBy: 'Admin_001',
+        consentOptIn: false,
+        declineReason: 'KYC verification failed due to invalid documents. Please resubmit valid government-issued ID for verification.',
+        adminNotes: 'Multiple failed KYC attempts. User flagged for review.',
+        events: [
+            { id: 1, action: 'Reward Generated', timestamp: new Date(Date.now() - 35 * 24 * 60 * 60 * 1000).toISOString(), triggeredBy: 'System' },
+            { id: 2, action: 'User Claimed Reward', timestamp: new Date(Date.now() - 25 * 24 * 60 * 60 * 1000).toISOString(), triggeredBy: 'User' },
+            { id: 3, action: 'KYC Rejected', timestamp: new Date(Date.now() - 22 * 24 * 60 * 60 * 1000).toISOString(), triggeredBy: 'Admin_001' },
+            { id: 4, action: 'Reward Declined', timestamp: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000).toISOString(), triggeredBy: 'Admin_001' }
+        ]
     },
 ];
 

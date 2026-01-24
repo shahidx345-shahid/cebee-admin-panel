@@ -74,6 +74,11 @@ const PollsPage = () => {
             startTime: new Date('2026-01-12T15:59:00'),
             closeTime: new Date('2026-01-17T15:59:00'),
             createdAt: new Date('2026-01-10T15:59:00'),
+            matches: [
+              { homeTeam: 'PSG', awayTeam: 'Marseille' },
+              { homeTeam: 'Monaco', awayTeam: 'Lyon' },
+              { homeTeam: 'Lille', awayTeam: 'Rennes' }
+            ]
           },
           {
             id: '2',
@@ -84,16 +89,41 @@ const PollsPage = () => {
             startTime: new Date('2026-01-02T15:59:00'),
             closeTime: new Date('2026-01-07T15:59:00'),
             createdAt: new Date('2025-12-30T15:59:00'),
+            matches: [
+              { homeTeam: 'Man City', awayTeam: 'Liverpool' },
+              { homeTeam: 'Arsenal', awayTeam: 'Chelsea' },
+              { homeTeam: 'Spurs', awayTeam: 'Newcastle' }
+            ]
           },
           {
             id: '3',
             pollId: 'POLL_007',
             leagueName: 'La Liga',
-            status: 'closed',
+            status: 'active',
             voteCount: 14321,
             startTime: new Date('2025-12-28T15:59:00'),
-            closeTime: new Date('2026-01-02T15:59:00'),
+            closeTime: new Date('2026-02-02T15:59:00'),
             createdAt: new Date('2025-12-26T15:59:00'),
+            matches: [
+              { homeTeam: 'Real Madrid', awayTeam: 'Barcelona' },
+              { homeTeam: 'Atletico Madrid', awayTeam: 'Sevilla' },
+              { homeTeam: 'Valencia', awayTeam: 'Real Betis' }
+            ]
+          },
+          {
+            id: '4',
+            pollId: 'POLL_008',
+            leagueName: 'Bundesliga',
+            status: 'scheduled',
+            voteCount: 0,
+            startTime: new Date('2026-02-05T15:59:00'),
+            closeTime: new Date('2026-02-10T15:59:00'),
+            createdAt: new Date('2026-01-20T15:59:00'),
+            matches: [
+              { homeTeam: 'Bayern Munich', awayTeam: 'Dortmund' },
+              { homeTeam: 'Leipzig', awayTeam: 'Leverkusen' },
+              { homeTeam: 'Frankfurt', awayTeam: 'Wolfsburg' }
+            ]
           },
         ];
 
@@ -189,7 +219,7 @@ const PollsPage = () => {
       setFilteredPolls(updatedPolls);
       setClosePollDialogOpen(false);
       setPollToClose(null);
-      alert('Poll closed successfully!'); // Keep alert for final feedback or remove if desired
+      alert('Poll closed successfully!');
     } catch (error) {
       console.error('Error closing poll:', error);
       alert('Failed to close poll');
@@ -207,7 +237,6 @@ const PollsPage = () => {
   };
 
   const getStatusChip = (status) => {
-    // Map pending to scheduled for display
     const displayStatus = status === 'pending' ? 'scheduled' : status;
 
     const statusConfig = {
@@ -274,7 +303,7 @@ const PollsPage = () => {
     {
       id: 'status',
       label: 'Status',
-      render: (_, row) => getStatusChip(row.status || row.pollStatus || 'pending'),
+      render: (_, row) => getStatusChip(row.status || row.pollStatus || 'scheduled'),
     },
     {
       id: 'voteCount',
@@ -465,7 +494,7 @@ const PollsPage = () => {
               {polls.filter((p) => (p.status || p.pollStatus) === 'pending' || (p.status || p.pollStatus) === 'scheduled').length}
             </Typography>
             <Typography variant="body2" sx={{ color: '#6B7280', fontSize: 15, fontWeight: 400 }}>
-              Pending
+              Scheduled
             </Typography>
           </Card>
         </Grid>
@@ -514,7 +543,7 @@ const PollsPage = () => {
         {[
           { id: 'all', label: 'All Polls', icon: <ViewModule />, color: colors.brandRed, bgColor: '#FEE2E2' },
           { id: 'active', label: 'Active', icon: <PieChart />, color: '#10B981', bgColor: '#D1FAE5' },
-          { id: 'scheduled', label: 'Pending', icon: <Schedule />, color: '#F59E0B', bgColor: '#FEF3C7' },
+          { id: 'scheduled', label: 'Scheduled', icon: <Schedule />, color: '#F59E0B', bgColor: '#FEF3C7' },
           { id: 'closed', label: 'Closed', icon: <CheckCircle />, color: '#6B7280', bgColor: '#F3F4F6' },
         ].map((item) => {
           const isSelected = statusFilter === item.id;
@@ -798,9 +827,41 @@ const PollsPage = () => {
                         Status
                       </Typography>
                     </Box>
-                    <Typography variant="body2" sx={{ fontWeight: 600, fontSize: 14, color: colors.brandBlack }}>
-                      {pollDetails.status === 'closed' ? 'Closed' : pollDetails.status === 'active' ? 'Active' : 'Pending'}
-                    </Typography>
+                    {getStatusChip(pollDetails.status || pollDetails.pollStatus || 'scheduled')}
+                  </Box>
+
+                  {/* Matches List Section - Enhanced Card Style */}
+                  <Box sx={{ mt: 3, mb: 1 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                      <SportsSoccer sx={{ fontSize: 18, color: colors.brandRed }} />
+                      <Typography variant="h6" sx={{ fontWeight: 600, fontSize: 16, color: colors.brandBlack }}>
+                        Matches Voted On
+                      </Typography>
+                    </Box>
+
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                      {pollDetails.matches && pollDetails.matches.length > 0 ? (
+                        pollDetails.matches.map((match, index) => (
+                          <Card key={index} elevation={0} sx={{
+                            p: 2,
+                            borderRadius: '12px',
+                            border: `1px solid ${colors.divider}`,
+                            backgroundColor: colors.brandWhite
+                          }}>
+                            <Typography variant="subtitle1" sx={{ fontWeight: 700, color: colors.brandBlack, lineHeight: 1.2, mb: 0.5 }}>
+                              {match.homeTeam}
+                            </Typography>
+                            <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13 }}>
+                              vs {match.awayTeam}
+                            </Typography>
+                          </Card>
+                        ))
+                      ) : (
+                        <Box sx={{ p: 2, borderRadius: '8px', bgcolor: '#F9FAFB', border: '1px dashed #D1D5DB', textAlign: 'center' }}>
+                          <Typography variant="body2" sx={{ color: colors.textSecondary }}>No specific matches listed.</Typography>
+                        </Box>
+                      )}
+                    </Box>
                   </Box>
 
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 2 }}>

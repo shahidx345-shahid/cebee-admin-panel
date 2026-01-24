@@ -100,3 +100,16 @@ code {
 .MuiButton-root {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
+
+/* Enforce cursor pointer for all button types and interactive elements */
+button,
+[type="button"],
+[type="submit"],
+[type="reset"],
+.MuiButton-root,
+.MuiIconButton-root,
+.MuiButtonBase-root,
+.MuiChip-root[onClick],
+[role="button"] {
+  cursor: pointer !important;
+}

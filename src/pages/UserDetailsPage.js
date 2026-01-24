@@ -16,6 +16,7 @@ import {
   TableHead,
   TableRow,
   Paper,
+  TextField,
 } from '@mui/material';
 import {
   ArrowBack,
@@ -50,12 +51,26 @@ const UserDetailsPage = () => {
     notes: ''
   });
 
+  // KYC Notes State
+  const [isEditingNotes, setIsEditingNotes] = useState(false);
+  const [noteTemp, setNoteTemp] = useState('');
+
+  useEffect(() => {
+    if (kycData.notes) setNoteTemp(kycData.notes);
+  }, [kycData.notes]);
+
+  const handleSaveNotes = () => {
+    handleKycUpdate({ notes: noteTemp });
+    setIsEditingNotes(false);
+  };
+
   useEffect(() => {
     loadUserData();
   }, [id]);
 
   const generateDummyUserData = (userId) => {
     const countries = ['United States', 'United Kingdom', 'Canada', 'Australia', 'Germany', 'France', 'Spain', 'Italy', 'Brazil', 'India', 'Nigeria', 'South Africa', 'Kenya', 'Ghana'];
+    const isFlagged = Math.random() > 0.8;
     return {
       id: userId,
       username: 'john_doe_0',
@@ -69,16 +84,21 @@ const UserDetailsPage = () => {
       isBlocked: false,
       isDeleted: false,
       isDeactivated: false,
-      fraudFlags: [],
+      isFlagged: isFlagged,
+      flagReason: isFlagged ? 'Multiple failed login attempts from different IPs' : '',
+      adminNotes: 'User requires manual review for high withdrawal amounts.',
+      fraudFlags: isFlagged ? ['Suspicious IP'] : [],
       spTotal: 2450,
       spCurrent: 1200,
       cpTotal: 350,
       cpCurrent: 150,
       totalPredictions: 45,
+      totalReferrals: 23,
       predictionAccuracy: 68.5,
       totalPolls: 12,
       createdAt: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000),
       lastLogin: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+      kycRequestedAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000), // Demo date
       spFromPredictions: 1800,
       spFromDailyLogin: 650,
       cpFromReferrals: 200,
@@ -101,20 +121,23 @@ const UserDetailsPage = () => {
       }
 
       let userData = null;
-
-      // Firebase data fetching removed. Using dummy data.
-
-
       // Use dummy data if no real data exists
       if (!userData) {
         userData = generateDummyUserData(id);
       }
 
       setUser(userData);
-      setActivities([]);
+
+      // Demo Log Activities
+      setActivities([
+        { id: 1, type: 'LOGIN', description: 'User logged in from IP 192.168.1.1', timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString() },
+        { id: 2, type: 'PREDICTION_MADE', description: 'Placed prediction on Arsenal vs Chelsea', timestamp: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString() },
+        { id: 3, type: 'POLL_VOTE', description: 'Voted in "Player of the Month" poll', timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString() },
+        { id: 4, type: 'REWARD_CLAIM', description: 'Claimed Daily Login Bonus (50 SP)', timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString() },
+        { id: 5, type: 'KYC_SUBMISSION', description: 'Submitted ID Document for verification', timestamp: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString() },
+      ]);
     } catch (error) {
       console.error('Error loading user:', error);
-      // Fallback to dummy data
       const dummyData = generateDummyUserData(id);
       setUser(dummyData);
       setActivities([]);
@@ -122,18 +145,29 @@ const UserDetailsPage = () => {
       setLoading(false);
     }
   };
-
   const handleKycUpdate = async (updates) => {
-    // Optimistic update
-    const newData = { ...kycData, ...updates };
-    // Ensure specific date fields are Date objects for UI, but might be strings in updates
-    if (updates.submittedAt) newData.submittedAt = new Date(updates.submittedAt);
-    if (updates.verifiedAt) newData.verifiedAt = new Date(updates.verifiedAt);
+    setKycData((prev) => ({
+      ...prev,
+      ...updates
+    }));
+    try {
+      await MockDataService.updateKycData(id, updates);
+    } catch (error) {
+      console.error('Failed to update KYC data:', error);
+    }
+  };
 
-    setKycData(newData);
-
-    // Persist
-    await MockDataService.updateKycData(id, updates);
+  const getAccountStatusChip = (user) => {
+    if (user.isBlocked) {
+      return <Chip label="Blocked" color="error" size="small" sx={{ fontWeight: 700 }} />;
+    }
+    if (user.isFlagged) {
+      return <Chip label="Flagged" color="warning" size="small" sx={{ fontWeight: 700 }} />;
+    }
+    if (!user.isActive) {
+      return <Chip label="Inactive" color="default" size="small" sx={{ fontWeight: 700 }} />;
+    }
+    return <Chip label="Active" color="success" size="small" sx={{ fontWeight: 700 }} />;
   };
 
   if (loading) {
@@ -143,107 +177,6 @@ const UserDetailsPage = () => {
       </Box>
     );
   }
-
-  if (!user) {
-    return (
-      <Box sx={{ textAlign: 'center', padding: 6 }}>
-        <Typography variant="h6" sx={{ color: colors.error, mb: 2 }}>
-          User not found
-        </Typography>
-        <Button
-          variant="contained"
-          onClick={() => navigate(constants.routes.users)}
-          sx={{
-            background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
-            borderRadius: '12px',
-            textTransform: 'none',
-            fontWeight: 600,
-          }}
-        >
-          Back to Users
-        </Button>
-      </Box>
-    );
-  }
-
-  const getAccountStatusChip = () => {
-    if (user.isBlocked) {
-      return (
-        <Chip
-          icon={<Cancel />}
-          label="Blocked"
-          sx={{
-            backgroundColor: `${colors.error}1A`,
-            color: colors.error,
-            fontWeight: 600,
-          }}
-        />
-      );
-    }
-    if (user.isDeleted || user.isDeactivated) {
-      return (
-        <Chip
-          icon={<Cancel />}
-          label="Deactivated"
-          sx={{
-            backgroundColor: `${colors.textSecondary}1A`,
-            color: colors.textSecondary,
-            fontWeight: 600,
-          }}
-        />
-      );
-    }
-    if (user.fraudFlags && user.fraudFlags.length > 0) {
-      return (
-        <Chip
-          icon={<Flag />}
-          label="Flagged"
-          sx={{
-            backgroundColor: `${colors.warning}1A`,
-            color: colors.warning,
-            fontWeight: 600,
-          }}
-        />
-      );
-    }
-    if (user.status === 'suspended') {
-      return (
-        <Chip
-          icon={<Cancel />}
-          label="Suspended"
-          sx={{
-            backgroundColor: `${colors.warning}1A`,
-            color: colors.warning,
-            fontWeight: 600,
-          }}
-        />
-      );
-    }
-    if (user.isActive) {
-      return (
-        <Chip
-          icon={<CheckCircle />}
-          label="Active"
-          sx={{
-            backgroundColor: `${colors.success}1A`,
-            color: colors.success,
-            fontWeight: 600,
-          }}
-        />
-      );
-    }
-    return (
-      <Chip
-        icon={<Cancel />}
-        label="Inactive"
-        sx={{
-          backgroundColor: `${colors.textSecondary}1A`,
-          color: colors.textSecondary,
-          fontWeight: 600,
-        }}
-      />
-    );
-  };
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%' }}>
@@ -264,131 +197,100 @@ const UserDetailsPage = () => {
         Back to Users
       </Button>
 
-      {/* Read Only Notice */}
-      <Alert
-        severity="info"
-        sx={{ mb: 3, borderRadius: '12px' }}
-      >
-        <Typography variant="body2" sx={{ fontWeight: 700, mb: 0.5 }}>
-          Read-Only Mode
-        </Typography>
-        <Typography variant="caption" sx={{ color: colors.textSecondary }}>
-          User profile and activity logs are view-only. No modifications to SP, rankings, or predictions allowed.
-        </Typography>
-      </Alert>
+      {/* Flagged Banner */}
+      {user.isFlagged && (
+        <Alert
+          severity="error"
+          sx={{ mb: 3, borderRadius: '12px' }}
+          icon={<Flag fontSize="inherit" />}
+        >
+          <Typography variant="body2" sx={{ fontWeight: 700 }}>
+            Account Flagged
+          </Typography>
+          <Typography variant="caption">
+            Reason: {user.flagReason || 'Suspicious Activity detected.'}
+          </Typography>
+        </Alert>
+      )}
 
-      {/* User Info Card */}
-      <Card sx={{ padding: 3, mb: 3, borderRadius: '16px' }}>
-        <Grid container spacing={3}>
-          <Grid item xs={12} md={3}>
+      {/* User Info Card - New Layout */}
+      <Card sx={{ p: 4, mb: 3, borderRadius: '16px' }}>
+        <Grid container spacing={4}>
+          <Grid item xs={12} md={3} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <Box
               sx={{
-                width: '100%',
-                aspectRatio: '1',
-                borderRadius: '16px',
+                width: 120,
+                height: 120,
+                borderRadius: '50%',
                 background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 boxShadow: `0 4px 12px ${colors.brandRed}4D`,
+                mb: 2
               }}
             >
-              <Person sx={{ fontSize: 64, color: colors.brandWhite }} />
+              <Person sx={{ fontSize: 60, color: colors.brandWhite }} />
             </Box>
+            {getAccountStatusChip(user)}
+            <Typography variant="caption" sx={{ color: colors.textSecondary, mt: 1 }}>ID: {user.id}</Typography>
           </Grid>
           <Grid item xs={12} md={9}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-              <Box>
-                <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>
-                  {user.fullName || `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username || 'N/A'}
-                </Typography>
-                <Typography variant="body2" sx={{ color: colors.textSecondary, mb: 0.5 }}>
-                  @{user.username || 'N/A'}
-                </Typography>
-                <Typography variant="body2" sx={{ color: colors.textSecondary, mb: 0.5 }}>
-                  {user.email || 'No email'}
-                </Typography>
-                <Typography variant="body2" sx={{ color: colors.textSecondary }}>
-                  {user.country || 'N/A'}
-                </Typography>
-              </Box>
-            </Box>
-            <Grid container spacing={2}>
-              <Grid item xs={6} md={3}>
-                <Typography variant="caption" sx={{ color: colors.textSecondary }}>
-                  User ID
-                </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                  {user.id}
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 3, borderBottom: `1px solid ${colors.divider}`, pb: 1 }}>
+              Profile Details
+            </Typography>
+            <Grid container spacing={3}>
+              <Grid item xs={12} sm={6}>
+                <Typography variant="caption" sx={{ color: colors.textSecondary, display: 'block', mb: 0.5 }}>Full Name</Typography>
+                <Typography variant="body1" sx={{ fontWeight: 600 }}>{user.fullName || 'N/A'}</Typography>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <Typography variant="caption" sx={{ color: colors.textSecondary, display: 'block', mb: 0.5 }}>Username</Typography>
+                <Typography variant="body1" sx={{ fontWeight: 600 }}>@{user.username || 'N/A'}</Typography>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <Typography variant="caption" sx={{ color: colors.textSecondary, display: 'block', mb: 0.5 }}>Email</Typography>
+                <Typography variant="body1" sx={{ fontWeight: 600 }}>{user.email || 'N/A'}</Typography>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <Typography variant="caption" sx={{ color: colors.textSecondary, display: 'block', mb: 0.5 }}>Country</Typography>
+                <Typography variant="body1" sx={{ fontWeight: 600 }}>{user.country || 'N/A'}</Typography>
+              </Grid>
+              <Grid item xs={12} sm={6}>
+                <Typography variant="caption" sx={{ color: colors.textSecondary, display: 'block', mb: 0.5 }}>Registration Date</Typography>
+                <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                  {user.createdAt ? format(user.createdAt, 'MMM dd, yyyy') : 'N/A'}
                 </Typography>
               </Grid>
-              <Grid item xs={6} md={3}>
-                <Typography variant="caption" sx={{ color: colors.textSecondary }}>
-                  Account Status
-                </Typography>
-                <Box sx={{ mt: 0.5 }}>
-                  {getAccountStatusChip()}
-                </Box>
-              </Grid>
-              <Grid item xs={6} md={3}>
-                <Typography variant="caption" sx={{ color: colors.textSecondary }}>
-                  Registration Date
-                </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                  {user.createdAt
-                    ? format(user.createdAt?.toDate ? user.createdAt.toDate() : new Date(user.createdAt), 'MMM dd, yyyy')
-                    : 'N/A'}
+              <Grid item xs={12} sm={6}>
+                <Typography variant="caption" sx={{ color: colors.textSecondary, display: 'block', mb: 0.5 }}>Last Login</Typography>
+                <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                  {user.lastLogin ? format(user.lastLogin, 'MMM dd, yyyy HH:mm') : 'Never'}
                 </Typography>
               </Grid>
-              <Grid item xs={6} md={3}>
-                <Typography variant="caption" sx={{ color: colors.textSecondary }}>
-                  Last Login Date
-                </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                  {user.lastLogin
-                    ? format(user.lastLogin?.toDate ? user.lastLogin.toDate() : new Date(user.lastLogin), 'MMM dd, yyyy HH:mm')
-                    : user.lastLoginAt
-                      ? format(user.lastLoginAt?.toDate ? user.lastLoginAt.toDate() : new Date(user.lastLoginAt), 'MMM dd, yyyy HH:mm')
-                      : 'Never'}
-                </Typography>
-              </Grid>
-              {user.fraudFlags && user.fraudFlags.length > 0 && (
-                <Grid item xs={12}>
-                  <Typography variant="caption" sx={{ color: colors.textSecondary, mb: 0.5, display: 'block' }}>
-                    Flags
-                  </Typography>
-                  <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                    {user.fraudFlags.map((flag, index) => (
-                      <Chip
-                        key={index}
-                        icon={<Flag />}
-                        label={flag}
-                        size="small"
-                        sx={{
-                          backgroundColor: `${colors.error}1A`,
-                          color: colors.error,
-                          fontWeight: 600,
-                        }}
-                      />
-                    ))}
-                  </Box>
-                </Grid>
-              )}
             </Grid>
           </Grid>
         </Grid>
       </Card>
 
+      {/* Admin Notes */}
+      <Card sx={{ p: 3, mb: 3, borderRadius: '16px', bgcolor: '#FFF8F6', border: `1px solid ${colors.brandRed}20` }}>
+        <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
+          <AssignmentInd sx={{ color: colors.brandRed }} />
+          <Typography variant="subtitle1" sx={{ fontWeight: 700, color: colors.brandRed }}>General Admin Notes</Typography>
+        </Box>
+        <Typography variant="body2" sx={{ fontStyle: 'italic', color: colors.brandBlack }}>
+          {user.adminNotes || 'No verification notes specific to this user.'}
+        </Typography>
+      </Card>
 
-
-      {/* KYC Verification Section (Phase 1) */}
+      {/* KYC Verification Section */}
       <Card sx={{ padding: 3, mb: 3, borderRadius: '16px', border: `1px solid ${colors.divider}` }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
             <VerifiedUser sx={{ color: colors.brandRed, fontSize: 24 }} />
             <Box>
               <Typography variant="h6" sx={{ fontWeight: 700 }}>KYC Verification</Typography>
-              <Typography variant="caption" sx={{ color: colors.textSecondary }}>Used for reward payouts only in Phase 1.</Typography>
             </Box>
           </Box>
           <Chip
@@ -399,9 +301,12 @@ const UserDetailsPage = () => {
         </Box>
 
         <Grid container spacing={3}>
-          {/* Metadata */}
           <Grid item xs={12} md={8}>
             <Grid container spacing={2}>
+              <Grid item xs={6} md={4}>
+                <Typography variant="caption" sx={{ color: colors.textSecondary }}>Requested Date</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>{user.kycRequestedAt ? format(user.kycRequestedAt, 'MMM dd, yyyy') : '-'}</Typography>
+              </Grid>
               <Grid item xs={6} md={4}>
                 <Typography variant="caption" sx={{ color: colors.textSecondary }}>Submitted At</Typography>
                 <Typography variant="body2" sx={{ fontWeight: 600 }}>{kycData.submittedAt ? format(kycData.submittedAt, 'MMM dd, yyyy HH:mm') : '-'}</Typography>
@@ -419,23 +324,76 @@ const UserDetailsPage = () => {
                 <Chip label={kycData.riskLevel.toUpperCase()} size="small" color={kycData.riskLevel === 'high' ? 'error' : 'default'} sx={{ height: 24, fontSize: 11, fontWeight: 700 }} />
               </Grid>
             </Grid>
-
+            {/* Notes section kept same */}
             <Box sx={{ mt: 3 }}>
-              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1 }}>Internal Notes (Admin Only)</Typography>
-              <Grid container spacing={1}>
-                <Grid item xs={10}>
-                  <Typography variant="body2" sx={{ p: 1.5, bgcolor: '#F9FAFB', borderRadius: '8px', border: '1px solid #E5E7EB', minHeight: '60px' }}>
-                    {kycData.notes || 'No notes added.'}
-                  </Typography>
-                </Grid>
-                <Grid item xs={2}>
-                  <Button variant="outlined" size="small" fullWidth sx={{ height: '100%' }}>Edit</Button>
-                </Grid>
-              </Grid>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Internal Notes (Admin Only)</Typography>
+                {!isEditingNotes ? (
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => setIsEditingNotes(true)}
+                    startIcon={<Edit sx={{ fontSize: 14 }} />}
+                    sx={{ height: 28, minWidth: 'auto', px: 2 }}
+                  >
+                    Edit
+                  </Button>
+                ) : (
+                  <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Button
+                      variant="text"
+                      size="small"
+                      onClick={() => {
+                        setNoteTemp(kycData.notes);
+                        setIsEditingNotes(false);
+                      }}
+                      sx={{ height: 28, color: colors.textSecondary }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="contained"
+                      size="small"
+                      onClick={handleSaveNotes}
+                      sx={{ height: 28 }}
+                    >
+                      Save
+                    </Button>
+                  </Box>
+                )}
+              </Box>
+
+              {isEditingNotes ? (
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={3}
+                  value={noteTemp}
+                  onChange={(e) => setNoteTemp(e.target.value)}
+                  placeholder="Enter internal notes, rejection reasons, or manual check details..."
+                  sx={{
+                    bgcolor: '#FFF',
+                    '& .MuiOutlinedInput-root': {
+                      fontSize: 14,
+                    }
+                  }}
+                />
+              ) : (
+                <Typography variant="body2" sx={{
+                  p: 1.5,
+                  bgcolor: '#F9FAFB',
+                  borderRadius: '8px',
+                  border: '1px solid #E5E7EB',
+                  minHeight: '60px',
+                  color: kycData.notes ? colors.brandBlack : colors.textSecondary,
+                  fontStyle: kycData.notes ? 'normal' : 'italic'
+                }}>
+                  {kycData.notes || 'No notes added.'}
+                </Typography>
+              )}
             </Box>
           </Grid>
-
-          {/* Actions */}
+          {/* Actions kept same */}
           <Grid item xs={12} md={4}>
             <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5 }}>Admin Actions</Typography>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -461,6 +419,27 @@ const UserDetailsPage = () => {
         Points & Performance
       </Typography>
       <Grid container spacing={2} sx={{ mb: 3 }}>
+        {/* Total Referrals ADDED */}
+        <Grid item xs={6} md={3}>
+          <Card
+            sx={{
+              padding: 2,
+              background: `linear-gradient(135deg, ${colors.brandRed}1A 0%, ${colors.brandRed}0D 100%)`,
+              border: `1.5px solid ${colors.brandRed}33`,
+              borderRadius: '16px',
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+              <AssignmentInd sx={{ fontSize: 24, color: colors.brandRed }} />
+              <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 12 }}>
+                Total Referrals
+              </Typography>
+            </Box>
+            <Typography variant="h4" sx={{ fontWeight: 700, color: colors.brandRed }}>
+              {user.totalReferrals || 0}
+            </Typography>
+          </Card>
+        </Grid>
         <Grid item xs={6} md={3}>
           <Card
             sx={{
