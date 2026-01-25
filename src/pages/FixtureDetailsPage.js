@@ -18,6 +18,10 @@ import {
   DialogContent,
   DialogActions,
   Alert,
+  TextField,
+  Checkbox,
+  FormControlLabel,
+  LinearProgress,
 } from '@mui/material';
 import {
   ArrowBack,
@@ -33,6 +37,8 @@ import {
   People,
   ArrowUpward,
   Person,
+  StopCircle,
+  Save,
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { colors, constants } from '../config/theme';
@@ -51,6 +57,15 @@ const FixtureDetailsPage = () => {
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [approveDialogOpen, setApproveDialogOpen] = useState(false);
   const [isApproved, setIsApproved] = useState(false);
+  const [scoreDialogOpen, setScoreDialogOpen] = useState(false);
+  const [endMatchDialogOpen, setEndMatchDialogOpen] = useState(false);
+  const [scoreForm, setScoreForm] = useState({
+    homeScore: '',
+    awayScore: '',
+    firstGoalScorer: '',
+    firstGoalMinute: '',
+    markCompleted: true,
+  });
 
   useEffect(() => {
     const loadFixtureData = async () => {
@@ -426,7 +441,85 @@ const FixtureDetailsPage = () => {
     console.log(`[SYSTEM LOG] Match details approved for ${id}`);
   };
 
+  const handleEndMatch = () => {
+    setEndMatchDialogOpen(true);
+  };
 
+  const confirmEndMatch = () => {
+    // Update fixture status to 'resultsProcessing' without scores
+    setFixture(prev => ({
+      ...prev,
+      status: 'resultsProcessing',
+      matchStatus: 'resultsProcessing',
+    }));
+    setEndMatchDialogOpen(false);
+    console.log(`[SYSTEM LOG] Match ${id} ended - awaiting final score`);
+    alert('Match ended successfully. You can upload the score later.');
+  };
+
+  const handleOpenScoreDialog = () => {
+    setScoreForm({
+      homeScore: fixture.homeScore || '',
+      awayScore: fixture.awayScore || '',
+      firstGoalScorer: fixture.firstGoalScorer || '',
+      firstGoalMinute: fixture.firstGoalMinute || '',
+      markCompleted: true,
+    });
+    setScoreDialogOpen(true);
+  };
+
+  const handleSaveScore = () => {
+    // Validate scores
+    if (scoreForm.homeScore === '' || scoreForm.awayScore === '') {
+      alert('Please enter both home and away scores');
+      return;
+    }
+
+    // Update fixture with scores
+    setFixture(prev => ({
+      ...prev,
+      homeScore: parseInt(scoreForm.homeScore),
+      awayScore: parseInt(scoreForm.awayScore),
+      firstGoalScorer: scoreForm.firstGoalScorer,
+      firstGoalMinute: scoreForm.firstGoalMinute ? parseInt(scoreForm.firstGoalMinute) : null,
+      status: scoreForm.markCompleted ? 'completed' : 'resultsProcessing',
+      matchStatus: scoreForm.markCompleted ? 'completed' : 'resultsProcessing',
+    }));
+
+    setScoreDialogOpen(false);
+    console.log(`[SYSTEM LOG] Score saved for match ${id}:`, scoreForm);
+    alert(scoreForm.markCompleted ? 'Score saved and match completed!' : 'Score saved. Match still processing.');
+  };
+
+  const getFlowProgress = () => {
+    const status = fixture?.status || 'scheduled';
+    if (status === 'scheduled' || status === 'published') return 0;
+    if (status === 'predictionLocked' || status === 'locked') return 25;
+    if (status === 'live') return 50;
+    if (status === 'resultsProcessing' || status === 'pending') return 75;
+    if (status === 'completed') return 100;
+    return 0;
+  };
+
+  const getFlowStatus = () => {
+    const status = fixture?.status || 'scheduled';
+    if (status === 'scheduled' || status === 'published') return 'Prediction Open';
+    if (status === 'predictionLocked' || status === 'locked') return 'Prediction Locked';
+    if (status === 'live') return 'Match Live';
+    if (status === 'resultsProcessing' || status === 'pending') return 'Results Processing';
+    if (status === 'completed') return 'Completed';
+    return 'Unknown';
+  };
+
+  const getFlowColor = () => {
+    const progress = getFlowProgress();
+    if (progress === 0) return '#EBF5FF';
+    if (progress === 25) return '#FFF4E6';
+    if (progress === 50) return '#FEF3C7';
+    if (progress === 75) return '#FFF7ED';
+    if (progress === 100) return '#ECFDF5';
+    return '#F3F4F6';
+  };
 
   if (loading) {
     return (
@@ -941,6 +1034,41 @@ const FixtureDetailsPage = () => {
 
         {/* Right Sidebar: Timeline & Actions */}
         <Grid item xs={12} md={4}>
+          {/* Match Flow Progress Indicator */}
+          <Card sx={{ borderRadius: '20px', p: 2.5, mb: 3, bgcolor: getFlowColor(), border: `2px solid ${colors.brandRed}30` }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, color: colors.brandBlack }}>
+                Fixture Flow
+              </Typography>
+              <Chip 
+                label={getFlowStatus()}
+                size="small"
+                sx={{ 
+                  fontWeight: 700,
+                  fontSize: 11,
+                  bgcolor: colors.brandRed,
+                  color: colors.brandWhite,
+                }}
+              />
+            </Box>
+            <LinearProgress 
+              variant="determinate" 
+              value={getFlowProgress()} 
+              sx={{
+                height: 8,
+                borderRadius: '8px',
+                bgcolor: `${colors.brandWhite}80`,
+                '& .MuiLinearProgress-bar': {
+                  bgcolor: colors.brandRed,
+                  borderRadius: '8px',
+                }
+              }}
+            />
+            <Typography variant="caption" sx={{ color: colors.textSecondary, mt: 1, display: 'block', textAlign: 'center' }}>
+              {getFlowProgress()}% Complete
+            </Typography>
+          </Card>
+
           {/* Admin Actions */}
           <Card sx={{ borderRadius: '20px', p: 3, mb: 3, bgcolor: '#FFF8F6', border: `1px solid ${colors.brandRed}20` }}>
             <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2, color: colors.brandRed }}>Admin Actions</Typography>
@@ -973,10 +1101,36 @@ const FixtureDetailsPage = () => {
             >
               {isApproved ? 'Match Details Approved' : 'Approve Match Details'}
             </Button>
+
+            {/* End Match Button (only show when match is live) */}
+            {fixture?.status === 'live' && (
+              <Button 
+                fullWidth 
+                variant="outlined" 
+                startIcon={<StopCircle />}
+                onClick={handleEndMatch}
+                sx={{
+                  mb: 1,
+                  borderColor: colors.warning,
+                  color: colors.warning,
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  '&:hover': {
+                    borderColor: colors.warning,
+                    bgcolor: `${colors.warning}14`,
+                  }
+                }}
+              >
+                End Match (Results Pending)
+              </Button>
+            )}
+
             <Button 
               fullWidth 
               variant="outlined" 
               color="error"
+              startIcon={<Save />}
+              onClick={handleOpenScoreDialog}
               sx={{
                 textTransform: 'none',
                 fontWeight: 600,
@@ -1065,6 +1219,208 @@ const FixtureDetailsPage = () => {
             }}
           >
             Confirm Approval
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* End Match Dialog */}
+      <Dialog 
+        open={endMatchDialogOpen} 
+        onClose={() => setEndMatchDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: { borderRadius: '16px' }
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 700, color: colors.warning }}>
+          End Live Match
+        </DialogTitle>
+        <DialogContent>
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
+              You are about to end the live match:
+            </Typography>
+            <Typography variant="body2" sx={{ fontSize: 13 }}>
+              • Match: {fixture?.homeTeam} vs {fixture?.awayTeam}
+            </Typography>
+            <Typography variant="body2" sx={{ fontSize: 13 }}>
+              • Fixture ID: {id}
+            </Typography>
+          </Alert>
+          <Typography variant="body2" sx={{ mb: 2 }}>
+            This will change the match status to <strong>"Results Processing"</strong> without uploading the final score yet.
+          </Typography>
+          <Typography variant="body2" sx={{ color: colors.textSecondary }}>
+            You can return later to upload the final score and complete the match flow.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 3, pt: 0 }}>
+          <Button 
+            onClick={() => setEndMatchDialogOpen(false)}
+            sx={{ textTransform: 'none', fontWeight: 600 }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={confirmEndMatch}
+            variant="contained"
+            startIcon={<StopCircle />}
+            sx={{ 
+              bgcolor: colors.warning,
+              textTransform: 'none',
+              fontWeight: 700,
+              '&:hover': { bgcolor: '#D97706' }
+            }}
+          >
+            End Match
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Score Upload Dialog */}
+      <Dialog 
+        open={scoreDialogOpen} 
+        onClose={() => setScoreDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: { borderRadius: '16px' }
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 700, color: colors.brandRed }}>
+          Upload Match Score
+        </DialogTitle>
+        <DialogContent>
+          <Alert severity="info" sx={{ mb: 3, mt: 1 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              {fixture?.homeTeam} vs {fixture?.awayTeam}
+            </Typography>
+            <Typography variant="caption" sx={{ color: colors.textSecondary }}>
+              Fixture ID: {id}
+            </Typography>
+          </Alert>
+
+          <Grid container spacing={2}>
+            <Grid item xs={6}>
+              <TextField
+                fullWidth
+                label="Home Score"
+                type="number"
+                value={scoreForm.homeScore}
+                onChange={(e) => setScoreForm({ ...scoreForm, homeScore: e.target.value })}
+                InputProps={{
+                  inputProps: { min: 0 }
+                }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '12px',
+                  }
+                }}
+              />
+              <Typography variant="caption" sx={{ color: colors.textSecondary, mt: 0.5, display: 'block' }}>
+                {fixture?.homeTeam}
+              </Typography>
+            </Grid>
+            <Grid item xs={6}>
+              <TextField
+                fullWidth
+                label="Away Score"
+                type="number"
+                value={scoreForm.awayScore}
+                onChange={(e) => setScoreForm({ ...scoreForm, awayScore: e.target.value })}
+                InputProps={{
+                  inputProps: { min: 0 }
+                }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '12px',
+                  }
+                }}
+              />
+              <Typography variant="caption" sx={{ color: colors.textSecondary, mt: 0.5, display: 'block' }}>
+                {fixture?.awayTeam}
+              </Typography>
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="First Goal Scorer (Optional)"
+                value={scoreForm.firstGoalScorer}
+                onChange={(e) => setScoreForm({ ...scoreForm, firstGoalScorer: e.target.value })}
+                placeholder="e.g. Ronaldo"
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '12px',
+                  }
+                }}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="First Goal Minute (Optional)"
+                type="number"
+                value={scoreForm.firstGoalMinute}
+                onChange={(e) => setScoreForm({ ...scoreForm, firstGoalMinute: e.target.value })}
+                placeholder="e.g. 23"
+                InputProps={{
+                  inputProps: { min: 1, max: 120 }
+                }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '12px',
+                  }
+                }}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={scoreForm.markCompleted}
+                    onChange={(e) => setScoreForm({ ...scoreForm, markCompleted: e.target.checked })}
+                    sx={{
+                      color: colors.brandRed,
+                      '&.Mui-checked': {
+                        color: colors.brandRed,
+                      }
+                    }}
+                  />
+                }
+                label={
+                  <Box>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                      Mark as Completed
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: colors.textSecondary }}>
+                      This will complete the fixture flow and trigger prediction settlement
+                    </Typography>
+                  </Box>
+                }
+              />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions sx={{ p: 3, pt: 0 }}>
+          <Button 
+            onClick={() => setScoreDialogOpen(false)}
+            sx={{ textTransform: 'none', fontWeight: 600 }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={handleSaveScore}
+            variant="contained"
+            startIcon={<Save />}
+            sx={{ 
+              bgcolor: colors.success,
+              textTransform: 'none',
+              fontWeight: 700,
+              '&:hover': { bgcolor: '#059669' }
+            }}
+          >
+            Save Score
           </Button>
         </DialogActions>
       </Dialog>

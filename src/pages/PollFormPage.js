@@ -18,6 +18,7 @@ import {
   ListItemText,
   Alert,
   Chip,
+  Divider,
 } from '@mui/material';
 import {
   ArrowBack,
@@ -46,6 +47,14 @@ const PollFormPage = () => {
   const [leagues, setLeagues] = useState([]);
   const [leagueFixtures, setLeagueFixtures] = useState([]);
   const [polls, setPolls] = useState([]);
+  const [availableTeams, setAvailableTeams] = useState([]);
+  const [selectedFixtures, setSelectedFixtures] = useState([
+    { matchNum: 1, teamA: '', teamB: '' },
+    { matchNum: 2, teamA: '', teamB: '' },
+    { matchNum: 3, teamA: '', teamB: '' },
+    { matchNum: 4, teamA: '', teamB: '' },
+    { matchNum: 5, teamA: '', teamB: '' },
+  ]);
 
   const [formData, setFormData] = useState({
     leagueId: '',
@@ -92,27 +101,73 @@ const PollFormPage = () => {
   }, [id, isEditMode]);
 
   useEffect(() => {
-    const loadLeagueFixtures = async (leagueId) => {
+    const loadLeagueTeams = async (leagueId) => {
       if (!leagueId) {
+        setAvailableTeams([]);
         setLeagueFixtures([]);
         return;
       }
       try {
-        // Mock fixtures
+        // Mock teams based on league
+        const allTeams = {
+          premier_league: [
+            { id: 'team_pl_1', name: 'Arsenal', leagueId: 'premier_league' },
+            { id: 'team_pl_2', name: 'Chelsea', leagueId: 'premier_league' },
+            { id: 'team_pl_3', name: 'Liverpool', leagueId: 'premier_league' },
+            { id: 'team_pl_4', name: 'Manchester City', leagueId: 'premier_league' },
+            { id: 'team_pl_5', name: 'Manchester United', leagueId: 'premier_league' },
+            { id: 'team_pl_6', name: 'Tottenham', leagueId: 'premier_league' },
+            { id: 'team_pl_7', name: 'Newcastle', leagueId: 'premier_league' },
+            { id: 'team_pl_8', name: 'Aston Villa', leagueId: 'premier_league' },
+            { id: 'team_pl_9', name: 'Brighton', leagueId: 'premier_league' },
+            { id: 'team_pl_10', name: 'West Ham', leagueId: 'premier_league' },
+          ],
+          la_liga: [
+            { id: 'team_ll_1', name: 'Real Madrid', leagueId: 'la_liga' },
+            { id: 'team_ll_2', name: 'Barcelona', leagueId: 'la_liga' },
+            { id: 'team_ll_3', name: 'Atletico Madrid', leagueId: 'la_liga' },
+            { id: 'team_ll_4', name: 'Sevilla', leagueId: 'la_liga' },
+            { id: 'team_ll_5', name: 'Valencia', leagueId: 'la_liga' },
+            { id: 'team_ll_6', name: 'Real Sociedad', leagueId: 'la_liga' },
+            { id: 'team_ll_7', name: 'Villarreal', leagueId: 'la_liga' },
+            { id: 'team_ll_8', name: 'Real Betis', leagueId: 'la_liga' },
+            { id: 'team_ll_9', name: 'Athletic Bilbao', leagueId: 'la_liga' },
+            { id: 'team_ll_10', name: 'Osasuna', leagueId: 'la_liga' },
+          ],
+          ligue_1: [
+            { id: 'team_l1_1', name: 'PSG', leagueId: 'ligue_1' },
+            { id: 'team_l1_2', name: 'Marseille', leagueId: 'ligue_1' },
+            { id: 'team_l1_3', name: 'Lyon', leagueId: 'ligue_1' },
+            { id: 'team_l1_4', name: 'Monaco', leagueId: 'ligue_1' },
+            { id: 'team_l1_5', name: 'Lille', leagueId: 'ligue_1' },
+            { id: 'team_l1_6', name: 'Nice', leagueId: 'ligue_1' },
+            { id: 'team_l1_7', name: 'Lens', leagueId: 'ligue_1' },
+            { id: 'team_l1_8', name: 'Rennes', leagueId: 'ligue_1' },
+            { id: 'team_l1_9', name: 'Montpellier', leagueId: 'ligue_1' },
+            { id: 'team_l1_10', name: 'Nantes', leagueId: 'ligue_1' },
+          ],
+        };
+
+        const teams = allTeams[leagueId] || [];
+        setAvailableTeams(teams);
+        
+        // Keep legacy fixtures for display reference
         const fixtures = [
           { id: 'f1', homeTeam: 'Team A', awayTeam: 'Team B' },
           { id: 'f2', homeTeam: 'Team C', awayTeam: 'Team D' },
         ];
         setLeagueFixtures(fixtures);
       } catch (error) {
-        console.error('Error loading fixtures:', error);
+        console.error('Error loading teams:', error);
+        setAvailableTeams([]);
         setLeagueFixtures([]);
       }
     };
 
     if (formData.leagueId) {
-      loadLeagueFixtures(formData.leagueId);
+      loadLeagueTeams(formData.leagueId);
     } else {
+      setAvailableTeams([]);
       setLeagueFixtures([]);
     }
   }, [formData.leagueId]);
@@ -121,15 +176,55 @@ const PollFormPage = () => {
     setFormData({ ...formData, [field]: value });
   };
 
+  const handleTeamSelect = (matchNum, teamType, teamId) => {
+    setSelectedFixtures(prev => 
+      prev.map(fixture => 
+        fixture.matchNum === matchNum 
+          ? { ...fixture, [teamType]: teamId }
+          : fixture
+      )
+    );
+  };
+
+  const validateFixtures = () => {
+    // Check all matches have both teams
+    const allMatchesComplete = selectedFixtures.every(f => f.teamA && f.teamB);
+    
+    // Check no team plays itself
+    const noSelfMatchups = selectedFixtures.every(f => f.teamA !== f.teamB);
+    
+    // Check exactly 5 matches
+    const exactlyFive = selectedFixtures.length === 5;
+    
+    return allMatchesComplete && noSelfMatchups && exactlyFive;
+  };
+
   const handleSave = async () => {
+    // Validate fixtures first
+    if (!validateFixtures()) {
+      alert('Please select both teams for all 5 matches before saving.');
+      return;
+    }
+
     try {
       setSaving(true);
 
       // Mock save
       await new Promise(resolve => setTimeout(resolve, 1000));
 
-      console.log('Poll saved:', formData);
-      alert('Poll saved successfully (Mock)!');
+      const pollData = {
+        ...formData,
+        fixtures: selectedFixtures.map(f => ({
+          matchNum: f.matchNum,
+          teamAId: f.teamA,
+          teamAName: availableTeams.find(t => t.id === f.teamA)?.name,
+          teamBId: f.teamB,
+          teamBName: availableTeams.find(t => t.id === f.teamB)?.name,
+        }))
+      };
+
+      console.log('Poll saved:', pollData);
+      alert('Poll saved successfully with 5 team matchups!');
 
       navigate(constants.routes.polls);
     } catch (error) {
@@ -343,8 +438,8 @@ const PollFormPage = () => {
                       Teams / Matches in this Poll
                     </Typography>
                   </Box>
-                  {leagueFixtures.length > 0 ? (
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                  {availableTeams.length > 0 ? (
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                       <Alert severity="info" sx={{ mb: 1 }}>
                         <Typography variant="body2" sx={{ fontWeight: 600, fontSize: 13 }}>
                           Matches per poll: Minimum 5, Maximum 5
@@ -353,42 +448,132 @@ const PollFormPage = () => {
                           (Only Super Admin can override this limit if required)
                         </Typography>
                       </Alert>
-                      {leagueFixtures.slice(0, 5).map((fixture) => (
+
+                      {/* Selectable Team Matchups */}
+                      {selectedFixtures.map((fixture, index) => (
                         <Card
-                          key={fixture.id}
+                          key={fixture.matchNum}
                           elevation={0}
                           sx={{
                             padding: 2,
                             borderRadius: '12px',
                             backgroundColor: colors.brandWhite,
                             border: `1px solid ${colors.divider}`,
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: 'flex-start',
-                            justifyContent: 'center',
                             '&:hover': {
-                              borderColor: colors.info,
-                              backgroundColor: '#F8FAFC'
+                              borderColor: colors.brandRed,
+                              boxShadow: `0 2px 8px ${colors.brandRed}20`,
                             }
                           }}
                         >
-                          <Typography variant="subtitle1" sx={{ fontWeight: 700, color: colors.brandBlack, lineHeight: 1.2, mb: 0.5 }}>
-                            {fixture.homeTeam || 'TBD'}
+                          <Typography variant="subtitle2" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 2 }}>
+                            Match {fixture.matchNum}
                           </Typography>
-                          <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13 }}>
-                            vs {fixture.awayTeam || 'TBD'}
-                          </Typography>
+
+                          {/* Team A (Home) Selection */}
+                          <FormControl 
+                            fullWidth 
+                            sx={{ 
+                              mb: 1.5,
+                              '& .MuiOutlinedInput-root': {
+                                borderRadius: '10px',
+                                bgcolor: `${colors.backgroundLight}80`,
+                              }
+                            }}
+                          >
+                            <InputLabel>Team A (Home)</InputLabel>
+                            <Select
+                              value={fixture.teamA}
+                              onChange={(e) => handleTeamSelect(fixture.matchNum, 'teamA', e.target.value)}
+                              label="Team A (Home)"
+                            >
+                              <MenuItem value="">
+                                <em>Select Team A</em>
+                              </MenuItem>
+                              {availableTeams.map((team) => (
+                                <MenuItem 
+                                  key={team.id} 
+                                  value={team.id}
+                                  disabled={fixture.teamB === team.id}
+                                >
+                                  {team.name}
+                                </MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+
+                          {/* VS Divider */}
+                          <Divider sx={{ my: 1 }}>
+                            <Chip 
+                              label="VS" 
+                              size="small" 
+                              sx={{ 
+                                fontWeight: 700, 
+                                bgcolor: colors.brandRed, 
+                                color: colors.brandWhite,
+                                fontSize: 11,
+                              }} 
+                            />
+                          </Divider>
+
+                          {/* Team B (Away) Selection */}
+                          <FormControl 
+                            fullWidth 
+                            sx={{ 
+                              mt: 1.5,
+                              '& .MuiOutlinedInput-root': {
+                                borderRadius: '10px',
+                                bgcolor: `${colors.backgroundLight}80`,
+                              }
+                            }}
+                          >
+                            <InputLabel>Team B (Away)</InputLabel>
+                            <Select
+                              value={fixture.teamB}
+                              onChange={(e) => handleTeamSelect(fixture.matchNum, 'teamB', e.target.value)}
+                              label="Team B (Away)"
+                            >
+                              <MenuItem value="">
+                                <em>Select Team B</em>
+                              </MenuItem>
+                              {availableTeams.map((team) => (
+                                <MenuItem 
+                                  key={team.id} 
+                                  value={team.id}
+                                  disabled={fixture.teamA === team.id}
+                                >
+                                  {team.name}
+                                </MenuItem>
+                              ))}
+                            </Select>
+                          </FormControl>
+
+                          {/* Selected Teams Preview */}
+                          {fixture.teamA && fixture.teamB && (
+                            <Box sx={{ mt: 2, p: 1.5, borderRadius: '8px', bgcolor: `${colors.success}0D`, border: `1px solid ${colors.success}40` }}>
+                              <Typography variant="caption" sx={{ color: colors.success, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                <CheckCircle sx={{ fontSize: 14 }} />
+                                Match {fixture.matchNum} Ready
+                              </Typography>
+                              <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack, mt: 0.5 }}>
+                                {availableTeams.find(t => t.id === fixture.teamA)?.name} vs {availableTeams.find(t => t.id === fixture.teamB)?.name}
+                              </Typography>
+                            </Box>
+                          )}
                         </Card>
                       ))}
-                      {leagueFixtures.length > 5 && (
-                        <Typography variant="caption" sx={{ color: colors.textSecondary, mt: 0.5, textAlign: 'center', display: 'block' }}>
-                          + {leagueFixtures.length - 5} more matches
-                        </Typography>
+
+                      {/* Validation Summary */}
+                      {validateFixtures() && (
+                        <Alert severity="success" sx={{ mt: 1 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600, fontSize: 13 }}>
+                            ✓ All 5 matches configured correctly
+                          </Typography>
+                        </Alert>
                       )}
                     </Box>
                   ) : (
                     <Typography variant="body2" sx={{ color: colors.textSecondary, fontStyle: 'italic' }}>
-                      No fixtures found for this league. Users will vote on teams from this league.
+                      Select a league above to choose teams for the poll.
                     </Typography>
                   )}
                 </Box>
@@ -703,7 +888,7 @@ const PollFormPage = () => {
             variant="contained"
             startIcon={<Add />}
             onClick={handleSave}
-            disabled={saving || !rules.onePollPerLeague || !rules.maxFiveActive || !rules.closeAfterStart || !rules.durationValid}
+            disabled={saving || !rules.onePollPerLeague || !rules.maxFiveActive || !rules.closeAfterStart || !rules.durationValid || !validateFixtures()}
             sx={{
               background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
               borderRadius: '20px',
