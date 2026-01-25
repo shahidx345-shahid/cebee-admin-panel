@@ -99,8 +99,7 @@ const UserDetailsPage = () => {
       totalPolls: 12,
       createdAt: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000),
       lastLogin: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-      kycRequestedAt: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000),
-      kycRequestedAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000), // Demo date
+      kycRequestedAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
       spFromPredictions: 1800,
       spFromDailyLogin: 650,
       cpFromReferrals: 200,
