@@ -86,8 +86,9 @@ const UserDetailsPage = () => {
       isDeactivated: false,
       isFlagged: isFlagged,
       flagReason: isFlagged ? 'Multiple failed login attempts from different IPs' : '',
+      flagSource: isFlagged ? (Math.random() > 0.5 ? 'System Flagged' : 'Admin Flagged') : null,
       adminNotes: 'User requires manual review for high withdrawal amounts.',
-      fraudFlags: isFlagged ? ['Suspicious IP'] : [],
+      fraudFlags: isFlagged ? ['Suspicious IP', 'Multiple Accounts'] : [],
       spTotal: 2450,
       spCurrent: 1200,
       cpTotal: 350,
@@ -98,6 +99,7 @@ const UserDetailsPage = () => {
       totalPolls: 12,
       createdAt: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000),
       lastLogin: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+      kycRequestedAt: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000),
       kycRequestedAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000), // Demo date
       spFromPredictions: 1800,
       spFromDailyLogin: 650,
@@ -128,13 +130,18 @@ const UserDetailsPage = () => {
 
       setUser(userData);
 
-      // Demo Log Activities
+      // Demo Log Activities - Enhanced
       setActivities([
-        { id: 1, type: 'LOGIN', description: 'User logged in from IP 192.168.1.1', timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString() },
-        { id: 2, type: 'PREDICTION_MADE', description: 'Placed prediction on Arsenal vs Chelsea', timestamp: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString() },
-        { id: 3, type: 'POLL_VOTE', description: 'Voted in "Player of the Month" poll', timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString() },
-        { id: 4, type: 'REWARD_CLAIM', description: 'Claimed Daily Login Bonus (50 SP)', timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString() },
-        { id: 5, type: 'KYC_SUBMISSION', description: 'Submitted ID Document for verification', timestamp: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString() },
+        { id: 1, type: 'LOGIN', description: 'User logged in from IP 192.168.1.1', timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), icon: 'login' },
+        { id: 2, type: 'PREDICTION_MADE', description: 'Placed prediction on Arsenal vs Chelsea (2-1)', timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(), icon: 'prediction' },
+        { id: 3, type: 'REWARD_EARNED', description: 'Earned 50 SP from correct prediction', timestamp: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), icon: 'reward' },
+        { id: 4, type: 'POLL_VOTE', description: 'Voted in "Premier League Top Team" poll', timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), icon: 'poll' },
+        { id: 5, type: 'REFERRAL', description: 'Referred new user (john_smith_23) - 10 CP earned', timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(), icon: 'referral' },
+        { id: 6, type: 'REWARD_CLAIM', description: 'Claimed Daily Login Bonus (25 SP)', timestamp: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(), icon: 'reward' },
+        { id: 7, type: 'PROFILE_UPDATE', description: 'Updated profile information', timestamp: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), icon: 'profile' },
+        { id: 8, type: 'KYC_SUBMISSION', description: 'Submitted ID Document for verification', timestamp: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(), icon: 'kyc' },
+        { id: 9, type: 'PASSWORD_CHANGE', description: 'Changed account password', timestamp: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(), icon: 'security' },
+        { id: 10, type: 'ACCOUNT_CREATED', description: 'Account created successfully', timestamp: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString(), icon: 'account' },
       ]);
     } catch (error) {
       console.error('Error loading user:', error);
@@ -197,19 +204,49 @@ const UserDetailsPage = () => {
         Back to Users
       </Button>
 
-      {/* Flagged Banner */}
+      {/* Flagged Banner - Enhanced with flag source */}
       {user.isFlagged && (
         <Alert
           severity="error"
-          sx={{ mb: 3, borderRadius: '12px' }}
+          sx={{ mb: 3, borderRadius: '12px', border: `2px solid ${colors.error}` }}
           icon={<Flag fontSize="inherit" />}
         >
-          <Typography variant="body2" sx={{ fontWeight: 700 }}>
-            Account Flagged
-          </Typography>
-          <Typography variant="caption">
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+            <Typography variant="body2" sx={{ fontWeight: 700, fontSize: 16 }}>
+              Account Flagged
+            </Typography>
+            <Chip 
+              label={user.flagSource || (user.fraudFlags && user.fraudFlags.length > 0 ? 'System Flagged' : 'Admin Flagged')}
+              size="small"
+              sx={{
+                bgcolor: colors.error,
+                color: colors.brandWhite,
+                fontWeight: 700,
+                fontSize: 11
+              }}
+            />
+          </Box>
+          <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
             Reason: {user.flagReason || 'Suspicious Activity detected.'}
           </Typography>
+          {user.fraudFlags && user.fraudFlags.length > 0 && (
+            <Box sx={{ display: 'flex', gap: 1, mt: 1, flexWrap: 'wrap' }}>
+              {user.fraudFlags.map((flag, index) => (
+                <Chip
+                  key={index}
+                  label={flag}
+                  size="small"
+                  sx={{
+                    bgcolor: `${colors.error}20`,
+                    color: colors.error,
+                    fontWeight: 600,
+                    fontSize: 11,
+                    height: 24
+                  }}
+                />
+              ))}
+            </Box>
+          )}
         </Alert>
       )}
 
@@ -239,34 +276,52 @@ const UserDetailsPage = () => {
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 3, borderBottom: `1px solid ${colors.divider}`, pb: 1 }}>
               Profile Details
             </Typography>
-            <Grid container spacing={3}>
-              <Grid item xs={12} sm={6}>
-                <Typography variant="caption" sx={{ color: colors.textSecondary, display: 'block', mb: 0.5 }}>Full Name</Typography>
-                <Typography variant="body1" sx={{ fontWeight: 600 }}>{user.fullName || 'N/A'}</Typography>
+            <Grid container spacing={2.5}>
+              {/* Full Name */}
+              <Grid item xs={12}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1, borderBottom: `1px solid ${colors.divider}` }}>
+                  <Typography variant="body2" sx={{ color: colors.textSecondary, fontWeight: 600 }}>Full Name</Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 700, color: colors.brandBlack }}>{user.fullName || 'N/A'}</Typography>
+                </Box>
               </Grid>
-              <Grid item xs={12} sm={6}>
-                <Typography variant="caption" sx={{ color: colors.textSecondary, display: 'block', mb: 0.5 }}>Username</Typography>
-                <Typography variant="body1" sx={{ fontWeight: 600 }}>@{user.username || 'N/A'}</Typography>
+              {/* Username */}
+              <Grid item xs={12}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1, borderBottom: `1px solid ${colors.divider}` }}>
+                  <Typography variant="body2" sx={{ color: colors.textSecondary, fontWeight: 600 }}>Username</Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 700, color: colors.brandBlack }}>@{user.username || 'N/A'}</Typography>
+                </Box>
               </Grid>
-              <Grid item xs={12} sm={6}>
-                <Typography variant="caption" sx={{ color: colors.textSecondary, display: 'block', mb: 0.5 }}>Email</Typography>
-                <Typography variant="body1" sx={{ fontWeight: 600 }}>{user.email || 'N/A'}</Typography>
+              {/* Email */}
+              <Grid item xs={12}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1, borderBottom: `1px solid ${colors.divider}` }}>
+                  <Typography variant="body2" sx={{ color: colors.textSecondary, fontWeight: 600 }}>Email Address</Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 700, color: colors.brandBlack }}>{user.email || 'N/A'}</Typography>
+                </Box>
               </Grid>
-              <Grid item xs={12} sm={6}>
-                <Typography variant="caption" sx={{ color: colors.textSecondary, display: 'block', mb: 0.5 }}>Country</Typography>
-                <Typography variant="body1" sx={{ fontWeight: 600 }}>{user.country || 'N/A'}</Typography>
+              {/* Country */}
+              <Grid item xs={12}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1, borderBottom: `1px solid ${colors.divider}` }}>
+                  <Typography variant="body2" sx={{ color: colors.textSecondary, fontWeight: 600 }}>Country</Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 700, color: colors.brandBlack }}>{user.country || 'N/A'}</Typography>
+                </Box>
               </Grid>
-              <Grid item xs={12} sm={6}>
-                <Typography variant="caption" sx={{ color: colors.textSecondary, display: 'block', mb: 0.5 }}>Registration Date</Typography>
-                <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                  {user.createdAt ? format(user.createdAt, 'MMM dd, yyyy') : 'N/A'}
-                </Typography>
+              {/* Registration Date */}
+              <Grid item xs={12}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1, borderBottom: `1px solid ${colors.divider}` }}>
+                  <Typography variant="body2" sx={{ color: colors.textSecondary, fontWeight: 600 }}>Registration Date</Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 700, color: colors.brandBlack }}>
+                    {user.createdAt ? format(user.createdAt, 'MMM dd, yyyy') : 'N/A'}
+                  </Typography>
+                </Box>
               </Grid>
-              <Grid item xs={12} sm={6}>
-                <Typography variant="caption" sx={{ color: colors.textSecondary, display: 'block', mb: 0.5 }}>Last Login</Typography>
-                <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                  {user.lastLogin ? format(user.lastLogin, 'MMM dd, yyyy HH:mm') : 'Never'}
-                </Typography>
+              {/* Last Login */}
+              <Grid item xs={12}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', py: 1 }}>
+                  <Typography variant="body2" sx={{ color: colors.textSecondary, fontWeight: 600 }}>Last Login</Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 700, color: colors.brandBlack }}>
+                    {user.lastLogin ? format(user.lastLogin, 'MMM dd, yyyy HH:mm') : 'Never'}
+                  </Typography>
+                </Box>
               </Grid>
             </Grid>
           </Grid>
@@ -419,27 +474,6 @@ const UserDetailsPage = () => {
         Points & Performance
       </Typography>
       <Grid container spacing={2} sx={{ mb: 3 }}>
-        {/* Total Referrals ADDED */}
-        <Grid item xs={6} md={3}>
-          <Card
-            sx={{
-              padding: 2,
-              background: `linear-gradient(135deg, ${colors.brandRed}1A 0%, ${colors.brandRed}0D 100%)`,
-              border: `1.5px solid ${colors.brandRed}33`,
-              borderRadius: '16px',
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
-              <AssignmentInd sx={{ fontSize: 24, color: colors.brandRed }} />
-              <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 12 }}>
-                Total Referrals
-              </Typography>
-            </Box>
-            <Typography variant="h4" sx={{ fontWeight: 700, color: colors.brandRed }}>
-              {user.totalReferrals || 0}
-            </Typography>
-          </Card>
-        </Grid>
         <Grid item xs={6} md={3}>
           <Card
             sx={{
@@ -577,6 +611,27 @@ const UserDetailsPage = () => {
             </Box>
             <Typography variant="h4" sx={{ fontWeight: 700, color: colors.warning }}>
               {user.totalPolls || 0}
+            </Typography>
+          </Card>
+        </Grid>
+        {/* Total Referrals - Moved to last position */}
+        <Grid item xs={6} md={3}>
+          <Card
+            sx={{
+              padding: 2,
+              background: `linear-gradient(135deg, ${colors.brandRed}1A 0%, ${colors.brandRed}0D 100%)`,
+              border: `1.5px solid ${colors.brandRed}33`,
+              borderRadius: '16px',
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+              <AssignmentInd sx={{ fontSize: 24, color: colors.brandRed }} />
+              <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 12 }}>
+                Total Referrals
+              </Typography>
+            </Box>
+            <Typography variant="h4" sx={{ fontWeight: 700, color: colors.brandRed }}>
+              {user.totalReferrals || 0}
             </Typography>
           </Card>
         </Grid>

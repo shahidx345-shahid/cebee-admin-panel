@@ -530,20 +530,33 @@ const PollsPage = () => {
       <Card
         sx={{
           mb: 3,
-          p: 1,
-          borderRadius: '20px',
+          p: { xs: 0.5, sm: 1 },
+          borderRadius: { xs: '16px', sm: '20px' },
           backgroundColor: colors.brandWhite,
           border: 'none',
           boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.05)',
           display: 'flex',
-          gap: 1,
+          gap: { xs: 0.5, sm: 1 },
           overflowX: 'auto',
+          maxWidth: '100%',
+          flexWrap: { xs: 'nowrap', md: 'wrap' },
+          WebkitOverflowScrolling: 'touch',
+          '&::-webkit-scrollbar': {
+            height: '4px',
+          },
+          '&::-webkit-scrollbar-track': {
+            background: 'transparent',
+          },
+          '&::-webkit-scrollbar-thumb': {
+            background: colors.divider,
+            borderRadius: '4px',
+          },
         }}
       >
         {[
           { id: 'all', label: 'All Polls', icon: <ViewModule />, color: colors.brandRed, bgColor: '#FEE2E2' },
-          { id: 'active', label: 'Active', icon: <PieChart />, color: '#10B981', bgColor: '#D1FAE5' },
           { id: 'scheduled', label: 'Scheduled', icon: <Schedule />, color: '#F59E0B', bgColor: '#FEF3C7' },
+          { id: 'active', label: 'Active', icon: <PieChart />, color: '#10B981', bgColor: '#D1FAE5' },
           { id: 'closed', label: 'Closed', icon: <CheckCircle />, color: '#6B7280', bgColor: '#F3F4F6' },
         ].map((item) => {
           const isSelected = statusFilter === item.id;
@@ -553,27 +566,42 @@ const PollsPage = () => {
               onClick={() => setStatusFilter(item.id)}
               disableRipple
               sx={{
-                flex: 1,
-                minWidth: 120,
-                borderRadius: '16px',
+                flex: { xs: '0 0 auto', sm: '0 0 auto', md: 1 },
+                minWidth: { xs: 'auto', sm: 110, md: 120 },
+                width: { xs: 'auto', md: 'auto' },
+                borderRadius: { xs: '12px', sm: '16px' },
                 textTransform: 'none',
                 fontWeight: 700,
-                fontSize: 15,
-                py: 1.5,
+                fontSize: { xs: 13, sm: 14, md: 15 },
+                py: { xs: 1, sm: 1.25, md: 1.5 },
+                px: { xs: 1.5, sm: 2, md: 2.5 },
                 backgroundColor: isSelected ? item.color : 'transparent',
                 color: isSelected ? colors.brandWhite : colors.brandBlack,
                 transition: 'all 0.2s',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                boxSizing: 'border-box',
                 '&:hover': {
                   backgroundColor: isSelected ? item.color : item.bgColor,
                 },
               }}
             >
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Box 
+                sx={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: { xs: 0.75, sm: 1, md: 1.5 },
+                  overflow: 'hidden',
+                  maxWidth: '100%',
+                }}
+              >
                 <Box
                   sx={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: '8px',
+                    width: { xs: 24, sm: 26, md: 28 },
+                    height: { xs: 24, sm: 26, md: 28 },
+                    flexShrink: 0,
+                    borderRadius: { xs: '6px', sm: '8px' },
                     backgroundColor: isSelected ? 'rgba(255, 255, 255, 0.2)' : item.bgColor,
                     display: 'flex',
                     alignItems: 'center',
@@ -581,9 +609,18 @@ const PollsPage = () => {
                     color: isSelected ? colors.brandWhite : item.color,
                   }}
                 >
-                  {React.cloneElement(item.icon, { sx: { fontSize: 18 } })}
+                  {React.cloneElement(item.icon, { sx: { fontSize: { xs: 16, sm: 17, md: 18 } } })}
                 </Box>
-                {item.label}
+                <Box
+                  component="span"
+                  sx={{
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {item.label}
+                </Box>
               </Box>
             </Button>
           );

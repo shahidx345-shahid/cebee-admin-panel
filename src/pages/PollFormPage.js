@@ -345,6 +345,14 @@ const PollFormPage = () => {
                   </Box>
                   {leagueFixtures.length > 0 ? (
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                      <Alert severity="info" sx={{ mb: 1 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 600, fontSize: 13 }}>
+                          Matches per poll: Minimum 5, Maximum 5
+                        </Typography>
+                        <Typography variant="caption" sx={{ fontSize: 12 }}>
+                          (Only Super Admin can override this limit if required)
+                        </Typography>
+                      </Alert>
                       {leagueFixtures.slice(0, 5).map((fixture) => (
                         <Card
                           key={fixture.id}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Box,
   Typography,
@@ -79,35 +79,35 @@ const SettingsPage = () => {
   const [isSuperAdmin, setIsSuperAdmin] = useState(true);
   const [isCheckingUpdates, setIsCheckingUpdates] = useState(false);
 
-  useEffect(() => {
-    loadSettings();
-  }, []);
-
-  const loadSettings = async () => {
+  const loadSettings = useCallback(async () => {
     try {
       setLoading(true);
       // Simulating network delay
-      await new Promise(resolve => setTimeout(resolve, 800));
+      await new Promise(resolve => setTimeout(resolve, 500));
 
-      // Data is already in initial state, but we could set it explicitly if needed
-      // Just creating a mock effect here
+      // Data is already in initial state, no need to set anything
+      // This prevents unnecessary re-renders
     } catch (error) {
       console.error('Error loading settings:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const handleChange = (field, value) => {
-    setSettings({ ...settings, [field]: value });
+  useEffect(() => {
+    loadSettings();
+  }, [loadSettings]);
+
+  const handleChange = useCallback((field, value) => {
+    setSettings(prev => ({ ...prev, [field]: value }));
     setHasUnsavedChanges(true);
-  };
+  }, []);
 
-  const handleSave = () => {
+  const handleSave = useCallback(() => {
     setSaveDialogOpen(true);
-  };
+  }, []);
 
-  const performSave = async () => {
+  const performSave = useCallback(async () => {
     try {
       // Mock save operation
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -119,72 +119,83 @@ const SettingsPage = () => {
       console.error('Error saving settings:', error);
       alert('Failed to save settings');
     }
-  };
+  }, []);
 
-  const handleToggleMaintenance = () => {
+  const handleToggleMaintenance = useCallback(() => {
     setMaintenanceDialogOpen(true);
-  };
+  }, []);
 
-  const performToggleMaintenance = async () => {
-    const isEnablingMaintenance = settings.platformStatus === 'online';
-    const newStatus = isEnablingMaintenance ? 'maintenance' : 'online';
+  const performToggleMaintenance = useCallback(async () => {
+    setSettings(prev => {
+      const isEnablingMaintenance = prev.platformStatus === 'online';
+      const newStatus = isEnablingMaintenance ? 'maintenance' : 'online';
 
-    const updatedSettings = {
-      ...settings,
-      platformStatus: newStatus,
-    };
+      const updatedSettings = {
+        ...prev,
+        platformStatus: newStatus,
+      };
 
-    if (isEnablingMaintenance) {
-      updatedSettings.maintenanceStartedAt = new Date();
-      updatedSettings.maintenanceStartedBy = 'Admin'; // TODO: Get from auth context
-    } else {
-      updatedSettings.maintenanceStartedAt = null;
-      updatedSettings.maintenanceStartedBy = null;
-    }
+      if (isEnablingMaintenance) {
+        updatedSettings.maintenanceStartedAt = new Date();
+        updatedSettings.maintenanceStartedBy = 'Admin';
+      } else {
+        updatedSettings.maintenanceStartedAt = null;
+        updatedSettings.maintenanceStartedBy = null;
+      }
 
-    setSettings(updatedSettings);
+      // Mock System Log
+      console.log(`[SYSTEM LOG] Maintenance mode ${isEnablingMaintenance ? 'ENABLED' : 'DISABLED'} by Super Admin at ${new Date().toISOString()}`);
+
+      setTimeout(() => {
+        alert(isEnablingMaintenance ? 'Maintenance mode enabled' : 'Platform is now online');
+      }, 0);
+
+      return updatedSettings;
+    });
+    
     setHasUnsavedChanges(true);
     setMaintenanceDialogOpen(false);
+  }, []);
 
-    // Mock System Log
-    console.log(`[SYSTEM LOG] Maintenance mode ${isEnablingMaintenance ? 'ENABLED' : 'DISABLED'} by Super Admin at ${new Date().toISOString()}`);
-
-    alert(isEnablingMaintenance ? 'Maintenance mode enabled' : 'Platform is now online');
-  };
-
-  const handleReset = () => {
+  const handleReset = useCallback(() => {
     setResetDialogOpen(true);
-  };
+  }, []);
 
-  const performReset = () => {
-    setSettings({
-      ...settings,
+  const performReset = useCallback(() => {
+    // Reset Button Scope: Only affects date format, time format, and timezone handling
+    // Platform status, app name, and maintenance message are NOT reset
+    setSettings(prev => ({
+      ...prev,
       dateFormat: 'ddMmYyyy',
       timeFormat: 'hour12',
       displayTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    });
+    }));
     setHasUnsavedChanges(true);
     setResetDialogOpen(false);
-    console.log(`[SYSTEM LOG] Settings reset to defaults by Super Admin at ${new Date().toISOString()}`);
-    alert('Settings reset to defaults (logged)');
-  };
+    console.log(`[SYSTEM LOG] Date/Time settings reset to defaults by Super Admin at ${new Date().toISOString()}`);
+    alert('Date/Time settings reset to defaults (logged)');
+  }, []);
 
-  const handleResetMaintenanceMessage = () => {
-    setSettings({
-      ...settings,
+  const handleResetMaintenanceMessage = useCallback(() => {
+    setSettings(prev => ({
+      ...prev,
       maintenanceTitle: MAINTENANCE_DEFAULTS.defaultTitle,
       maintenanceMessage: MAINTENANCE_DEFAULTS.defaultMessage,
-    });
+    }));
     setHasUnsavedChanges(true);
-  };
+  }, []);
 
-  const handleCheckForUpdates = async () => {
+  const handleCheckForUpdates = useCallback(async () => {
     setIsCheckingUpdates(true);
     // Simulate checking for updates
     await new Promise((resolve) => setTimeout(resolve, 2000));
     setIsCheckingUpdates(false);
     alert('Update check completed');
-  };
+  }, []);
+
+  const isMaintenanceMode = useMemo(() => {
+    return settings.platformStatus === 'maintenance';
+  }, [settings.platformStatus]);
 
   if (loading) {
     return (
@@ -193,8 +204,6 @@ const SettingsPage = () => {
       </Box>
     );
   }
-
-  const isMaintenanceMode = settings.platformStatus === 'maintenance';
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%' }}>
@@ -245,32 +254,58 @@ const SettingsPage = () => {
       <Box
         sx={{
           display: 'flex',
+          flexDirection: { xs: 'column', md: 'row' },
           justifyContent: 'space-between',
-          alignItems: 'center',
+          alignItems: { xs: 'flex-start', md: 'center' },
           mb: 3,
-          padding: 2,
+          padding: { xs: 1.5, md: 2 },
           backgroundColor: colors.brandWhite,
           borderBottom: `1px solid ${colors.divider}33`,
+          gap: { xs: 2, md: 0 },
+          maxWidth: '100%',
+          overflow: 'hidden',
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+        <Box sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: { xs: 1, md: 1.5 },
+          maxWidth: '100%',
+          overflow: 'hidden',
+          flex: 1,
+        }}>
           <Box
             sx={{
-              padding: 1.25,
+              padding: { xs: 1, md: 1.25 },
               background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
-              borderRadius: '12px',
+              borderRadius: { xs: '10px', md: '12px' },
+              flexShrink: 0,
             }}
           >
-            <Settings sx={{ fontSize: 22, color: colors.brandWhite }} />
+            <Settings sx={{ fontSize: { xs: 20, md: 22 }, color: colors.brandWhite }} />
           </Box>
-          <Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Box
+            sx={{
+              flex: 1,
+              minWidth: 0,
+              overflow: 'hidden',
+            }}
+          >
+            <Box sx={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: 1,
+              flexWrap: 'wrap',
+            }}>
               <Typography
                 variant="h4"
                 sx={{
                   fontWeight: 700,
                   color: colors.brandBlack,
-                  fontSize: { xs: 24, md: 28 },
+                  fontSize: { xs: 20, sm: 24, md: 28 },
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
                 }}
               >
                 Settings
@@ -283,31 +318,52 @@ const SettingsPage = () => {
                     backgroundColor: `${colors.brandRed}1A`,
                     color: colors.brandRed,
                     fontWeight: 700,
-                    fontSize: 10,
-                    height: 20,
+                    fontSize: { xs: 9, md: 10 },
+                    height: { xs: 18, md: 20 },
+                    flexShrink: 0,
                   }}
                 />
               )}
             </Box>
-            <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 14 }}>
+            <Typography 
+              variant="body2" 
+              sx={{ 
+                color: colors.textSecondary, 
+                fontSize: { xs: 12, md: 14 },
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: { xs: 'normal', md: 'nowrap' },
+                lineHeight: 1.4,
+              }}
+            >
               Configure platform status, app settings, and preferences
             </Typography>
           </Box>
         </Box>
-        <Box sx={{ display: 'flex', gap: 1 }}>
+        <Box sx={{ 
+          display: 'flex', 
+          gap: { xs: 1, md: 1 },
+          width: { xs: '100%', md: 'auto' },
+          flexWrap: { xs: 'wrap', md: 'nowrap' },
+        }}>
           {isSuperAdmin && (
             <Button
               variant="outlined"
-              startIcon={<Refresh />}
+              startIcon={<Refresh sx={{ fontSize: { xs: 18, md: 20 } }} />}
               onClick={handleReset}
               sx={{
-                borderColor: '#FE9C0A', // Custom Orange
+                flex: { xs: '1 1 auto', md: '0 0 auto' },
+                minWidth: { xs: 'auto', md: 'auto' },
+                borderColor: '#FE9C0A',
                 color: '#FE9C0A',
                 borderWidth: 1.5,
                 textTransform: 'none',
                 fontWeight: 700,
-                borderRadius: '12px',
-                px: 3,
+                borderRadius: { xs: '10px', md: '12px' },
+                px: { xs: 2, md: 3 },
+                py: { xs: 1, md: 1.25 },
+                fontSize: { xs: 13, md: 14 },
+                whiteSpace: 'nowrap',
                 '&:hover': {
                   borderColor: '#D97706',
                   backgroundColor: '#FFFBEB'
@@ -319,23 +375,28 @@ const SettingsPage = () => {
           )}
           <Button
             variant="contained"
-            startIcon={<CheckCircle />}
+            startIcon={<CheckCircle sx={{ fontSize: { xs: 18, md: 20 } }} />}
             onClick={handleSave}
             disabled={!hasUnsavedChanges}
             sx={{
-              backgroundColor: '#C9E7CA !important', // Requested Green
-              color: '#065F46', // Dark Green Text
-              borderRadius: '12px',
+              flex: { xs: '1 1 auto', md: '0 0 auto' },
+              minWidth: { xs: 'auto', md: 'auto' },
+              backgroundColor: '#C9E7CA !important',
+              color: '#065F46',
+              borderRadius: { xs: '10px', md: '12px' },
               textTransform: 'none',
               fontWeight: 700,
-              px: 3,
+              px: { xs: 2, md: 3 },
+              py: { xs: 1, md: 1.25 },
+              fontSize: { xs: 13, md: 14 },
               boxShadow: 'none',
+              whiteSpace: 'nowrap',
               '&:disabled': {
                 backgroundColor: '#E5E7EB !important',
                 color: '#9CA3AF !important'
               },
               '&:hover': {
-                backgroundColor: '#B4E0B6 !important', // Slightly darker shade of #C9E7CA
+                backgroundColor: '#B4E0B6 !important',
                 boxShadow: 'none'
               }
             }}
@@ -370,34 +431,63 @@ const SettingsPage = () => {
       {/* Platform Status Card */}
       <Card
         sx={{
-          padding: 3,
-          borderRadius: '20px',
+          padding: { xs: 2, md: 3 },
+          borderRadius: { xs: '16px', md: '20px' },
           border: `1.5px solid ${colors.divider}33`,
           mb: 2.5,
           backgroundColor: 'white',
           boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
+          maxWidth: '100%',
+          overflow: 'hidden',
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 4 }}>
+        <Box sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: { xs: 1, md: 1.5 }, 
+          mb: { xs: 3, md: 4 },
+          flexWrap: 'wrap',
+        }}>
           <Box
             sx={{
-              width: 40,
-              height: 40,
-              borderRadius: '12px',
-              background: '#22C55E', // Green
+              width: { xs: 36, md: 40 },
+              height: { xs: 36, md: 40 },
+              borderRadius: { xs: '10px', md: '12px' },
+              background: '#22C55E',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               boxShadow: '0 4px 6px -1px rgba(34, 197, 94, 0.3)',
+              flexShrink: 0,
             }}
           >
-            <Public sx={{ fontSize: 24, color: 'white' }} />
+            <Public sx={{ fontSize: { xs: 20, md: 24 }, color: 'white' }} />
           </Box>
-          <Box>
-            <Typography variant="h6" sx={{ fontWeight: 700, fontSize: 18, color: colors.brandBlack }}>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography 
+              variant="h6" 
+              sx={{ 
+                fontWeight: 700, 
+                fontSize: { xs: 16, md: 18 }, 
+                color: colors.brandBlack,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
               Platform Status
             </Typography>
-            <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 14 }}>
+            <Typography 
+              variant="body2" 
+              sx={{ 
+                color: colors.textSecondary, 
+                fontSize: { xs: 12, md: 14 },
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: { xs: 'normal', md: 'nowrap' },
+                lineHeight: 1.4,
+              }}
+            >
               Control platform availability and maintenance mode
             </Typography>
           </Box>
@@ -406,30 +496,63 @@ const SettingsPage = () => {
         {/* Current Status Strip */}
         <Box
           sx={{
-            padding: 2,
-            borderRadius: '16px',
-            backgroundColor: isMaintenanceMode ? '#FFFBEB' : '#ECFDF5', // Light orange or light green
+            padding: { xs: 1.5, md: 2 },
+            borderRadius: { xs: '12px', md: '16px' },
+            backgroundColor: isMaintenanceMode ? '#FFFBEB' : '#ECFDF5',
             border: `1px solid ${isMaintenanceMode ? '#FCD34D' : '#6EE7B7'}`,
             display: 'flex',
+            flexDirection: { xs: 'column', sm: 'row' },
             justifyContent: 'space-between',
-            alignItems: 'center',
-            mb: 4
+            alignItems: { xs: 'stretch', sm: 'center' },
+            gap: { xs: 2, sm: 0 },
+            mb: 4,
+            maxWidth: '100%',
+            overflow: 'hidden',
           }}
         >
-          <Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Box sx={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: { xs: 1, md: 1.5 }, 
+              mb: 0.5,
+              flexWrap: 'wrap',
+            }}>
               <Box sx={{
-                width: 32, height: 32, borderRadius: '8px',
-                backgroundColor: isMaintenanceMode ? '#F59E0B' : '#22C55E', // Orange or Green bg
-                display: 'flex', alignItems: 'center', justifyContent: 'center'
+                width: { xs: 28, md: 32 },
+                height: { xs: 28, md: 32 },
+                borderRadius: { xs: '6px', md: '8px' },
+                backgroundColor: isMaintenanceMode ? '#F59E0B' : '#22C55E',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
               }}>
-                {isMaintenanceMode ? <Block sx={{ color: 'white', fontSize: 18 }} /> : <CheckCircle sx={{ color: 'white', fontSize: 18 }} />}
+                {isMaintenanceMode ? <Block sx={{ color: 'white', fontSize: { xs: 16, md: 18 } }} /> : <CheckCircle sx={{ color: 'white', fontSize: { xs: 16, md: 18 } }} />}
               </Box>
-              <Box>
-                <Typography variant="caption" sx={{ color: colors.textSecondary, fontSize: 12, fontWeight: 600, display: 'block' }}>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography 
+                  variant="caption" 
+                  sx={{ 
+                    color: colors.textSecondary, 
+                    fontSize: { xs: 11, md: 12 }, 
+                    fontWeight: 600, 
+                    display: 'block',
+                  }}
+                >
                   Current Status
                 </Typography>
-                <Typography variant="h6" sx={{ fontWeight: 700, fontSize: 18, color: isMaintenanceMode ? '#B45309' : '#15803D' }}>
+                <Typography 
+                  variant="h6" 
+                  sx={{ 
+                    fontWeight: 700, 
+                    fontSize: { xs: 16, md: 18 }, 
+                    color: isMaintenanceMode ? '#B45309' : '#15803D',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
                   {isMaintenanceMode ? 'MAINTENANCE MODE' : 'ONLINE'}
                 </Typography>
               </Box>
@@ -440,16 +563,20 @@ const SettingsPage = () => {
             <Button
               variant="contained"
               onClick={handleToggleMaintenance}
-              startIcon={<Build />} // Changed from Settings rot to Build
+              startIcon={<Build sx={{ fontSize: { xs: 18, md: 20 } }} />}
               sx={{
-                backgroundColor: '#FE9C0A !important', // Custom Orange
+                flexShrink: 0,
+                width: { xs: '100%', sm: 'auto' },
+                backgroundColor: '#FE9C0A !important',
                 color: 'white',
                 textTransform: 'none',
                 fontWeight: 700,
-                borderRadius: '12px',
-                px: 3,
-                py: 1,
+                borderRadius: { xs: '10px', md: '12px' },
+                px: { xs: 2, md: 3 },
+                py: { xs: 1, md: 1 },
+                fontSize: { xs: 13, md: 14 },
                 boxShadow: '0 4px 6px -1px rgba(254, 156, 10, 0.3)',
+                whiteSpace: 'nowrap',
                 '&:hover': {
                   backgroundColor: '#F59E0B !important'
                 }
@@ -514,34 +641,63 @@ const SettingsPage = () => {
       {/* General Settings Section */}
       <Card
         sx={{
-          padding: 3,
-          borderRadius: '20px',
+          padding: { xs: 2, md: 3 },
+          borderRadius: { xs: '16px', md: '20px' },
           border: `1.5px solid ${colors.divider}33`,
           mb: 2.5,
           backgroundColor: 'white',
           boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
+          maxWidth: '100%',
+          overflow: 'hidden',
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 4 }}>
+        <Box sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: { xs: 1, md: 1.5 }, 
+          mb: { xs: 3, md: 4 },
+          flexWrap: 'wrap',
+        }}>
           <Box
             sx={{
-              width: 40,
-              height: 40,
-              borderRadius: '12px',
+              width: { xs: 36, md: 40 },
+              height: { xs: 36, md: 40 },
+              borderRadius: { xs: '10px', md: '12px' },
               background: '#DC2626',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               boxShadow: '0 4px 6px -1px rgba(220, 38, 38, 0.3)',
+              flexShrink: 0,
             }}
           >
-            <Settings sx={{ fontSize: 24, color: 'white' }} />
+            <Settings sx={{ fontSize: { xs: 20, md: 24 }, color: 'white' }} />
           </Box>
-          <Box>
-            <Typography variant="h6" sx={{ fontWeight: 700, fontSize: 18, color: colors.brandBlack }}>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography 
+              variant="h6" 
+              sx={{ 
+                fontWeight: 700, 
+                fontSize: { xs: 16, md: 18 }, 
+                color: colors.brandBlack,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
               General Settings
             </Typography>
-            <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 14 }}>
+            <Typography 
+              variant="body2" 
+              sx={{ 
+                color: colors.textSecondary, 
+                fontSize: { xs: 12, md: 14 },
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: { xs: 'normal', md: 'nowrap' },
+                lineHeight: 1.4,
+              }}
+            >
               Configure basic app settings and preferences
             </Typography>
           </Box>
@@ -745,33 +901,62 @@ const SettingsPage = () => {
       {/* App Updates Section */}
       <Card
         sx={{
-          padding: 3,
-          borderRadius: '20px',
+          padding: { xs: 2, md: 3 },
+          borderRadius: { xs: '16px', md: '20px' },
           border: `1.5px solid ${colors.divider}33`,
           backgroundColor: 'white',
           boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
+          maxWidth: '100%',
+          overflow: 'hidden',
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 4 }}>
+        <Box sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          gap: { xs: 1, md: 1.5 }, 
+          mb: { xs: 3, md: 4 },
+          flexWrap: 'wrap',
+        }}>
           <Box
             sx={{
-              width: 40,
-              height: 40,
-              borderRadius: '12px',
+              width: { xs: 36, md: 40 },
+              height: { xs: 36, md: 40 },
+              borderRadius: { xs: '10px', md: '12px' },
               background: '#3B82F6',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               boxShadow: '0 4px 6px -1px rgba(59, 130, 246, 0.3)',
+              flexShrink: 0,
             }}
           >
-            <SystemUpdate sx={{ fontSize: 24, color: 'white' }} />
+            <SystemUpdate sx={{ fontSize: { xs: 20, md: 24 }, color: 'white' }} />
           </Box>
-          <Box>
-            <Typography variant="h6" sx={{ fontWeight: 700, fontSize: 18, color: colors.brandBlack }}>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography 
+              variant="h6" 
+              sx={{ 
+                fontWeight: 700, 
+                fontSize: { xs: 16, md: 18 }, 
+                color: colors.brandBlack,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
               App Updates
             </Typography>
-            <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 14 }}>
+            <Typography 
+              variant="body2" 
+              sx={{ 
+                color: colors.textSecondary, 
+                fontSize: { xs: 12, md: 14 },
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: { xs: 'normal', md: 'nowrap' },
+                lineHeight: 1.4,
+              }}
+            >
               Manage application updates and versioning
             </Typography>
           </Box>
@@ -968,16 +1153,23 @@ const SettingsPage = () => {
             </Typography>
           </Alert>
         </DialogContent>
-        <DialogActions sx={{ padding: 2.5, gap: 1, backgroundColor: `${colors.backgroundLight}4D` }}>
+        <DialogActions sx={{ 
+          padding: { xs: 2, md: 2.5 }, 
+          gap: { xs: 1, md: 1 }, 
+          backgroundColor: `${colors.backgroundLight}4D`,
+          flexDirection: { xs: 'column', sm: 'row' },
+        }}>
           <Button
             onClick={() => setSaveDialogOpen(false)}
             variant="outlined"
             sx={{
+              width: { xs: '100%', sm: 'auto' },
               borderColor: colors.textSecondary,
               color: colors.textSecondary,
               textTransform: 'none',
               fontWeight: 700,
-              borderRadius: '12px',
+              borderRadius: { xs: '10px', md: '12px' },
+              order: { xs: 2, sm: 1 },
             }}
           >
             Cancel
@@ -986,10 +1178,12 @@ const SettingsPage = () => {
             onClick={performSave}
             variant="contained"
             sx={{
+              width: { xs: '100%', sm: 'auto' },
               background: `linear-gradient(135deg, ${colors.success} 0%, ${colors.success}DD 100%)`,
               textTransform: 'none',
               fontWeight: 700,
-              borderRadius: '12px',
+              borderRadius: { xs: '10px', md: '12px' },
+              order: { xs: 1, sm: 2 },
             }}
           >
             Save Changes
@@ -1087,16 +1281,23 @@ const SettingsPage = () => {
             </Box>
           </Box>
         </DialogContent>
-        <DialogActions sx={{ padding: 2.5, gap: 1, backgroundColor: `${colors.backgroundLight}4D` }}>
+        <DialogActions sx={{ 
+          padding: { xs: 2, md: 2.5 }, 
+          gap: { xs: 1, md: 1 }, 
+          backgroundColor: `${colors.backgroundLight}4D`,
+          flexDirection: { xs: 'column', sm: 'row' },
+        }}>
           <Button
             onClick={() => setResetDialogOpen(false)}
             variant="outlined"
             sx={{
+              width: { xs: '100%', sm: 'auto' },
               borderColor: colors.textSecondary,
               color: colors.textSecondary,
               textTransform: 'none',
               fontWeight: 700,
-              borderRadius: '12px',
+              borderRadius: { xs: '10px', md: '12px' },
+              order: { xs: 2, sm: 1 },
             }}
           >
             Cancel
@@ -1105,10 +1306,12 @@ const SettingsPage = () => {
             onClick={performReset}
             variant="contained"
             sx={{
+              width: { xs: '100%', sm: 'auto' },
               background: `linear-gradient(135deg, ${colors.warning} 0%, ${colors.warning}DD 100%)`,
               textTransform: 'none',
               fontWeight: 700,
-              borderRadius: '12px',
+              borderRadius: { xs: '10px', md: '12px' },
+              order: { xs: 1, sm: 2 },
             }}
           >
             Reset to Defaults
@@ -1203,16 +1406,23 @@ const SettingsPage = () => {
             </Box>
           </Box>
         </DialogContent>
-        <DialogActions sx={{ padding: 2.5, gap: 1, backgroundColor: `${colors.backgroundLight}4D` }}>
+        <DialogActions sx={{ 
+          padding: { xs: 2, md: 2.5 }, 
+          gap: { xs: 1, md: 1 }, 
+          backgroundColor: `${colors.backgroundLight}4D`,
+          flexDirection: { xs: 'column', sm: 'row' },
+        }}>
           <Button
             onClick={() => setMaintenanceDialogOpen(false)}
             variant="outlined"
             sx={{
+              width: { xs: '100%', sm: 'auto' },
               borderColor: colors.textSecondary,
               color: colors.textSecondary,
               textTransform: 'none',
               fontWeight: 700,
-              borderRadius: '12px',
+              borderRadius: { xs: '10px', md: '12px' },
+              order: { xs: 2, sm: 1 },
             }}
           >
             Cancel
@@ -1221,11 +1431,13 @@ const SettingsPage = () => {
             onClick={performToggleMaintenance}
             variant="contained"
             sx={{
+              width: { xs: '100%', sm: 'auto' },
               background: `linear-gradient(135deg, ${isMaintenanceMode ? colors.success : colors.warning
                 } 0%, ${isMaintenanceMode ? colors.success : colors.warning}DD 100%)`,
               textTransform: 'none',
               fontWeight: 700,
-              borderRadius: '12px',
+              borderRadius: { xs: '10px', md: '12px' },
+              order: { xs: 1, sm: 2 },
             }}
           >
             {isMaintenanceMode ? 'Go Online' : 'Enable Maintenance'}

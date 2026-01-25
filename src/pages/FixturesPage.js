@@ -733,14 +733,21 @@ const FixturesPage = () => {
       <Card
         sx={{
           mb: 3,
-          borderRadius: '20px',
+          borderRadius: { xs: '16px', md: '20px' },
           backgroundColor: colors.brandWhite,
           boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-          overflow: 'hidden',
+          overflow: { xs: 'auto', md: 'hidden' },
           padding: 0,
+          maxWidth: '100%',
+          WebkitOverflowScrolling: 'touch',
         }}
       >
-        <Box sx={{ display: 'flex', width: '100%', gap: 0 }}>
+        <Box sx={{ 
+          display: 'flex', 
+          width: { xs: 'max-content', md: '100%' },
+          minWidth: { xs: 'max-content', md: '100%' },
+          gap: 0,
+        }}>
           {statusFilters.map((filter, index) => {
             const isSelected = selectedStatus === filter.value;
             const Icon = filter.icon;
@@ -750,12 +757,13 @@ const FixturesPage = () => {
                 key={filter.value}
                 onClick={() => setSelectedStatus(filter.value)}
                 sx={{
-                  flex: 1,
+                  flex: { xs: '0 0 auto', md: 1 },
+                  minWidth: { xs: 110, sm: 130, md: 'auto' },
                   textTransform: 'none',
                   fontWeight: 600,
-                  px: 2,
-                  py: isSelected ? 3 : 2.5,
-                  minHeight: 64,
+                  px: { xs: 1.5, sm: 2 },
+                  py: { xs: isSelected ? 2 : 1.75, md: isSelected ? 3 : 2.5 },
+                  minHeight: { xs: 54, md: 64 },
                   borderRadius: 0,
                   backgroundColor: isSelected ? filter.color : 'transparent',
                   color: isSelected ? colors.brandWhite : colors.textSecondary,
@@ -764,14 +772,16 @@ const FixturesPage = () => {
                   boxShadow: isSelected ? `0 2px 8px ${filter.color}40` : 'none',
                   position: 'relative',
                   margin: isSelected ? '4px' : '0',
+                  whiteSpace: 'nowrap',
+                  fontSize: { xs: 13, sm: 14, md: 15 },
                   '&:first-of-type': {
-                    borderTopLeftRadius: '20px',
-                    borderBottomLeftRadius: '20px',
+                    borderTopLeftRadius: { xs: '16px', md: '20px' },
+                    borderBottomLeftRadius: { xs: '16px', md: '20px' },
                     marginLeft: isSelected ? '4px' : '0',
                   },
                   '&:last-of-type': {
-                    borderTopRightRadius: '20px',
-                    borderBottomRightRadius: '20px',
+                    borderTopRightRadius: { xs: '16px', md: '20px' },
+                    borderBottomRightRadius: { xs: '16px', md: '20px' },
                     marginRight: isSelected ? '4px' : '0',
                   },
                   '&:hover': {
@@ -782,12 +792,22 @@ const FixturesPage = () => {
               >
                 <Icon
                   sx={{
-                    fontSize: 20,
-                    mr: 1,
+                    fontSize: { xs: 18, md: 20 },
+                    mr: { xs: 0.75, md: 1 },
                     color: isSelected ? colors.brandWhite : filter.color,
+                    flexShrink: 0,
                   }}
                 />
-                {filter.label}
+                <Box
+                  component="span"
+                  sx={{
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {filter.label}
+                </Box>
               </Button>
             );
           })}
@@ -795,15 +815,22 @@ const FixturesPage = () => {
       </Card>
 
       {/* Search, Sort, and Add Fixture Row */}
-      <Box sx={{ display: 'flex', gap: 1.5, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
-        <Box sx={{ flex: 1, minWidth: { xs: '100%', md: '300px' } }}>
+      <Box sx={{ 
+        display: 'flex', 
+        flexDirection: { xs: 'column', md: 'row' },
+        gap: { xs: 1, md: 1.5 }, 
+        mb: 3, 
+        alignItems: 'stretch',
+        maxWidth: '100%',
+      }}>
+        <Box sx={{ flex: { xs: '1 1 100%', md: 1 }, minWidth: { xs: '100%', md: '300px' }, maxWidth: '100%' }}>
           <SearchBar
             value={searchQuery}
             onChange={setSearchQuery}
             placeholder="Search by team name or match ID..."
           />
         </Box>
-        <FormControl sx={{ minWidth: { xs: '100%', md: 200 }, position: 'relative' }}>
+        <FormControl sx={{ minWidth: { xs: '100%', md: 200 }, maxWidth: '100%', position: 'relative' }}>
           <Select
             value={selectedSort}
             onChange={(e) => setSelectedSort(e.target.value)}

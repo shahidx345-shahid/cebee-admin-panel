@@ -60,7 +60,7 @@ const ReferralsPage = () => {
   const [selectedReferral, setSelectedReferral] = useState(null);
   const [actionMenuAnchor, setActionMenuAnchor] = useState(null);
   const [selectedRowForAction, setSelectedRowForAction] = useState(null);
-  const [timePeriod, setTimePeriod] = useState('allTime'); // 'allTime' or 'monthly'
+  const [timePeriod, setTimePeriod] = useState('monthly'); // 'allTime' or 'monthly' - Default changed to monthly
   const [timePeriodMenuAnchor, setTimePeriodMenuAnchor] = useState(null);
 
   const handleActionMenuOpen = (event, row) => {

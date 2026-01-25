@@ -234,7 +234,10 @@ const UsersPage = () => {
         isBlocked: isBlocked,
         isDeleted: isDeleted,
         isDeactivated: isDeleted,
+        isFlagged: hasFlags,
         fraudFlags: hasFlags ? ['Suspicious activity', 'Multiple accounts'] : [],
+        flagReason: hasFlags ? 'Multiple accounts detected from same device' : '',
+        flagSource: hasFlags ? (Math.random() > 0.5 ? 'System Flagged' : 'Admin Flagged') : null,
         spTotal: Math.floor(Math.random() * 5000) + 100,
         spCurrent: Math.floor(Math.random() * 2000) + 50,
         cpTotal: Math.floor(Math.random() * 1000) + 10,
@@ -1484,6 +1487,7 @@ const UsersPage = () => {
         >
           View Details
         </MenuItem>
+        {/* Edit User - Only available for Super Admin 
         <MenuItem
           onClick={() => {
             handleMenuClose();
@@ -1491,6 +1495,7 @@ const UsersPage = () => {
         >
           Edit User
         </MenuItem>
+        */}
         <MenuItem
           onClick={() => {
             handleMenuClose();

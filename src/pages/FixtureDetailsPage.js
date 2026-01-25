@@ -13,6 +13,11 @@ import {
   Step,
   StepLabel,
   Divider,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Alert,
 } from '@mui/material';
 import {
   ArrowBack,
@@ -44,6 +49,8 @@ const FixtureDetailsPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [approveDialogOpen, setApproveDialogOpen] = useState(false);
+  const [isApproved, setIsApproved] = useState(false);
 
   useEffect(() => {
     const loadFixtureData = async () => {
@@ -347,6 +354,17 @@ const FixtureDetailsPage = () => {
         status: 'won',
       },
     ];
+  };
+
+  const handleApproveMatch = () => {
+    setApproveDialogOpen(true);
+  };
+
+  const confirmApproval = () => {
+    setIsApproved(true);
+    setApproveDialogOpen(false);
+    // In production, this would update the backend
+    console.log(`[SYSTEM LOG] Match details approved for ${id}`);
   };
 
 
@@ -726,38 +744,78 @@ const FixtureDetailsPage = () => {
               <Typography variant="body2" sx={{ opacity: 0.8 }}>Away</Typography>
             </Grid>
           </Grid>
-          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 1, mt: 3, opacity: 0.8 }}>
-            <LocationOn sx={{ fontSize: 16 }} />
-            <Typography variant="body2">Emirates Stadium, London</Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2, mt: 3, opacity: 0.9 }}>
+            <LocationOn sx={{ fontSize: 18 }} />
+            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+              {fixture?.homeTeam === 'Arsenal' ? 'Emirates Stadium' : 
+               fixture?.homeTeam === 'Manchester United' ? 'Old Trafford' :
+               fixture?.homeTeam === 'Liverpool' ? 'Anfield' :
+               fixture?.homeTeam === 'Newcastle' ? 'St James\' Park' :
+               'Stadium TBD'}
+            </Typography>
+            <Typography variant="body2" sx={{ opacity: 0.7 }}>•</Typography>
+            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+              {fixture?.league || 'Premier League'}
+            </Typography>
           </Box>
         </CardContent>
       </Card>
 
       <Grid container spacing={3}>
-        {/* Match Stats (Mock) */}
+        {/* Match Stats */}
         <Grid item xs={12} md={8}>
           <Card sx={{ borderRadius: '20px', mb: 3, p: 3 }}>
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 3 }}>Match Statistics</Typography>
 
-            {['Possession', 'Shots on Target', 'Corners'].map((stat, i) => (
-              <Box key={stat} sx={{ mb: 3 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                  <Typography variant="body2" fontWeight={600}>{i === 0 ? '55%' : i === 1 ? '6' : '4'}</Typography>
-                  <Typography variant="body2" color="text.secondary">{stat}</Typography>
-                  <Typography variant="body2" fontWeight={600}>{i === 0 ? '45%' : i === 1 ? '3' : '2'}</Typography>
-                </Box>
-                <Box sx={{ display: 'flex', gap: 1, height: 8, borderRadius: 4, overflow: 'hidden' }}>
-                  <Box sx={{ flex: i === 0 ? 0.55 : i === 1 ? 0.6 : 0.65, bgcolor: colors.brandRed }} />
-                  <Box sx={{ flex: i === 0 ? 0.45 : i === 1 ? 0.4 : 0.35, bgcolor: '#E5E7EB' }} />
-                </Box>
+            {(fixture?.status === 'live' || fixture?.status === 'completed') ? (
+              <>
+                {[
+                  { stat: 'Possession', home: '55%', away: '45%', homeVal: 0.55 },
+                  { stat: 'Shots on Target', home: '6', away: '3', homeVal: 0.67 },
+                  { stat: 'Corners', home: '7', away: '4', homeVal: 0.64 },
+                  { stat: 'Fouls', home: '8', away: '12', homeVal: 0.40 },
+                  { stat: 'Offsides', home: '2', away: '3', homeVal: 0.40 },
+                ].map((item, i) => (
+                  <Box key={item.stat} sx={{ mb: 3 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                      <Typography variant="body2" fontWeight={700} sx={{ color: colors.brandRed }}>{item.home}</Typography>
+                      <Typography variant="body2" color="text.secondary" fontWeight={600}>{item.stat}</Typography>
+                      <Typography variant="body2" fontWeight={700} sx={{ color: colors.brandBlack }}>{item.away}</Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', gap: 1, height: 8, borderRadius: 4, overflow: 'hidden' }}>
+                      <Box sx={{ flex: item.homeVal, bgcolor: colors.brandRed, borderRadius: '4px 0 0 4px' }} />
+                      <Box sx={{ flex: 1 - item.homeVal, bgcolor: '#E5E7EB', borderRadius: '0 4px 4px 0' }} />
+                    </Box>
+                  </Box>
+                ))}
+              </>
+            ) : (
+              <Box sx={{ textAlign: 'center', py: 4 }}>
+                <Schedule sx={{ fontSize: 48, color: colors.textSecondary, mb: 2 }} />
+                <Typography variant="body2" sx={{ color: colors.textSecondary }}>
+                  Match statistics will be available once the match starts
+                </Typography>
               </Box>
-            ))}
+            )}
           </Card>
 
           {/* Predictions List */}
           <Card sx={{ borderRadius: '20px', p: 0 }}>
-            <Box sx={{ p: 3, borderBottom: `1px solid ${colors.divider}` }}>
-              <Typography variant="h6" sx={{ fontWeight: 700 }}>User Predictions</Typography>
+            <Box sx={{ p: 3, borderBottom: `1px solid ${colors.divider}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Box>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>User Predictions</Typography>
+                <Typography variant="caption" sx={{ color: colors.textSecondary }}>
+                  {filteredPredictions.length} predictions made for this fixture
+                </Typography>
+              </Box>
+              <Chip 
+                label={`${predictions.length} Total`}
+                sx={{ 
+                  bgcolor: `${colors.brandRed}20`,
+                  color: colors.brandRed,
+                  fontWeight: 700
+                }}
+              />
             </Box>
             <DataTable
               columns={[
@@ -827,35 +885,130 @@ const FixtureDetailsPage = () => {
           {/* Admin Actions */}
           <Card sx={{ borderRadius: '20px', p: 3, mb: 3, bgcolor: '#FFF8F6', border: `1px solid ${colors.brandRed}20` }}>
             <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2, color: colors.brandRed }}>Admin Actions</Typography>
-            <Button fullWidth variant="contained" sx={{ mb: 1, bgcolor: colors.brandRed, '&:hover': { bgcolor: colors.brandDarkRed } }}>
-              Approve Match Details
+            
+            {isApproved && (
+              <Alert severity="success" sx={{ mb: 2, borderRadius: '8px' }}>
+                <Typography variant="body2" sx={{ fontWeight: 600, fontSize: 13 }}>
+                  Match Details Approved
+                </Typography>
+              </Alert>
+            )}
+
+            <Button 
+              fullWidth 
+              variant="contained" 
+              disabled={isApproved}
+              startIcon={<CheckCircle />}
+              onClick={handleApproveMatch}
+              sx={{ 
+                mb: 1, 
+                bgcolor: colors.brandRed, 
+                textTransform: 'none',
+                fontWeight: 600,
+                '&:hover': { bgcolor: colors.brandDarkRed },
+                '&.Mui-disabled': {
+                  bgcolor: colors.divider,
+                  color: colors.textSecondary,
+                }
+              }}
+            >
+              {isApproved ? 'Match Details Approved' : 'Approve Match Details'}
             </Button>
-            <Button fullWidth variant="outlined" color="error">
+            <Button 
+              fullWidth 
+              variant="outlined" 
+              color="error"
+              sx={{
+                textTransform: 'none',
+                fontWeight: 600,
+              }}
+            >
               Settle / Update Score
             </Button>
           </Card>
 
-          {/* Timeline (Mock) */}
+          {/* Key Events Timeline */}
           <Card sx={{ borderRadius: '20px', p: 3 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Key Events</Typography>
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Match Timeline</Typography>
             <Box sx={{ position: 'relative', pl: 2, borderLeft: `2px solid ${colors.divider}` }}>
-              {[
-                { min: '78', event: 'Goal - Away', detail: 'Salah' },
-                { min: '45', event: 'Half Time', detail: '1-1' },
-                { min: '23', event: 'Goal - Home', detail: 'Rashford' },
-                { min: '0', event: 'Kickoff', detail: '' },
+              {fixture?.status === 'live' || fixture?.status === 'completed' ? [
+                { min: '90', event: 'Full Time', detail: fixture?.status === 'completed' ? `${fixture.homeScore}-${fixture.awayScore}` : '', color: colors.success },
+                { min: '78', event: 'Goal - Away', detail: fixture?.awayTeam, color: colors.info },
+                { min: '65', event: 'Substitution', detail: 'Home Team', color: colors.warning },
+                { min: '45', event: 'Half Time', detail: '1-1', color: colors.textSecondary },
+                { min: '23', event: 'Goal - Home', detail: fixture?.homeTeam, color: colors.info },
+                { min: '12', event: 'Yellow Card', detail: 'Away Team', color: colors.warning },
+                { min: '0', event: 'Kickoff', detail: '', color: colors.brandRed },
+              ] : [
+                { min: '', event: 'Match Scheduled', detail: fixture?.kickoffTime ? format(fixture.kickoffTime, 'MMM dd, yyyy HH:mm') : '', color: colors.info },
+                { min: '', event: 'Predictions Open', detail: `${predictions.length} predictions made`, color: colors.success },
               ].map((ev, i) => (
                 <Box key={i} sx={{ mb: 3, position: 'relative' }}>
-                  <Box sx={{ position: 'absolute', left: -21, top: 0, width: 10, height: 10, borderRadius: '50%', bgcolor: colors.brandRed }} />
-                  <Typography variant="caption" sx={{ color: colors.textSecondary }}>{ev.min}'</Typography>
-                  <Typography variant="body2" fontWeight={600}>{ev.event}</Typography>
-                  <Typography variant="caption">{ev.detail}</Typography>
+                  <Box sx={{ position: 'absolute', left: -21, top: 0, width: 10, height: 10, borderRadius: '50%', bgcolor: ev.color }} />
+                  {ev.min && <Typography variant="caption" sx={{ color: colors.textSecondary, fontWeight: 700 }}>{ev.min}'</Typography>}
+                  <Typography variant="body2" fontWeight={600} sx={{ color: colors.brandBlack }}>{ev.event}</Typography>
+                  {ev.detail && <Typography variant="caption" sx={{ color: colors.textSecondary }}>{ev.detail}</Typography>}
                 </Box>
               ))}
             </Box>
           </Card>
         </Grid>
       </Grid>
+
+      {/* Approve Match Details Dialog */}
+      <Dialog 
+        open={approveDialogOpen} 
+        onClose={() => setApproveDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: { borderRadius: '16px' }
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 700, color: colors.brandRed }}>
+          Approve Match Details
+        </DialogTitle>
+        <DialogContent>
+          <Alert severity="info" sx={{ mb: 2 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
+              You are about to approve:
+            </Typography>
+            <Typography variant="body2" sx={{ fontSize: 13 }}>
+              • Match: {fixture?.homeTeam} vs {fixture?.awayTeam}
+            </Typography>
+            <Typography variant="body2" sx={{ fontSize: 13 }}>
+              • Fixture ID: {id}
+            </Typography>
+            <Typography variant="body2" sx={{ fontSize: 13 }}>
+              • Status: {fixture?.status}
+            </Typography>
+          </Alert>
+          <Typography variant="body2">
+            This action confirms the match details are accurate and ready for predictions. This action will be logged.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 3, pt: 0 }}>
+          <Button 
+            onClick={() => setApproveDialogOpen(false)}
+            sx={{ textTransform: 'none', fontWeight: 600 }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={confirmApproval}
+            variant="contained"
+            startIcon={<CheckCircle />}
+            sx={{ 
+              bgcolor: colors.success,
+              textTransform: 'none',
+              fontWeight: 700,
+              '&:hover': { bgcolor: '#059669' }
+            }}
+          >
+            Confirm Approval
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

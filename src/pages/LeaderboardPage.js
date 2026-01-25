@@ -410,20 +410,43 @@ const LeaderboardPage = () => {
 
 
   const getRankBadge = (rank) => {
+    // Gold, Silver, Bronze for top 3
+    let bgColor = `${colors.brandRed}1A`;
+    let borderColor = `${colors.brandRed}33`;
+    let textColor = colors.brandRed;
+    
+    if (rank === 1) {
+      // Gold
+      bgColor = '#FFD70020';
+      borderColor = '#FFD700';
+      textColor = '#B8860B'; // Dark goldenrod
+    } else if (rank === 2) {
+      // Silver
+      bgColor = '#C0C0C020';
+      borderColor = '#C0C0C0';
+      textColor = '#696969'; // Dim gray
+    } else if (rank === 3) {
+      // Bronze
+      bgColor = '#CD7F3220';
+      borderColor = '#CD7F32';
+      textColor = '#8B4513'; // Saddle brown
+    }
+    
     return (
       <Box
         sx={{
           width: 48,
           height: 48,
           borderRadius: '50%',
-          backgroundColor: `${colors.brandRed}1A`,
-          border: `2px solid ${colors.brandRed}33`,
+          backgroundColor: bgColor,
+          border: `2px solid ${borderColor}`,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
+          boxShadow: rank <= 3 ? `0 2px 8px ${borderColor}40` : 'none',
         }}
       >
-        <Typography variant="body2" sx={{ fontWeight: 700, color: colors.brandRed, fontSize: 14 }}>
+        <Typography variant="body2" sx={{ fontWeight: 700, color: textColor, fontSize: 14 }}>
           #{rank}
         </Typography>
       </Box>
@@ -757,14 +780,17 @@ const LeaderboardPage = () => {
       <Card
         sx={{
           display: 'flex',
-          alignItems: 'center',
-          gap: 2,
+          flexDirection: { xs: 'column', md: 'row' },
+          alignItems: 'stretch',
+          gap: { xs: 1, sm: 1.5, md: 2 },
           mb: 3,
-          p: 1,
-          borderRadius: '24px',
+          p: { xs: 1, md: 1 },
+          borderRadius: { xs: '16px', md: '24px' },
           backgroundColor: colors.brandWhite,
           border: `1px solid ${colors.divider}`,
-          boxShadow: '0 2px 12px rgba(0,0,0,0.03)'
+          boxShadow: '0 2px 12px rgba(0,0,0,0.03)',
+          maxWidth: '100%',
+          overflow: 'hidden',
         }}
       >
         {/* Period Filter (Monthly SP Leaders) */}
@@ -773,52 +799,73 @@ const LeaderboardPage = () => {
           startIcon={
             <Box
               sx={{
-                width: 36,
-                height: 36,
-                borderRadius: '10px',
+                width: { xs: 32, md: 36 },
+                height: { xs: 32, md: 36 },
+                borderRadius: { xs: '8px', md: '10px' },
                 backgroundColor: '#FFB4B4',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 ml: -0.5,
+                flexShrink: 0,
               }}
             >
-              <BarChart sx={{ fontSize: 18, color: colors.brandWhite }} />
+              <BarChart sx={{ fontSize: { xs: 16, md: 18 }, color: colors.brandWhite }} />
             </Box>
           }
           endIcon={
             <Box sx={{
-              width: 30, height: 30, borderRadius: '8px', backgroundColor: '#FFDADA',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              mr: -0.5
+              width: { xs: 26, md: 30 },
+              height: { xs: 26, md: 30 },
+              borderRadius: { xs: '6px', md: '8px' },
+              backgroundColor: '#FFDADA',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              mr: -0.5,
+              flexShrink: 0,
             }}>
-              <ArrowDropDown sx={{ fontSize: 20, color: colors.brandRed }} />
+              <ArrowDropDown sx={{ fontSize: { xs: 18, md: 20 }, color: colors.brandRed }} />
             </Box>
           }
           onClick={(e) => setPeriodAnchor(e.currentTarget)}
           sx={{
-            flex: 1,
+            flex: { xs: '1 1 auto', md: 1 },
+            minWidth: { xs: 'auto', md: 220 },
             borderColor: '#FFE0E0',
             color: colors.brandBlack,
             backgroundColor: '#FFF5F5',
-            borderRadius: '30px',
+            borderRadius: { xs: '20px', md: '30px' },
             textTransform: 'none',
             fontWeight: 500,
-            px: 2,
-            py: 1.0,
-            fontSize: 15,
+            px: { xs: 1.5, md: 2 },
+            py: { xs: 0.75, md: 1.0 },
+            fontSize: { xs: 13, md: 15 },
             border: '1.5px solid #FFE0E0',
             justifyContent: 'space-between',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            maxWidth: '100%',
             '&:hover': {
               borderColor: '#FFCCCC',
               backgroundColor: '#FFF0F0',
             },
           }}
         >
-          {selectedPeriod === 'allTime' ? 'All Time Leaders' :
-            selectedPeriod === 'monthly' ? 'Monthly SP Leaders' :
-              selectedPeriod === 'weekly' ? 'Weekly SP Leaders' :
-                selectedPeriod === 'daily' ? 'Daily SP Leaders' : 'Leaders'}
+          <Box
+            component="span"
+            sx={{
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {selectedPeriod === 'allTime' ? 'All Time Leaders' :
+              selectedPeriod === 'monthly' ? 'Monthly SP Leaders' :
+                selectedPeriod === 'weekly' ? 'Weekly SP Leaders' :
+                  selectedPeriod === 'daily' ? 'Daily SP Leaders' : 'Leaders'}
+          </Box>
         </Button>
         <Menu
           anchorEl={periodAnchor}
@@ -888,21 +935,22 @@ const LeaderboardPage = () => {
         </Menu>
 
         {/* Search Bar */}
-        <Box sx={{ flex: 1.5 }}>
+        <Box sx={{ flex: { xs: '1 1 100%', md: 1.5 }, minWidth: { xs: '100%', md: 0 }, maxWidth: '100%' }}>
           <Box
             sx={{
               display: 'flex',
               alignItems: 'center',
-              gap: 2,
-              padding: '12px 24px',
+              gap: { xs: 1.5, md: 2 },
+              padding: { xs: '10px 16px', md: '12px 24px' },
               backgroundColor: '#F9F9F9',
-              borderRadius: '30px',
+              borderRadius: { xs: '20px', md: '30px' },
               border: 'none',
               width: '100%',
-              height: 54
+              height: { xs: 44, md: 54 },
+              boxSizing: 'border-box',
             }}
           >
-            <Search sx={{ fontSize: 22, color: colors.brandRed }} />
+            <Search sx={{ fontSize: { xs: 20, md: 22 }, color: colors.brandRed, flexShrink: 0 }} />
             <input
               type="text"
               placeholder="Search by username or email..."
@@ -916,6 +964,7 @@ const LeaderboardPage = () => {
                 color: '#4A4A4A',
                 backgroundColor: 'transparent',
                 width: '100%',
+                minWidth: 0,
               }}
             />
           </Box>
@@ -927,50 +976,71 @@ const LeaderboardPage = () => {
           startIcon={
             <Box
               sx={{
-                width: 36,
-                height: 36,
-                borderRadius: '10px',
+                width: { xs: 32, md: 36 },
+                height: { xs: 32, md: 36 },
+                borderRadius: { xs: '8px', md: '10px' },
                 backgroundColor: '#FFB4B4',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 ml: -0.5,
+                flexShrink: 0,
               }}
             >
-              <ArrowUpward sx={{ fontSize: 18, color: colors.brandWhite }} />
+              <ArrowUpward sx={{ fontSize: { xs: 16, md: 18 }, color: colors.brandWhite }} />
             </Box>
           }
           endIcon={
             <Box sx={{
-              width: 30, height: 30, borderRadius: '8px', backgroundColor: '#FFDADA',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              mr: -0.5
+              width: { xs: 26, md: 30 },
+              height: { xs: 26, md: 30 },
+              borderRadius: { xs: '6px', md: '8px' },
+              backgroundColor: '#FFDADA',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              mr: -0.5,
+              flexShrink: 0,
             }}>
-              <ArrowDropDown sx={{ fontSize: 20, color: colors.brandRed }} />
+              <ArrowDropDown sx={{ fontSize: { xs: 18, md: 20 }, color: colors.brandRed }} />
             </Box>
           }
           onClick={(e) => setSortAnchor(e.currentTarget)}
           sx={{
-            flex: 1,
+            flex: { xs: '1 1 auto', md: 1 },
+            minWidth: { xs: 'auto', md: 180 },
             borderColor: '#FFE0E0',
             color: colors.brandBlack,
             backgroundColor: '#FFF5F5',
-            borderRadius: '30px',
+            borderRadius: { xs: '20px', md: '30px' },
             textTransform: 'none',
             fontWeight: 500,
-            px: 2,
-            py: 1.0,
-            fontSize: 15,
+            px: { xs: 1.5, md: 2 },
+            py: { xs: 0.75, md: 1.0 },
+            fontSize: { xs: 13, md: 15 },
             border: '1.5px solid #FFE0E0',
             justifyContent: 'space-between',
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            maxWidth: '100%',
             '&:hover': {
               borderColor: '#FFCCCC',
               backgroundColor: '#FFF0F0',
             },
           }}
         >
-          {selectedSort === 'rankAsc' ? 'Rank: Low to High' :
-            selectedSort === 'rankDesc' ? 'Rank: High to Low' : 'Sort Items'}
+          <Box
+            component="span"
+            sx={{
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {selectedSort === 'rankAsc' ? 'Rank: Low to High' :
+              selectedSort === 'rankDesc' ? 'Rank: High to Low' : 'Sort Items'}
+          </Box>
         </Button>
         <Menu
           anchorEl={sortAnchor}

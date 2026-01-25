@@ -669,31 +669,35 @@ const RewardsPage = () => {
           <Card
             sx={{
               display: 'flex',
-              alignItems: 'center',
-              gap: 2,
+              flexDirection: { xs: 'column', md: 'row' },
+              alignItems: 'stretch',
+              gap: { xs: 1, sm: 1.5, md: 2 },
               mb: 3,
-              p: 1, // Padding inside the white strip
-              borderRadius: '24px', // Rounded strip
+              p: { xs: 1, md: 1 },
+              borderRadius: { xs: '16px', md: '24px' },
               backgroundColor: colors.brandWhite,
               border: `1px solid ${colors.divider}`,
-              boxShadow: '0 2px 12px rgba(0,0,0,0.03)'
+              boxShadow: '0 2px 12px rgba(0,0,0,0.03)',
+              maxWidth: '100%',
+              overflow: 'hidden',
             }}
           >
             {/* Search Bar */}
-            <Box sx={{ flex: 1.5 }}>
+            <Box sx={{ flex: { xs: '1 1 100%', md: 1.5 }, minWidth: { xs: '100%', md: 0 }, maxWidth: '100%' }}>
               <Box
                 sx={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: 2,
-                  padding: '16px 24px',
+                  gap: { xs: 1.5, md: 2 },
+                  padding: { xs: '12px 16px', md: '16px 24px' },
                   backgroundColor: '#F9F9F9',
-                  borderRadius: '30px',
+                  borderRadius: { xs: '20px', md: '30px' },
                   border: 'none',
                   width: '100%',
+                  boxSizing: 'border-box',
                 }}
               >
-                <SearchIcon sx={{ fontSize: 22, color: colors.brandRed }} />
+                <SearchIcon sx={{ fontSize: { xs: 20, md: 22 }, color: colors.brandRed, flexShrink: 0 }} />
                 <input
                   type="text"
                   placeholder="Search by username or email..."
@@ -707,6 +711,7 @@ const RewardsPage = () => {
                     color: '#4A4A4A',
                     backgroundColor: 'transparent',
                     width: '100%',
+                    minWidth: 0,
                   }}
                 />
               </Box>
@@ -716,52 +721,74 @@ const RewardsPage = () => {
               startIcon={
                 < Box
                   sx={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: '10px',
+                    width: { xs: 32, md: 36 },
+                    height: { xs: 32, md: 36 },
+                    borderRadius: { xs: '8px', md: '10px' },
                     backgroundColor: '#FFB4B4',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     ml: -0.5,
+                    flexShrink: 0,
                   }}
                 >
-                  <ArrowDownward sx={{ fontSize: 18, color: colors.brandWhite }} />
+                  <ArrowDownward sx={{ fontSize: { xs: 16, md: 18 }, color: colors.brandWhite }} />
                 </Box>
               }
               endIcon={
                 <Box sx={{
-                  width: 30, height: 30, borderRadius: '8px', backgroundColor: '#FFDADA', // Slightly darker pink for arrow box
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  mr: -0.5
+                  width: { xs: 26, md: 30 },
+                  height: { xs: 26, md: 30 },
+                  borderRadius: { xs: '6px', md: '8px' },
+                  backgroundColor: '#FFDADA',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  mr: -0.5,
+                  flexShrink: 0,
                 }}>
-                  <ArrowDropDown sx={{ fontSize: 20, color: colors.brandRed }} />
+                  <ArrowDropDown sx={{ fontSize: { xs: 18, md: 20 }, color: colors.brandRed }} />
                 </Box>
               }
               onClick={(e) => setRankAnchor(e.currentTarget)}
               sx={{
-                flex: 1,
+                flex: { xs: '1 1 auto', md: 1 },
+                minWidth: { xs: 'auto', md: 150 },
                 borderColor: '#FFE0E0',
                 color: colors.brandBlack,
                 backgroundColor: '#FFF5F5',
-                borderRadius: '30px',
+                borderRadius: { xs: '20px', md: '30px' },
                 textTransform: 'none',
                 fontWeight: 500,
-                px: 3,
-                py: 1.75,
-                fontSize: 15,
+                px: { xs: 2, md: 3 },
+                py: { xs: 1, md: 1.75 },
+                fontSize: { xs: 13, md: 15 },
                 border: '1.5px solid #FFE0E0',
                 width: '100%',
+                justifyContent: 'space-between',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                maxWidth: '100%',
                 '&:hover': {
                   borderColor: '#FFCCCC',
                   backgroundColor: '#FFF0F0',
                 },
               }}
             >
-              Rank: {rankFilter === '1st-3rd' ? '1st to 3rd' :
-                rankFilter === '1st' ? '1st' :
-                  rankFilter === '2nd' ? '2nd' :
-                    rankFilter === '3rd' ? '3rd' : '1st to 3rd'}
+              <Box
+                component="span"
+                sx={{
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                Rank: {rankFilter === '1st-3rd' ? '1st to 3rd' :
+                  rankFilter === '1st' ? '1st' :
+                    rankFilter === '2nd' ? '2nd' :
+                      rankFilter === '3rd' ? '3rd' : '1st to 3rd'}
+              </Box>
             </Button>
             <Menu
               anchorEl={rankAnchor}
@@ -794,49 +821,70 @@ const RewardsPage = () => {
               startIcon={
                 <Box
                   sx={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: '10px',
-                    backgroundColor: '#E0F2F1', // Teal light
+                    width: { xs: 32, md: 36 },
+                    height: { xs: 32, md: 36 },
+                    borderRadius: { xs: '8px', md: '10px' },
+                    backgroundColor: '#E0F2F1',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     ml: -0.5,
+                    flexShrink: 0,
                   }}
                 >
-                  <Videocam sx={{ fontSize: 18, color: '#009688' }} />
+                  <Videocam sx={{ fontSize: { xs: 16, md: 18 }, color: '#009688' }} />
                 </Box>
               }
               endIcon={
                 <Box sx={{
-                  width: 30, height: 30, borderRadius: '8px', backgroundColor: '#E0F2F1', // Teal light
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  mr: -0.5
+                  width: { xs: 26, md: 30 },
+                  height: { xs: 26, md: 30 },
+                  borderRadius: { xs: '6px', md: '8px' },
+                  backgroundColor: '#E0F2F1',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  mr: -0.5,
+                  flexShrink: 0,
                 }}>
-                  <ArrowDropDown sx={{ fontSize: 20, color: '#009688' }} />
+                  <ArrowDropDown sx={{ fontSize: { xs: 18, md: 20 }, color: '#009688' }} />
                 </Box>
               }
               onClick={(e) => setConsentAnchor(e.currentTarget)}
               sx={{
-                flex: 1,
+                flex: { xs: '1 1 auto', md: 1 },
+                minWidth: { xs: 'auto', md: 140 },
                 borderColor: '#E0F2F1',
                 color: colors.brandBlack,
-                backgroundColor: '#F3FDFD', // Very light teal
-                borderRadius: '30px',
+                backgroundColor: '#F3FDFD',
+                borderRadius: { xs: '20px', md: '30px' },
                 textTransform: 'none',
                 fontWeight: 500,
-                px: 3,
-                py: 1.75,
-                fontSize: 15,
+                px: { xs: 2, md: 3 },
+                py: { xs: 1, md: 1.75 },
+                fontSize: { xs: 13, md: 15 },
                 border: '1.5px solid #E0F2F1',
                 width: '100%',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                maxWidth: '100%',
                 '&:hover': {
                   borderColor: '#B2DFDB',
                   backgroundColor: '#E0F2F1',
                 },
               }}
             >
-              Consent: {consentFilter === 'yes' ? 'Yes' : consentFilter === 'no' ? 'No' : 'All'}
+              <Box
+                component="span"
+                sx={{
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                Consent: {consentFilter === 'yes' ? 'Yes' : consentFilter === 'no' ? 'No' : 'All'}
+              </Box>
             </Button>
             <Menu
               anchorEl={consentAnchor}
@@ -865,49 +913,71 @@ const RewardsPage = () => {
               startIcon={
                 <Box
                   sx={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: '10px',
+                    width: { xs: 32, md: 36 },
+                    height: { xs: 32, md: 36 },
+                    borderRadius: { xs: '8px', md: '10px' },
                     backgroundColor: '#FFB4B4',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     ml: -0.5,
+                    flexShrink: 0,
                   }}
                 >
-                  <CalendarToday sx={{ fontSize: 18, color: colors.brandWhite }} />
+                  <CalendarToday sx={{ fontSize: { xs: 16, md: 18 }, color: colors.brandWhite }} />
                 </Box>
               }
               endIcon={
                 <Box sx={{
-                  width: 30, height: 30, borderRadius: '8px', backgroundColor: '#FFDADA',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  mr: -0.5
+                  width: { xs: 26, md: 30 },
+                  height: { xs: 26, md: 30 },
+                  borderRadius: { xs: '6px', md: '8px' },
+                  backgroundColor: '#FFDADA',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  mr: -0.5,
+                  flexShrink: 0,
                 }}>
-                  <ArrowDropDown sx={{ fontSize: 20, color: colors.brandRed }} />
+                  <ArrowDropDown sx={{ fontSize: { xs: 18, md: 20 }, color: colors.brandRed }} />
                 </Box>
               }
               onClick={(e) => setMonthAnchor(e.currentTarget)}
               sx={{
                 borderColor: '#FFE0E0',
                 color: colors.brandBlack,
-                flex: 1,
+                flex: { xs: '1 1 auto', md: 1 },
+                minWidth: { xs: 'auto', md: 160 },
                 backgroundColor: '#FFF5F5',
-                borderRadius: '30px',
+                borderRadius: { xs: '20px', md: '30px' },
                 textTransform: 'none',
                 fontWeight: 500,
-                px: 3,
-                py: 1.75,
-                fontSize: 15,
+                px: { xs: 2, md: 3 },
+                py: { xs: 1, md: 1.75 },
+                fontSize: { xs: 13, md: 15 },
                 border: '1.5px solid #FFE0E0',
                 width: '100%',
+                justifyContent: 'space-between',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                maxWidth: '100%',
                 '&:hover': {
                   borderColor: '#FFCCCC',
                   backgroundColor: '#FFF0F0',
                 },
               }}
             >
-              {selectedMonth === 'all' ? 'All Months' : format(new Date(selectedMonth + '-01'), 'MMMM yyyy')}
+              <Box
+                component="span"
+                sx={{
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {selectedMonth === 'all' ? 'All Months' : format(new Date(selectedMonth + '-01'), 'MMMM yyyy')}
+              </Box>
             </Button>
             <Menu
               anchorEl={monthAnchor}
@@ -994,46 +1064,76 @@ const RewardsPage = () => {
               startIcon={
                 <Box
                   sx={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: '10px',
+                    width: { xs: 32, md: 36 },
+                    height: { xs: 32, md: 36 },
+                    borderRadius: { xs: '8px', md: '10px' },
                     backgroundColor: '#FFB4B4',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     ml: -0.5,
+                    flexShrink: 0,
                   }}
                 >
-                  <ViewModule sx={{ fontSize: 18, color: colors.brandWhite }} />
+                  <ViewModule sx={{ fontSize: { xs: 16, md: 18 }, color: colors.brandWhite }} />
                 </Box>
               }
-              endIcon={<ArrowDropDown sx={{ fontSize: 22, color: colors.brandRed }} />}
+              endIcon={
+                <Box sx={{
+                  width: { xs: 26, md: 30 },
+                  height: { xs: 26, md: 30 },
+                  borderRadius: { xs: '6px', md: '8px' },
+                  backgroundColor: '#FFDADA',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  mr: -0.5,
+                  flexShrink: 0,
+                }}>
+                  <ArrowDropDown sx={{ fontSize: { xs: 18, md: 20 }, color: colors.brandRed }} />
+                </Box>
+              }
               onClick={(e) => setStatusAnchor(e.currentTarget)}
               sx={{
                 borderColor: '#FFE0E0',
                 color: colors.brandBlack,
-                flex: 1,
+                flex: { xs: '1 1 auto', md: 1 },
+                minWidth: { xs: 'auto', md: 140 },
                 backgroundColor: '#FFF5F5',
-                borderRadius: '30px',
+                borderRadius: { xs: '20px', md: '30px' },
                 textTransform: 'none',
                 fontWeight: 500,
-                px: 3,
-                py: 1.75,
-                fontSize: 15,
+                px: { xs: 2, md: 3 },
+                py: { xs: 1, md: 1.75 },
+                fontSize: { xs: 13, md: 15 },
                 border: '1.5px solid #FFE0E0',
                 width: '100%',
+                justifyContent: 'space-between',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                maxWidth: '100%',
                 '&:hover': {
                   borderColor: '#FFCCCC',
                   backgroundColor: '#FFF0F0',
                 },
               }}
             >
-              {statusFilter === 'all' ? 'All Statuses' :
-                statusFilter === 'pending' ? 'Pending' :
-                  statusFilter === 'processing' ? 'Processing' :
-                    statusFilter === 'paid' ? 'Paid' :
-                      statusFilter === 'cancelled' ? 'Cancelled' :
-                        statusFilter === 'unclaimed' ? 'Unclaimed' : 'All Statuses'}
+              <Box
+                component="span"
+                sx={{
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {statusFilter === 'all' ? 'All Statuses' :
+                  statusFilter === 'pending' ? 'Pending' :
+                    statusFilter === 'processing' ? 'Processing' :
+                      statusFilter === 'paid' ? 'Paid' :
+                        statusFilter === 'cancelled' ? 'Cancelled' :
+                          statusFilter === 'unclaimed' ? 'Unclaimed' : 'All Statuses'}
+              </Box>
             </Button>
             <Menu
               anchorEl={statusAnchor}

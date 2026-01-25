@@ -10,6 +10,7 @@ import {
   Chip,
   CircularProgress,
   Alert,
+  Divider,
 } from '@mui/material';
 import {
   ArrowBack,
@@ -22,6 +23,7 @@ import {
   CalendarToday,
   Shield,
   Diamond,
+  EmojiEvents,
 } from '@mui/icons-material';
 import { colors, constants } from '../config/theme';
 import { format } from 'date-fns';
@@ -32,69 +34,77 @@ const PredictionDetailsPage = () => {
   const [loading, setLoading] = useState(true);
   const [groupData, setGroupData] = useState(null);
   const [predictions, setPredictions] = useState([]);
-  const [selectedPredictionIndex, setSelectedPredictionIndex] = useState(0);
-
-
 
   const generateDummyPredictionData = (userId, matchId) => {
     const users = {
-      'john_doe': { username: 'John Doe', email: 'john@example.com' },
-      'jane_smith': { username: 'Jane Smith', email: 'jane@example.com' },
-      'mike_wilson': { username: 'Mike Wilson', email: 'mike@example.com' },
-      'sarah_jones': { username: 'Sarah Jones', email: 'sarah@example.com' },
-      'david_brown': { username: 'David Brown', email: 'david@example.com' },
+      'john_doe': { username: 'John Doe', email: 'john@example.com', country: 'Nigeria', totalPredictions: 45, accuracy: 68.5 },
+      'jane_smith': { username: 'Jane Smith', email: 'jane@example.com', country: 'Ghana', totalPredictions: 38, accuracy: 72.1 },
+      'mike_wilson': { username: 'Mike Wilson', email: 'mike@example.com', country: 'Kenya', totalPredictions: 52, accuracy: 65.3 },
+      'sarah_jones': { username: 'Sarah Jones', email: 'sarah@example.com', country: 'South Africa', totalPredictions: 41, accuracy: 70.2 },
+      'david_brown': { username: 'David Brown', email: 'david@example.com', country: 'Egypt', totalPredictions: 47, accuracy: 66.8 },
     };
 
     const matches = {
-      'FIX_001': { homeTeam: 'Arsenal', awayTeam: 'Chelsea', matchName: 'Arsenal vs Chelsea' },
-      'FIX_002': { homeTeam: 'Liverpool', awayTeam: 'Manchester United', matchName: 'Liverpool vs Manchester United' },
-      'FIX_003': { homeTeam: 'Manchester City', awayTeam: 'Tottenham', matchName: 'Manchester City vs Tottenham' },
-      'FIX_004': { homeTeam: 'Newcastle', awayTeam: 'Brighton', matchName: 'Newcastle vs Brighton' },
+      'FIX_001': { homeTeam: 'Arsenal', awayTeam: 'Chelsea', matchName: 'Arsenal vs Chelsea', actualResult: '2-1', status: 'completed' },
+      'FIX_002': { homeTeam: 'Liverpool', awayTeam: 'Manchester United', matchName: 'Liverpool vs Manchester United', actualResult: '1-1', status: 'completed' },
+      'FIX_003': { homeTeam: 'Manchester City', awayTeam: 'Tottenham', matchName: 'Manchester City vs Tottenham', actualResult: null, status: 'ongoing' },
+      'FIX_004': { homeTeam: 'Newcastle', awayTeam: 'Brighton', matchName: 'Newcastle vs Brighton', actualResult: '3-0', status: 'completed' },
     };
 
-    const user = users[userId] || { username: 'Unknown User', email: 'unknown@example.com' };
-    const match = matches[matchId] || { homeTeam: 'Team A', awayTeam: 'Team B', matchName: 'Team A vs Team B' };
+    const user = users[userId] || { username: 'Unknown User', email: 'unknown@example.com', country: 'Unknown', totalPredictions: 0, accuracy: 0 };
+    const match = matches[matchId] || { homeTeam: 'Team A', awayTeam: 'Team B', matchName: 'Team A vs Team B', actualResult: null, status: 'ongoing' };
 
-    // Generate a sample prediction
-    const isCompleted = Math.random() > 0.5;
-    const isCorrect = isCompleted && Math.random() > 0.5;
+    // Generate multiple predictions for this match
+    const predictionTypes = [
+      { type: 'correct_score', prediction: '2-1', spValue: 50 },
+      { type: 'match_result', prediction: 'Arsenal Win', spValue: 30 },
+      { type: 'both_teams_score', prediction: 'Yes', spValue: 20 },
+    ];
 
-    return {
-      id: `PRED_${userId}_${matchId}_001`,
-      userId: userId,
-      username: user.username,
-      userEmail: user.email,
-      fixtureId: matchId,
-      matchId: matchId,
-      matchName: match.matchName,
-      homeTeam: match.homeTeam,
-      awayTeam: match.awayTeam,
-      predictionType: 'correct_score',
-      prediction: '2-1',
-      predictionTime: isCompleted
-        ? new Date(Date.now() - (14 + Math.random() * 7) * 24 * 60 * 60 * 1000)
-        : new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000),
-      status: isCompleted ? (isCorrect ? 'correct' : 'incorrect') : 'ongoing',
-      predictionStatus: isCompleted ? (isCorrect ? 'correct' : 'incorrect') : 'ongoing',
-      actualResult: isCompleted ? '2-1' : null,
-      spAwarded: isCompleted && isCorrect ? 50 : 0,
-    };
+    const predictions = predictionTypes.map((pred, idx) => {
+      const isCompleted = match.status === 'completed';
+      const isCorrect = isCompleted && (idx === 0 || idx === 1); // First two are correct
+
+      return {
+        id: `PRED_${userId}_${matchId}_00${idx + 1}`,
+        userId: userId,
+        username: user.username,
+        userEmail: user.email,
+        userCountry: user.country,
+        userTotalPredictions: user.totalPredictions,
+        userAccuracy: user.accuracy,
+        fixtureId: matchId,
+        matchId: matchId,
+        matchName: match.matchName,
+        homeTeam: match.homeTeam,
+        awayTeam: match.awayTeam,
+        predictionType: pred.type,
+        prediction: pred.prediction,
+        predictionTime: new Date(Date.now() - (idx + 1) * 2 * 60 * 60 * 1000),
+        status: isCompleted ? (isCorrect ? 'correct' : 'incorrect') : 'pending',
+        predictionStatus: isCompleted ? (isCorrect ? 'correct' : 'incorrect') : 'pending',
+        actualResult: match.actualResult,
+        matchStatus: match.status,
+        spStatus: isCompleted ? (isCorrect ? 'awarded' : 'not_awarded') : 'pending',
+        spValue: pred.spValue,
+        spAwarded: isCompleted && isCorrect ? pred.spValue : 0,
+        correctness: isCompleted ? (isCorrect ? 'won' : 'lost') : 'pending',
+      };
+    });
+
+    return predictions;
   };
 
   useEffect(() => {
     const loadPredictionGroup = async () => {
       try {
         setLoading(true);
-        // Simulate network
         await new Promise(resolve => setTimeout(resolve, 800));
 
         const decodedId = decodeURIComponent(id);
         const [userId, matchId] = decodedId.split('_');
 
-        const dummyPred = generateDummyPredictionData(userId, matchId);
-
-        // Use dummy data
-        const predictionsData = [dummyPred];
+        const predictionsData = generateDummyPredictionData(userId, matchId);
 
         if (predictionsData.length > 0) {
           const firstPred = predictionsData[0];
@@ -102,33 +112,41 @@ const PredictionDetailsPage = () => {
             userId: userId,
             username: firstPred.username || 'Unknown User',
             userEmail: firstPred.userEmail || '',
+            userCountry: firstPred.userCountry || '',
+            userTotalPredictions: firstPred.userTotalPredictions || 0,
+            userAccuracy: firstPred.userAccuracy || 0,
             matchId: matchId,
             matchName: firstPred.matchName || `${firstPred.homeTeam || 'TBD'} vs ${firstPred.awayTeam || 'TBD'}`,
             homeTeam: firstPred.homeTeam || 'TBD',
             awayTeam: firstPred.awayTeam || 'TBD',
             fixtureId: firstPred.fixtureId || matchId,
+            matchStatus: firstPred.matchStatus || 'ongoing',
+            actualResult: firstPred.actualResult || null,
           });
           setPredictions(predictionsData);
-          setSelectedPredictionIndex(0);
         }
       } catch (error) {
         console.error('Error loading prediction group:', error);
-        // Fallback to dummy data
         const decodedId = decodeURIComponent(id);
         const [userId, matchId] = decodedId.split('_');
-        const dummyPred = generateDummyPredictionData(userId, matchId);
+        const predictionsData = generateDummyPredictionData(userId, matchId);
+        const firstPred = predictionsData[0];
         setGroupData({
           userId: userId,
-          username: dummyPred.username,
-          userEmail: dummyPred.userEmail,
+          username: firstPred.username,
+          userEmail: firstPred.userEmail,
+          userCountry: firstPred.userCountry,
+          userTotalPredictions: firstPred.userTotalPredictions,
+          userAccuracy: firstPred.userAccuracy,
           matchId: matchId,
-          matchName: dummyPred.matchName,
-          homeTeam: dummyPred.homeTeam,
-          awayTeam: dummyPred.awayTeam,
+          matchName: firstPred.matchName,
+          homeTeam: firstPred.homeTeam,
+          awayTeam: firstPred.awayTeam,
           fixtureId: matchId,
+          matchStatus: firstPred.matchStatus,
+          actualResult: firstPred.actualResult,
         });
-        setPredictions([dummyPred]);
-        setSelectedPredictionIndex(0);
+        setPredictions(predictionsData);
       } finally {
         setLoading(false);
       }
@@ -141,103 +159,25 @@ const PredictionDetailsPage = () => {
 
   const getTypeChip = (type) => {
     const typeMap = {
-      'correct_score': { label: 'Correct Score', icon: Diamond },
-      'goal_range': { label: 'Goal Range', icon: Star },
-      'match_result': { label: 'Match Result', icon: CheckCircle },
-      'both_teams_score': { label: 'Both Teams Score', icon: Star },
+      'correct_score': { label: 'Correct Score', color: colors.brandRed },
+      'goal_range': { label: 'Goal Range', color: colors.warning },
+      'match_result': { label: 'Match Result', color: colors.info },
+      'both_teams_score': { label: 'Both Teams Score', color: colors.success },
     };
 
     const config = typeMap[type] || typeMap['correct_score'];
-    const Icon = config.icon;
 
     return (
       <Chip
-        icon={<Icon sx={{ fontSize: 14 }} />}
+        icon={<Diamond sx={{ fontSize: 14 }} />}
         label={config.label}
         sx={{
-          backgroundColor: colors.brandWhite,
-          color: colors.brandBlack,
-          border: `1.5px solid ${colors.brandWhite}`,
-          fontWeight: 600,
-          fontSize: 11,
-          height: 28,
-          borderRadius: '8px',
-        }}
-      />
-    );
-  };
-
-  const getStatusChip = (status) => {
-    if (status === 'ongoing') {
-      return (
-        <Chip
-          label="ONGOING"
-          sx={{
-            backgroundColor: colors.brandWhite,
-            color: colors.brandBlack,
-            border: `1.5px solid ${colors.brandWhite}`,
-            fontWeight: 700,
-            fontSize: 11,
-            height: 28,
-            borderRadius: '8px',
-          }}
-        />
-      );
-    }
-
-    return (
-      <Chip
-        label="COMPLETED"
-        sx={{
-          backgroundColor: colors.brandWhite,
-          color: colors.brandBlack,
-          border: `1.5px solid ${colors.brandWhite}`,
+          backgroundColor: `${config.color}20`,
+          color: config.color,
+          border: `1.5px solid ${config.color}40`,
           fontWeight: 700,
-          fontSize: 11,
+          fontSize: 12,
           height: 28,
-          borderRadius: '8px',
-        }}
-      />
-    );
-  };
-
-  const getCorrectnessChip = (status) => {
-    if (status === 'correct') {
-      return (
-        <Chip
-          icon={<CheckCircle sx={{ fontSize: 14 }} />}
-          label="Correct"
-          sx={{
-            backgroundColor: colors.success,
-            color: colors.brandWhite,
-            border: `1.5px solid ${colors.success}`,
-            fontWeight: 600,
-            fontSize: 11,
-            height: 32,
-            borderRadius: '8px',
-            '& .MuiChip-icon': {
-              color: colors.brandWhite,
-            },
-          }}
-        />
-      );
-    }
-
-    return (
-      <Chip
-        icon={<Cancel sx={{ fontSize: 14 }} />}
-        label="Incorrect"
-        sx={{
-          backgroundColor: colors.error,
-          color: colors.brandWhite,
-          border: `1.5px solid ${colors.error}`,
-          fontWeight: 600,
-          fontSize: 11,
-          height: 32,
-          borderRadius: '8px',
-          '& .MuiChip-icon': {
-            color: colors.brandWhite,
-          },
         }}
       />
     );
@@ -246,7 +186,7 @@ const PredictionDetailsPage = () => {
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
-        <CircularProgress />
+        <CircularProgress sx={{ color: colors.brandRed }} />
       </Box>
     );
   }
@@ -273,11 +213,8 @@ const PredictionDetailsPage = () => {
     );
   }
 
-  const selectedPrediction = predictions[selectedPredictionIndex] || predictions[0];
-  if (!selectedPrediction) return null;
-
-  const predStatus = selectedPrediction.status || selectedPrediction.predictionStatus || 'ongoing';
-  const isCompleted = predStatus === 'correct' || predStatus === 'incorrect';
+  // Calculate total SP won across all predictions
+  const totalSP = predictions.reduce((sum, pred) => sum + (pred.spAwarded || 0), 0);
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%', pb: 4 }}>
@@ -290,33 +227,290 @@ const PredictionDetailsPage = () => {
           color: colors.brandRed,
           textTransform: 'none',
           fontWeight: 600,
-          backgroundColor: colors.brandWhite,
-          border: `1px solid ${colors.divider}`,
-          borderRadius: '10px',
-          px: 2,
-          py: 1,
           '&:hover': {
             backgroundColor: `${colors.brandRed}0D`,
-            borderColor: colors.brandRed,
           },
         }}
       >
         Back to Predictions
       </Button>
-      {/* Immutable Record Banner */}
+
+      {/* 1. Match Card */}
+      <Card
+        sx={{
+          mb: 3,
+          borderRadius: '20px',
+          background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
+          boxShadow: `0 6px 18px ${colors.brandRed}40`,
+          overflow: 'hidden',
+        }}
+      >
+        <CardContent sx={{ p: 4 }}>
+          <Grid container spacing={3} alignItems="center">
+            {/* Match Info */}
+            <Grid item xs={12} md={8}>
+              <Chip
+                label={`Fixture ID: ${groupData.fixtureId}`}
+                sx={{
+                  backgroundColor: colors.brandWhite,
+                  color: colors.brandRed,
+                  fontWeight: 700,
+                  fontSize: 11,
+                  height: 28,
+                  borderRadius: '8px',
+                  mb: 2,
+                }}
+              />
+              <Typography variant="h3" sx={{ fontWeight: 700, color: colors.brandWhite, mb: 2, fontSize: { xs: 28, md: 36 } }}>
+                {groupData.matchName}
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+                <Chip
+                  icon={<SportsSoccer sx={{ fontSize: 16 }} />}
+                  label={`${predictions.length} Predictions Made`}
+                  sx={{
+                    backgroundColor: `${colors.brandWhite}20`,
+                    color: colors.brandWhite,
+                    fontWeight: 600,
+                    border: `1px solid ${colors.brandWhite}40`,
+                  }}
+                />
+                {groupData.actualResult && (
+                  <Chip
+                    label={`Final Score: ${groupData.actualResult}`}
+                    sx={{
+                      backgroundColor: colors.brandWhite,
+                      color: colors.brandRed,
+                      fontWeight: 700,
+                    }}
+                  />
+                )}
+              </Box>
+            </Grid>
+            {/* Match Status */}
+            <Grid item xs={12} md={4} sx={{ textAlign: { xs: 'left', md: 'right' } }}>
+              <Chip
+                label={groupData.matchStatus?.toUpperCase() || 'ONGOING'}
+                sx={{
+                  backgroundColor: groupData.matchStatus === 'completed' ? colors.success : colors.warning,
+                  color: colors.brandWhite,
+                  fontWeight: 700,
+                  fontSize: 13,
+                  height: 32,
+                  px: 2,
+                }}
+              />
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
+
+      {/* 2. User Basic Profile */}
+      <Card sx={{ mb: 3, borderRadius: '16px' }}>
+        <CardContent sx={{ p: 3 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+            <Box
+              sx={{
+                width: 64,
+                height: 64,
+                borderRadius: '50%',
+                background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: `0 4px 12px ${colors.brandRed}40`,
+              }}
+            >
+              <Person sx={{ fontSize: 32, color: colors.brandWhite }} />
+            </Box>
+            <Box sx={{ flex: 1 }}>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: colors.brandBlack }}>
+                {groupData.username}
+              </Typography>
+              <Typography variant="body2" sx={{ color: colors.textSecondary, mb: 0.5 }}>
+                {groupData.userEmail}
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 2, mt: 1, flexWrap: 'wrap' }}>
+                <Chip
+                  label={groupData.userCountry}
+                  size="small"
+                  sx={{ bgcolor: `${colors.info}20`, color: colors.info, fontWeight: 600 }}
+                />
+                <Chip
+                  label={`${groupData.userTotalPredictions} Total Predictions`}
+                  size="small"
+                  sx={{ bgcolor: `${colors.brandRed}20`, color: colors.brandRed, fontWeight: 600 }}
+                />
+                <Chip
+                  label={`${groupData.userAccuracy}% Accuracy`}
+                  size="small"
+                  sx={{ bgcolor: `${colors.success}20`, color: colors.success, fontWeight: 600 }}
+                />
+              </Box>
+            </Box>
+          </Box>
+        </CardContent>
+      </Card>
+
+      {/* 3. Each Match Details for Each Prediction */}
+      <Typography variant="h5" sx={{ fontWeight: 700, mb: 2, color: colors.brandBlack }}>
+        Prediction Breakdown
+      </Typography>
+
+      {predictions.map((pred, index) => (
+        <Card key={pred.id} sx={{ mb: 2, borderRadius: '16px', border: `2px solid ${colors.divider}` }}>
+          <CardContent sx={{ p: 3 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: colors.brandBlack }}>
+                Prediction #{index + 1}
+              </Typography>
+              {getTypeChip(pred.predictionType)}
+            </Box>
+            <Grid container spacing={2.5}>
+              {/* Match */}
+              <Grid item xs={12} sm={6}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1, borderBottom: `1px solid ${colors.divider}` }}>
+                  <Typography variant="body2" sx={{ color: colors.textSecondary, fontWeight: 600 }}>Match</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: colors.brandBlack, textAlign: 'right' }}>{pred.matchName}</Typography>
+                </Box>
+              </Grid>
+              {/* Fixture ID */}
+              <Grid item xs={12} sm={6}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1, borderBottom: `1px solid ${colors.divider}` }}>
+                  <Typography variant="body2" sx={{ color: colors.textSecondary, fontWeight: 600 }}>Fixture ID</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: colors.brandBlack }}>{pred.fixtureId}</Typography>
+                </Box>
+              </Grid>
+              {/* Prediction Type */}
+              <Grid item xs={12} sm={6}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1, borderBottom: `1px solid ${colors.divider}` }}>
+                  <Typography variant="body2" sx={{ color: colors.textSecondary, fontWeight: 600 }}>Prediction Type</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: colors.brandBlack }}>
+                    {pred.predictionType.replace('_', ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                  </Typography>
+                </Box>
+              </Grid>
+              {/* Prediction */}
+              <Grid item xs={12} sm={6}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1, borderBottom: `1px solid ${colors.divider}` }}>
+                  <Typography variant="body2" sx={{ color: colors.textSecondary, fontWeight: 600 }}>Prediction</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: colors.brandRed }}>{pred.prediction}</Typography>
+                </Box>
+              </Grid>
+              {/* Prediction Time */}
+              <Grid item xs={12} sm={6}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1, borderBottom: `1px solid ${colors.divider}` }}>
+                  <Typography variant="body2" sx={{ color: colors.textSecondary, fontWeight: 600 }}>Prediction Time</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: colors.brandBlack }}>
+                    {format(pred.predictionTime, 'MMM dd, yyyy HH:mm')}
+                  </Typography>
+                </Box>
+              </Grid>
+              {/* Actual Result */}
+              <Grid item xs={12} sm={6}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1, borderBottom: `1px solid ${colors.divider}` }}>
+                  <Typography variant="body2" sx={{ color: colors.textSecondary, fontWeight: 600 }}>Actual Result</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: colors.brandBlack }}>
+                    {pred.actualResult || 'Pending'}
+                  </Typography>
+                </Box>
+              </Grid>
+              {/* SP Status */}
+              <Grid item xs={12} sm={6}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1, borderBottom: `1px solid ${colors.divider}` }}>
+                  <Typography variant="body2" sx={{ color: colors.textSecondary, fontWeight: 600 }}>SP Status</Typography>
+                  <Chip
+                    label={pred.spStatus === 'awarded' ? 'AWARDED' : pred.spStatus === 'not_awarded' ? 'NOT AWARDED' : 'PENDING'}
+                    size="small"
+                    color={pred.spStatus === 'awarded' ? 'success' : pred.spStatus === 'not_awarded' ? 'error' : 'default'}
+                    sx={{ fontWeight: 700, height: 24 }}
+                  />
+                </Box>
+              </Grid>
+              {/* Correctness */}
+              <Grid item xs={12} sm={6}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1, borderBottom: `1px solid ${colors.divider}` }}>
+                  <Typography variant="body2" sx={{ color: colors.textSecondary, fontWeight: 600 }}>Correctness</Typography>
+                  {pred.correctness === 'won' ? (
+                    <Chip
+                      icon={<CheckCircle sx={{ fontSize: 14 }} />}
+                      label="WON"
+                      size="small"
+                      sx={{ bgcolor: colors.success, color: colors.brandWhite, fontWeight: 700, height: 24 }}
+                    />
+                  ) : pred.correctness === 'lost' ? (
+                    <Chip
+                      icon={<Cancel sx={{ fontSize: 14 }} />}
+                      label="LOST"
+                      size="small"
+                      sx={{ bgcolor: colors.error, color: colors.brandWhite, fontWeight: 700, height: 24 }}
+                    />
+                  ) : (
+                    <Chip label="PENDING" size="small" sx={{ bgcolor: colors.warning, color: colors.brandWhite, fontWeight: 700, height: 24 }} />
+                  )}
+                </Box>
+              </Grid>
+              {/* SP Value */}
+              <Grid item xs={12}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1.5, bgcolor: `${colors.brandRed}10`, px: 2, borderRadius: '8px', mt: 1 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Star sx={{ fontSize: 20, color: colors.brandRed }} />
+                    <Typography variant="body1" sx={{ color: colors.brandRed, fontWeight: 700 }}>SP Value</Typography>
+                  </Box>
+                  <Typography variant="h6" sx={{ fontWeight: 700, color: colors.brandRed }}>
+                    {pred.spAwarded || 0} SP
+                  </Typography>
+                </Box>
+              </Grid>
+            </Grid>
+          </CardContent>
+        </Card>
+      ))}
+
+      {/* 4. Overall Match Total for SP */}
+      <Card sx={{ mb: 3, borderRadius: '16px', background: `linear-gradient(135deg, ${colors.success}20 0%, ${colors.success}10 100%)`, border: `2px solid ${colors.success}` }}>
+        <CardContent sx={{ p: 3 }}>
+          <Grid container spacing={3} alignItems="center">
+            <Grid item xs={12} md={8}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <EmojiEvents sx={{ fontSize: 32, color: colors.success }} />
+                <Box>
+                  <Typography variant="body2" sx={{ color: colors.textSecondary, mb: 0.5 }}>
+                    Total SP Won for This Match
+                  </Typography>
+                  <Typography variant="h4" sx={{ fontWeight: 700, color: colors.success }}>
+                    {totalSP} SP
+                  </Typography>
+                </Box>
+              </Box>
+            </Grid>
+            <Grid item xs={12} md={4} sx={{ textAlign: { xs: 'left', md: 'right' } }}>
+              <Typography variant="body2" sx={{ color: colors.textSecondary, mb: 0.5 }}>
+                From {predictions.length} Predictions
+              </Typography>
+              <Chip
+                icon={<Star sx={{ fontSize: 16 }} />}
+                label={`${predictions.filter(p => p.correctness === 'won').length} Correct`}
+                sx={{
+                  bgcolor: colors.success,
+                  color: colors.brandWhite,
+                  fontWeight: 700,
+                }}
+              />
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
+
+      {/* Immutable Record Notice */}
       <Alert
         icon={<Shield sx={{ fontSize: 20 }} />}
         sx={{
-          mb: 3,
           borderRadius: '12px',
-          backgroundColor: `${colors.info}26`,
-          border: `1.5px solid ${colors.info}4D`,
-          py: 1.5,
+          backgroundColor: `${colors.info}20`,
+          border: `1.5px solid ${colors.info}40`,
           '& .MuiAlert-icon': {
             color: colors.info,
-          },
-          '& .MuiAlert-message': {
-            width: '100%',
           },
         }}
       >
@@ -324,398 +518,9 @@ const PredictionDetailsPage = () => {
           Immutable Record
         </Typography>
         <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13 }}>
-          This prediction is a permanent audit record and cannot be modified or deleted.
+          All predictions are permanent audit records and cannot be modified or deleted.
         </Typography>
       </Alert>
-
-      {/* Main Prediction Card - Red */}
-      <Card
-        sx={{
-          padding: 4,
-          mb: 3,
-          borderRadius: '20px',
-          background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
-          boxShadow: `0 6px 18px ${colors.brandRed}40`,
-          position: 'relative',
-        }}
-      >
-        <CardContent sx={{ padding: 0, '&:last-child': { paddingBottom: 0 } }}>
-          {/* Top Row - Prediction ID and Status */}
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
-            <Chip
-              label={selectedPrediction.id?.substring(0, 8).toUpperCase() || 'PRED016'}
-              sx={{
-                backgroundColor: colors.brandWhite,
-                color: colors.brandBlack,
-                border: `1.5px solid ${colors.brandWhite}`,
-                fontWeight: 700,
-                fontSize: 11,
-                height: 28,
-                borderRadius: '8px',
-              }}
-            />
-            {getStatusChip(predStatus)}
-          </Box>
-
-          {/* Prediction Type */}
-          <Box sx={{ mb: 2 }}>
-            {getTypeChip(selectedPrediction.predictionType || selectedPrediction.type || 'correct_score')}
-          </Box>
-
-          {/* Match Title */}
-          <Typography
-            variant="h3"
-            sx={{
-              fontWeight: 700,
-              color: colors.brandWhite,
-              mb: 4,
-              fontSize: { xs: 28, md: 36 },
-            }}
-          >
-            {groupData.matchName}
-          </Typography>
-
-          {/* Prediction Section */}
-          <Box
-            sx={{
-              padding: 2.5,
-              mb: 3,
-              borderRadius: '16px',
-              backgroundColor: `${colors.brandDarkRed}80`,
-              border: `1px solid ${colors.brandWhite}33`,
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Star sx={{ fontSize: 24, color: colors.brandWhite }} />
-              <Box>
-                <Typography variant="body2" sx={{ color: `${colors.brandWhite}DD`, mb: 0.5 }}>
-                  Prediction
-                </Typography>
-                <Typography variant="h5" sx={{ fontWeight: 700, color: colors.brandWhite }}>
-                  {selectedPrediction.prediction || selectedPrediction.selectedTeam || selectedPrediction.predictionText || 'N/A'}
-                </Typography>
-              </Box>
-            </Box>
-          </Box>
-
-          {/* Bottom Row - Prediction Time, SP Awarded, Actual Result, Prediction Status */}
-          <Grid container spacing={3}>
-            {/* Prediction Time */}
-            <Grid item xs={6} md={3}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
-                <CalendarToday sx={{ fontSize: 20, color: colors.brandWhite }} />
-                <Typography variant="body2" sx={{ color: `${colors.brandWhite}DD`, fontWeight: 600 }}>
-                  Prediction Time
-                </Typography>
-              </Box>
-              <Typography variant="body1" sx={{ fontWeight: 600, color: colors.brandWhite }}>
-                {selectedPrediction.predictionTime
-                  ? format(
-                    selectedPrediction.predictionTime?.toDate
-                      ? selectedPrediction.predictionTime.toDate()
-                      : new Date(selectedPrediction.predictionTime),
-                    'MMM dd, yyyy HH:mm'
-                  )
-                  : 'N/A'}
-              </Typography>
-            </Grid>
-
-            {/* SP Awarded */}
-            <Grid item xs={6} md={3}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
-                <Star sx={{ fontSize: 20, color: colors.brandWhite }} />
-                <Typography variant="body2" sx={{ color: `${colors.brandWhite}DD`, fontWeight: 600 }}>
-                  SP Awarded
-                </Typography>
-              </Box>
-              {isCompleted ? (
-                <Chip
-                  icon={<CheckCircle sx={{ fontSize: 14 }} />}
-                  label={`${selectedPrediction.spAwarded || 0} SP`}
-                  sx={{
-                    backgroundColor: colors.brandWhite,
-                    color: colors.brandRed,
-                    border: `1.5px solid ${colors.brandWhite}`,
-                    fontWeight: 600,
-                    fontSize: 11,
-                    height: 32,
-                    borderRadius: '8px',
-                    '& .MuiChip-icon': {
-                      color: colors.brandRed,
-                    },
-                  }}
-                />
-              ) : (
-                <Chip
-                  icon={<AccessTime sx={{ fontSize: 14 }} />}
-                  label="Pending"
-                  sx={{
-                    backgroundColor: colors.brandWhite,
-                    color: colors.textSecondary,
-                    border: `1.5px solid ${colors.brandWhite}`,
-                    fontWeight: 600,
-                    fontSize: 11,
-                    height: 32,
-                    borderRadius: '8px',
-                    '& .MuiChip-icon': {
-                      color: colors.textSecondary,
-                    },
-                  }}
-                />
-              )}
-            </Grid>
-
-            {/* Actual Result */}
-            <Grid item xs={6} md={3}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
-                <CheckCircle sx={{ fontSize: 20, color: colors.brandWhite }} />
-                <Typography variant="body2" sx={{ color: `${colors.brandWhite}DD`, fontWeight: 600 }}>
-                  Actual Result
-                </Typography>
-              </Box>
-              <Typography variant="h6" sx={{ fontWeight: 700, color: colors.brandWhite }}>
-                {selectedPrediction.actualResult || 'N/A'}
-              </Typography>
-            </Grid>
-
-            {/* Prediction Status */}
-            <Grid item xs={6} md={3}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
-                <CheckCircle sx={{ fontSize: 20, color: colors.brandWhite }} />
-                <Typography variant="body2" sx={{ color: `${colors.brandWhite}DD`, fontWeight: 600 }}>
-                  Prediction Status
-                </Typography>
-              </Box>
-              {getCorrectnessChip(predStatus)}
-            </Grid>
-          </Grid>
-        </CardContent>
-      </Card>
-
-      {/* All Predictions List - Show all predictions if more than one */}
-      {predictions.length > 1 && (
-        <Card
-          sx={{
-            padding: 3,
-            mb: 3,
-            borderRadius: '20px',
-            background: colors.brandWhite,
-            border: `1.5px solid ${colors.divider}26`,
-            boxShadow: `0 6px 14px ${colors.shadow}1F`,
-          }}
-        >
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>
-              All Predictions ({predictions.length})
-            </Typography>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, backgroundColor: `${colors.warning}1A`, px: 2, py: 0.5, borderRadius: '8px' }}>
-              <Star sx={{ fontSize: 18, color: colors.warning }} />
-              <Typography variant="body2" sx={{ fontWeight: 700, color: colors.brandBlack }}>
-                Match Total SP: {predictions.reduce((sum, p) => sum + (p.spAwarded || 0), 0)}
-              </Typography>
-            </Box>
-          </Box>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {predictions.map((pred, index) => {
-              const status = pred.status || pred.predictionStatus || 'ongoing';
-              const isSelected = index === selectedPredictionIndex;
-              return (
-                <Card
-                  key={pred.id}
-                  onClick={() => setSelectedPredictionIndex(index)}
-                  sx={{
-                    padding: 2,
-                    borderRadius: '12px',
-                    border: `2px solid ${isSelected ? colors.brandRed : colors.divider}66`,
-                    backgroundColor: isSelected ? `${colors.brandRed}0A` : colors.brandWhite,
-                    cursor: 'pointer',
-                    '&:hover': {
-                      borderColor: colors.brandRed,
-                      backgroundColor: `${colors.brandRed}0D`,
-                    },
-                  }}
-                >
-                  <Grid container spacing={2} alignItems="center">
-                    {/* Match & Fixture ID */}
-                    <Grid item xs={12} md={3}>
-                      <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack }}>
-                        {pred.matchName || groupData.matchName}
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: colors.textSecondary }}>
-                        ID: {pred.fixtureId || groupData.fixtureId}
-                      </Typography>
-                    </Grid>
-
-                    {/* Prediction Type */}
-                    <Grid item xs={6} md={2}>
-                      {getTypeChip(pred.predictionType || pred.type || 'correct_score')}
-                    </Grid>
-
-                    {/* Prediction Time */}
-                    <Grid item xs={6} md={2}>
-                      <Typography variant="caption" sx={{ color: colors.textSecondary, display: 'block' }}>Time</Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                        {pred.predictionTime
-                          ? format(
-                            pred.predictionTime?.toDate
-                              ? pred.predictionTime.toDate()
-                              : new Date(pred.predictionTime),
-                            'MMM dd, HH:mm'
-                          )
-                          : 'N/A'}
-                      </Typography>
-                    </Grid>
-
-                    {/* Actual Result */}
-                    <Grid item xs={6} md={1.5}>
-                      <Typography variant="caption" sx={{ color: colors.textSecondary, display: 'block' }}>Result</Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        {pred.actualResult || '-'}
-                      </Typography>
-                    </Grid>
-
-                    {/* SP Status & Value */}
-                    <Grid item xs={6} md={1.5}>
-                      <Typography variant="caption" sx={{ color: colors.textSecondary, display: 'block' }}>SP Status</Typography>
-                      {status === 'ongoing' ? (
-                        <Chip
-                          icon={<AccessTime sx={{ fontSize: 12 }} />}
-                          label="Pending"
-                          size="small"
-                          sx={{
-                            backgroundColor: `${colors.warning}1A`,
-                            color: colors.warning,
-                            fontWeight: 600,
-                            fontSize: 10,
-                            height: 24,
-                          }}
-                        />
-                      ) : (
-                        <Chip
-                          icon={<Star sx={{ fontSize: 12 }} />}
-                          label={`${pred.spAwarded || 0} SP`}
-                          size="small"
-                          sx={{
-                            backgroundColor: `${colors.success}1A`,
-                            color: colors.success,
-                            fontWeight: 600,
-                            fontSize: 10,
-                            height: 24,
-                          }}
-                        />
-                      )}
-                    </Grid>
-
-                    {/* Correctness */}
-                    <Grid item xs={12} md={2}>
-                      <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                        {getCorrectnessChip(status)}
-                      </Box>
-                    </Grid>
-                  </Grid>
-                </Card>
-              );
-            })}
-          </Box>
-        </Card>
-      )}
-
-      {/* User Details and Match Details Cards */}
-      <Grid container spacing={3}>
-        {/* User Details Card */}
-        <Grid item xs={12} md={6}>
-          <Card
-            sx={{
-              padding: 3,
-              borderRadius: '20px',
-              background: colors.brandWhite,
-              border: `1.5px solid ${colors.info}26`,
-              boxShadow: `0 6px 14px ${colors.info}1F`,
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
-              <Box
-                sx={{
-                  padding: 1.5,
-                  background: `linear-gradient(135deg, ${colors.info} 0%, ${colors.info}80 100%)`,
-                  borderRadius: '16px',
-                  boxShadow: `0 4px 12px ${colors.info}40`,
-                }}
-              >
-                <Person sx={{ fontSize: 28, color: colors.brandWhite }} />
-              </Box>
-              <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                User Details
-              </Typography>
-            </Box>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <Box>
-                <Typography variant="body2" sx={{ color: colors.textSecondary, mb: 0.5 }}>
-                  Username
-                </Typography>
-                <Typography variant="body1" sx={{ fontWeight: 600, color: colors.brandBlack }}>
-                  {groupData.username}
-                </Typography>
-              </Box>
-              <Box>
-                <Typography variant="body2" sx={{ color: colors.textSecondary, mb: 0.5 }}>
-                  Email
-                </Typography>
-                <Typography variant="body1" sx={{ fontWeight: 600, color: colors.brandBlack }}>
-                  {groupData.userEmail || 'N/A'}
-                </Typography>
-              </Box>
-            </Box>
-          </Card>
-        </Grid>
-
-        {/* Match Details Card */}
-        <Grid item xs={12} md={6}>
-          <Card
-            sx={{
-              padding: 3,
-              borderRadius: '20px',
-              background: colors.brandWhite,
-              border: `1.5px solid ${colors.success}26`,
-              boxShadow: `0 6px 14px ${colors.success}1F`,
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
-              <Box
-                sx={{
-                  padding: 1.5,
-                  background: `linear-gradient(135deg, ${colors.success} 0%, ${colors.success}80 100%)`,
-                  borderRadius: '16px',
-                  boxShadow: `0 4px 12px ${colors.success}40`,
-                }}
-              >
-                <SportsSoccer sx={{ fontSize: 28, color: colors.brandWhite }} />
-              </Box>
-              <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                Match Details
-              </Typography>
-            </Box>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <Box>
-                <Typography variant="body2" sx={{ color: colors.textSecondary, mb: 0.5 }}>
-                  Match
-                </Typography>
-                <Typography variant="body1" sx={{ fontWeight: 600, color: colors.brandBlack }}>
-                  {groupData.matchName}
-                </Typography>
-              </Box>
-              <Box>
-                <Typography variant="body2" sx={{ color: colors.textSecondary, mb: 0.5 }}>
-                  Fixture ID
-                </Typography>
-                <Typography variant="body1" sx={{ fontWeight: 600, color: colors.brandBlack }}>
-                  {String(groupData.fixtureId).substring(0, 8)}...
-                </Typography>
-              </Box>
-            </Box>
-          </Card>
-        </Grid>
-      </Grid>
     </Box>
   );
 };
