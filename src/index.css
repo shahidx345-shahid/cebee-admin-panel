@@ -1291,3 +1291,172 @@ th {
     opacity: 1 !important;
   }
 }
+
+/* ========================================
+   CARD RESPONSIVENESS - ALL PAGES
+   ======================================== */
+
+/* Global Card Responsiveness */
+.MuiCard-root,
+.MuiPaper-root {
+  max-width: 100% !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+/* Card Content Responsive */
+.MuiCardContent-root {
+  padding: 24px !important;
+  box-sizing: border-box !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+}
+
+/* Card Headers */
+.MuiCardHeader-root {
+  padding: 20px 24px !important;
+  box-sizing: border-box !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+}
+
+.MuiCardHeader-title {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+/* Card Actions */
+.MuiCardActions-root {
+  padding: 16px 24px !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+  box-sizing: border-box !important;
+}
+
+/* Grid Items containing Cards */
+.MuiGrid-item .MuiCard-root,
+.MuiGrid-item .MuiPaper-root {
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
+}
+
+/* Flex containers with Cards */
+[style*="display: flex"] .MuiCard-root,
+[style*="display:flex"] .MuiCard-root {
+  max-width: 100% !important;
+  flex-shrink: 1 !important;
+  min-width: 0 !important;
+}
+
+/* Mobile Card Responsiveness */
+@media (max-width: 1023px) {
+  /* Card Padding */
+  .MuiCard-root {
+    margin: 0 !important;
+    border-radius: 16px !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
+  }
+  
+  .MuiCardContent-root {
+    padding: 16px !important;
+    box-sizing: border-box !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  
+  .MuiCardHeader-root {
+    padding: 12px 16px !important;
+    flex-wrap: wrap !important;
+  }
+  
+  .MuiCardHeader-title {
+    font-size: 16px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+  
+  .MuiCardHeader-subheader {
+    font-size: 13px !important;
+  }
+  
+  .MuiCardActions-root {
+    padding: 12px 16px !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+  
+  .MuiCardActions-root .MuiButton-root {
+    width: 100% !important;
+    margin: 4px 0 !important;
+  }
+  
+  /* Stat Cards */
+  .MuiCard-root[style*="gradient"],
+  .MuiCard-root[style*="linear-gradient"] {
+    min-height: auto !important;
+    padding: 16px !important;
+  }
+  
+  /* Info Cards with Icons */
+  .MuiCard-root .MuiBox-root:has(svg) {
+    flex-shrink: 0 !important;
+  }
+  
+  /* Cards in Grid */
+  .MuiGrid-container .MuiGrid-item {
+    padding: 8px !important;
+  }
+  
+  .MuiGrid-container {
+    margin: -8px !important;
+    width: calc(100% + 16px) !important;
+  }
+}
+
+/* Tablet Card Responsiveness */
+@media (min-width: 600px) and (max-width: 1023px) {
+  .MuiCardContent-root {
+    padding: 20px !important;
+  }
+  
+  .MuiCardHeader-root {
+    padding: 16px 20px !important;
+  }
+  
+  .MuiCardActions-root {
+    flex-direction: row !important;
+    padding: 14px 20px !important;
+  }
+  
+  .MuiCardActions-root .MuiButton-root {
+    width: auto !important;
+    flex: 1 !important;
+  }
+}
+
+/* Extra Small Mobile */
+@media (max-width: 375px) {
+  .MuiCard-root {
+    border-radius: 12px !important;
+  }
+  
+  .MuiCardContent-root {
+    padding: 12px !important;
+  }
+  
+  .MuiCardHeader-root {
+    padding: 10px 12px !important;
+  }
+  
+  .MuiCardHeader-title {
+    font-size: 14px !important;
+  }
+  
+  .MuiCardActions-root {
+    padding: 10px 12px !important;
+  }
+}
