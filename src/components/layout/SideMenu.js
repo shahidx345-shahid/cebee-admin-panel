@@ -34,18 +34,19 @@ import appIcon from '../../assets/app_icon.png';
 
 // Final navigation order for Phase 1 - Approved
 // Flow: Polls → Fixtures → Predictions → Rankings → Rewards
+// Rationale: Community polls drive fixture creation, which leads to predictions, rankings, and rewards
 const menuItems = [
   { title: 'Dashboard', icon: Dashboard, route: constants.routes.dashboard },
-  { title: 'Polls', icon: Poll, route: constants.routes.polls },
-  { title: 'Fixtures', icon: CalendarToday, route: constants.routes.fixtures },
-  { title: 'Leagues', icon: SportsSoccer, route: '/leagues' },
-  { title: 'Predictions', icon: BarChart, route: constants.routes.predictions },
-  { title: 'Leaderboard', icon: EmojiEvents, route: constants.routes.leaderboard },
-  { title: 'Rewards', icon: CardGiftcard, route: constants.routes.rewards },
-  { title: 'Users', icon: People, route: constants.routes.users },
-  { title: 'Referrals', icon: Group, route: constants.routes.referrals },
-  { title: 'Notifications', icon: Notifications, route: constants.routes.notifications },
-  { title: 'Content & Updates', icon: EditNote, route: constants.routes.content },
+  { title: 'Poll Management', icon: Poll, route: constants.routes.polls },
+  { title: 'Fixture Management', icon: CalendarToday, route: constants.routes.fixtures },
+  { title: 'League Management', icon: SportsSoccer, route: '/leagues' },
+  { title: 'Predictions Management', icon: BarChart, route: constants.routes.predictions },
+  { title: 'Leaderboard Control', icon: EmojiEvents, route: constants.routes.leaderboard },
+  { title: 'Rewards Management', icon: CardGiftcard, route: constants.routes.rewards },
+  { title: 'User Management', icon: People, route: constants.routes.users },
+  { title: 'Referral Management', icon: Group, route: constants.routes.referrals },
+  { title: 'Notifications Center', icon: Notifications, route: constants.routes.notifications },
+  { title: 'Content / App Updates', icon: EditNote, route: constants.routes.content },
   { title: 'System Logs', icon: Description, route: constants.routes.logs },
   { title: 'Settings', icon: Settings, route: constants.routes.settings },
 ];
@@ -205,14 +206,13 @@ const SideMenu = () => {
                     fontWeight: isSelected ? 700 : 500,
                     color: isSelected ? colors.brandWhite : `${colors.brandWhite}B3`,
                     letterSpacing: isSelected ? -0.3 : 0,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
+                    overflow: 'visible',
                   }}
                   sx={{
                     flex: 1,
                     minWidth: 0,
-                    overflow: 'hidden',
+                    paddingLeft: 1,
                   }}
                 />
                 {isSelected && (

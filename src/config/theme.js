@@ -621,7 +621,7 @@ export const constants = {
     settings: '/settings',
   },
   // Side Menu Width
-  sideMenuWidth: 260,
+  sideMenuWidth: 300,
   sideMenuCollapsedWidth: 80,
   // Top Bar Height
   topBarHeight: 80,
