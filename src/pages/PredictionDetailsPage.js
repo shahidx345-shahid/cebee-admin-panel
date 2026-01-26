@@ -45,14 +45,20 @@ const PredictionDetailsPage = () => {
     };
 
     const matches = {
+      'MATCH_001': { homeTeam: 'Arsenal', awayTeam: 'Chelsea', matchName: 'Arsenal vs Chelsea', actualResult: '2-1', status: 'completed' },
+      'MATCH_002': { homeTeam: 'Liverpool', awayTeam: 'Manchester United', matchName: 'Liverpool vs Manchester United', actualResult: '1-1', status: 'completed' },
+      'MATCH_003': { homeTeam: 'Manchester City', awayTeam: 'Tottenham', matchName: 'Manchester City vs Tottenham', actualResult: null, status: 'ongoing' },
+      'MATCH_004': { homeTeam: 'Newcastle', awayTeam: 'Brighton', matchName: 'Newcastle vs Brighton', actualResult: '3-0', status: 'completed' },
+      // Support old FIX_ format for backward compatibility
       'FIX_001': { homeTeam: 'Arsenal', awayTeam: 'Chelsea', matchName: 'Arsenal vs Chelsea', actualResult: '2-1', status: 'completed' },
       'FIX_002': { homeTeam: 'Liverpool', awayTeam: 'Manchester United', matchName: 'Liverpool vs Manchester United', actualResult: '1-1', status: 'completed' },
       'FIX_003': { homeTeam: 'Manchester City', awayTeam: 'Tottenham', matchName: 'Manchester City vs Tottenham', actualResult: null, status: 'ongoing' },
       'FIX_004': { homeTeam: 'Newcastle', awayTeam: 'Brighton', matchName: 'Newcastle vs Brighton', actualResult: '3-0', status: 'completed' },
     };
 
-    const user = users[userId] || { username: 'Unknown User', email: 'unknown@example.com', country: 'Unknown', totalPredictions: 0, accuracy: 0 };
-    const match = matches[matchId] || { homeTeam: 'Team A', awayTeam: 'Team B', matchName: 'Team A vs Team B', actualResult: null, status: 'ongoing' };
+    const user = users[userId] || { username: 'Unknown User', email: 'unknown@example.com', country: 'Nigeria', totalPredictions: 0, accuracy: 0 };
+    // Try MATCH_ format first, then FIX_ format, then default
+    const match = matches[matchId] || matches[matchId?.replace('MATCH_', 'FIX_')] || matches[matchId?.replace('FIX_', 'MATCH_')] || { homeTeam: 'Team A', awayTeam: 'Team B', matchName: 'Team A vs Team B', actualResult: null, status: 'ongoing' };
 
     // Generate multiple predictions for this match
     const predictionTypes = [
@@ -250,7 +256,7 @@ const PredictionDetailsPage = () => {
             {/* Match Info */}
             <Grid item xs={12} md={8}>
               <Chip
-                label={`Fixture ID: ${groupData.fixtureId}`}
+                label={`Match ID: ${groupData.fixtureId || groupData.matchId}`}
                 sx={{
                   backgroundColor: colors.brandWhite,
                   color: colors.brandRed,
@@ -361,9 +367,23 @@ const PredictionDetailsPage = () => {
         <Card key={pred.id} sx={{ mb: 2, borderRadius: '16px', border: `2px solid ${colors.divider}` }}>
           <CardContent sx={{ p: 3 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="h6" sx={{ fontWeight: 700, color: colors.brandBlack }}>
-                Prediction #{index + 1}
-              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Typography variant="h6" sx={{ fontWeight: 700, color: colors.brandBlack }}>
+                  Prediction #{index + 1}
+                </Typography>
+                <Chip
+                  label={`ID: ${pred.id || 'N/A'}`}
+                  size="small"
+                  sx={{
+                    backgroundColor: '#FFE5E5',
+                    color: colors.brandRed,
+                    fontWeight: 600,
+                    fontSize: 10,
+                    height: 24,
+                    borderRadius: '6px',
+                  }}
+                />
+              </Box>
               {getTypeChip(pred.predictionType)}
             </Box>
             <Grid container spacing={2.5}>
@@ -374,11 +394,18 @@ const PredictionDetailsPage = () => {
                   <Typography variant="body2" sx={{ fontWeight: 700, color: colors.brandBlack, textAlign: 'right' }}>{pred.matchName}</Typography>
                 </Box>
               </Grid>
-              {/* Fixture ID */}
+              {/* Match ID */}
               <Grid item xs={12} sm={6}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1, borderBottom: `1px solid ${colors.divider}` }}>
-                  <Typography variant="body2" sx={{ color: colors.textSecondary, fontWeight: 600 }}>Fixture ID</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 700, color: colors.brandBlack }}>{pred.fixtureId}</Typography>
+                  <Typography variant="body2" sx={{ color: colors.textSecondary, fontWeight: 600 }}>Match ID</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: colors.brandBlack }}>{pred.fixtureId || pred.matchId}</Typography>
+                </Box>
+              </Grid>
+              {/* Prediction ID */}
+              <Grid item xs={12} sm={6}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', py: 1, borderBottom: `1px solid ${colors.divider}` }}>
+                  <Typography variant="body2" sx={{ color: colors.textSecondary, fontWeight: 600 }}>Prediction ID</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700, color: colors.brandBlack }}>{pred.id || 'N/A'}</Typography>
                 </Box>
               </Grid>
               {/* Prediction Type */}

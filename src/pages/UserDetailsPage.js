@@ -17,6 +17,10 @@ import {
   TableRow,
   Paper,
   TextField,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from '@mui/material';
 import {
   ArrowBack,
@@ -54,6 +58,10 @@ const UserDetailsPage = () => {
   // KYC Notes State
   const [isEditingNotes, setIsEditingNotes] = useState(false);
   const [noteTemp, setNoteTemp] = useState('');
+  
+  // Flag User State
+  const [flagDialogOpen, setFlagDialogOpen] = useState(false);
+  const [flagReason, setFlagReason] = useState('');
 
   useEffect(() => {
     if (kycData.notes) setNoteTemp(kycData.notes);
@@ -463,6 +471,41 @@ const UserDetailsPage = () => {
               <Button variant="text" color="warning" startIcon={<TimerOff />} size="small" onClick={() => handleKycUpdate({ status: 'expired' })}>
                 Mark as Expired
               </Button>
+              {!user.isFlagged && (
+                <Button 
+                  variant="outlined" 
+                  color="warning" 
+                  startIcon={<Flag />} 
+                  size="small" 
+                  onClick={() => {
+                    setFlagReason('');
+                    setFlagDialogOpen(true);
+                  }}
+                >
+                  Flag User
+                </Button>
+              )}
+              {user.isFlagged && (
+                <Button 
+                  variant="outlined" 
+                  color="success" 
+                  startIcon={<CheckCircle />} 
+                  size="small" 
+                  onClick={() => {
+                    setUser(prev => ({
+                      ...prev,
+                      isFlagged: false,
+                      flagReason: '',
+                      flagSource: null,
+                      fraudFlags: [],
+                    }));
+                    console.log(`[SYSTEM LOG] User ${user.id} unflagged by Admin at ${new Date().toISOString()}`);
+                    alert('User unflagged successfully');
+                  }}
+                >
+                  Unflag User
+                </Button>
+              )}
             </Box>
           </Grid>
         </Grid>
@@ -747,6 +790,97 @@ const UserDetailsPage = () => {
           </TableContainer>
         )}
       </Card>
+
+      {/* Flag User Dialog */}
+      <Dialog
+        open={flagDialogOpen}
+        onClose={() => {
+          setFlagDialogOpen(false);
+          setFlagReason('');
+        }}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: { borderRadius: '16px' }
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 700, color: colors.warning }}>
+          Flag User
+        </DialogTitle>
+        <DialogContent>
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
+              You are about to flag this user:
+            </Typography>
+            <Typography variant="body2" sx={{ fontSize: 13 }}>
+              • User: {user?.username || 'N/A'}
+            </Typography>
+            <Typography variant="body2" sx={{ fontSize: 13 }}>
+              • User ID: {user?.id || 'N/A'}
+            </Typography>
+          </Alert>
+          <Typography variant="body2" sx={{ mb: 1, fontWeight: 600 }}>
+            Reason for Flagging <span style={{ color: colors.error }}>*</span>
+          </Typography>
+          <TextField
+            fullWidth
+            multiline
+            rows={4}
+            value={flagReason}
+            onChange={(e) => setFlagReason(e.target.value)}
+            placeholder="Enter the reason why this user is being flagged (e.g., Suspicious activity, Multiple accounts, etc.)"
+            required
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                borderRadius: '12px',
+              }
+            }}
+          />
+          <Typography variant="caption" sx={{ color: colors.textSecondary, mt: 1, display: 'block' }}>
+            This action will be logged and the user will be marked as flagged in the system.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 3, pt: 0 }}>
+          <Button 
+            onClick={() => {
+              setFlagDialogOpen(false);
+              setFlagReason('');
+            }}
+            sx={{ textTransform: 'none', fontWeight: 600 }}
+          >
+            Cancel
+          </Button>
+          <Button 
+            onClick={() => {
+              if (!flagReason.trim()) {
+                alert('Please enter a reason for flagging this user');
+                return;
+              }
+              setUser(prev => ({
+                ...prev,
+                isFlagged: true,
+                flagReason: flagReason.trim(),
+                flagSource: 'Admin Flagged',
+                fraudFlags: prev.fraudFlags || [],
+              }));
+              setFlagDialogOpen(false);
+              console.log(`[SYSTEM LOG] User ${user.id} flagged by Admin. Reason: ${flagReason} at ${new Date().toISOString()}`);
+              alert('User flagged successfully');
+              setFlagReason('');
+            }}
+            variant="contained"
+            startIcon={<Flag />}
+            sx={{ 
+              bgcolor: colors.warning,
+              textTransform: 'none',
+              fontWeight: 700,
+              '&:hover': { bgcolor: '#D97706' }
+            }}
+          >
+            Flag User
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box >
   );
 };

@@ -80,7 +80,7 @@ const FixturesPage = () => {
   const getSampleFixtures = () => {
     return [
       {
-        id: 'FIX_001',
+        id: 'MATCH_001',
         matchId: 'MATCH_123',
         homeTeam: 'Arsenal',
         awayTeam: 'Chelsea',
@@ -91,7 +91,7 @@ const FixturesPage = () => {
         hot: true,
       },
       {
-        id: 'FIX_002',
+        id: 'MATCH_002',
         matchId: 'MATCH_124',
         homeTeam: 'Real Madrid',
         awayTeam: 'Barcelona',
@@ -102,7 +102,7 @@ const FixturesPage = () => {
         hot: true,
       },
       {
-        id: 'FIX_003',
+        id: 'MATCH_003',
         matchId: 'MATCH_125',
         homeTeam: 'Manchester City',
         awayTeam: 'Liverpool',
@@ -113,7 +113,7 @@ const FixturesPage = () => {
         hot: false,
       },
       {
-        id: 'FIX_004',
+        id: 'MATCH_004',
         matchId: 'MATCH_126',
         homeTeam: 'Bayern Munich',
         awayTeam: 'Dortmund',

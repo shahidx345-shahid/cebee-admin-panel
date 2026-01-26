@@ -918,8 +918,8 @@ const RewardDetailsPage = () => {
                                 </Grid>
                                 <Grid item xs={12} sm={6} md={3}>
                                     <Typography variant="caption" sx={{ color: colors.textSecondary, textTransform: 'uppercase', fontWeight: 600 }}>Consent Type</Typography>
-                                    <Typography variant="body1" sx={{ fontWeight: 600, mt: 0.5 }}>
-                                        Video/Testimonial {reward.consentOptIn ? '' : '(Optional)'}
+                                    <Typography variant="body1" sx={{ fontWeight: 600, mt: 0.5, whiteSpace: 'nowrap' }}>
+                                        Video/Testimonial
                                     </Typography>
                                 </Grid>
                                 <Grid item xs={12} sm={6} md={3}>

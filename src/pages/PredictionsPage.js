@@ -73,10 +73,10 @@ const PredictionsPage = () => {
     const usernames = ['John Doe', 'Jane Smith', 'Mike Wilson', 'Sarah Jones', 'David Brown'];
     const emails = ['john@example.com', 'jane@example.com', 'mike@example.com', 'sarah@example.com', 'david@example.com'];
     const matches = [
-      { homeTeam: 'Arsenal', awayTeam: 'Chelsea', fixtureId: 'FIX_001' },
-      { homeTeam: 'Liverpool', awayTeam: 'Manchester United', fixtureId: 'FIX_002' },
-      { homeTeam: 'Manchester City', awayTeam: 'Tottenham', fixtureId: 'FIX_003' },
-      { homeTeam: 'Newcastle', awayTeam: 'Brighton', fixtureId: 'FIX_004' },
+      { homeTeam: 'Arsenal', awayTeam: 'Chelsea', fixtureId: 'MATCH_001' },
+      { homeTeam: 'Liverpool', awayTeam: 'Manchester United', fixtureId: 'MATCH_002' },
+      { homeTeam: 'Manchester City', awayTeam: 'Tottenham', fixtureId: 'MATCH_003' },
+      { homeTeam: 'Newcastle', awayTeam: 'Brighton', fixtureId: 'MATCH_004' },
     ];
     const predictionTypes = ['correct_score', 'match_result', 'both_teams_score', 'goal_range'];
     const predictions = [];
@@ -363,6 +363,34 @@ const PredictionsPage = () => {
 
   const columns = [
     {
+      id: 'predictionId',
+      label: 'Prediction ID',
+      render: (_, row) => {
+        // Show the first prediction ID, or the group ID if no predictions
+        const predictionId = row.predictions && row.predictions.length > 0 
+          ? row.predictions[0].id 
+          : row.id;
+        // Truncate to show only first 12 characters
+        const shortId = predictionId ? String(predictionId).substring(0, 12) + (predictionId.length > 12 ? '...' : '') : 'N/A';
+        return (
+          <Chip
+            label={shortId}
+            size="small"
+            sx={{
+              backgroundColor: '#FFE5E5',
+              color: colors.brandRed,
+              fontWeight: 600,
+              fontSize: 10,
+              height: 24,
+              borderRadius: '6px',
+              maxWidth: '120px',
+            }}
+            title={predictionId || 'N/A'} // Show full ID on hover
+          />
+        );
+      },
+    },
+    {
       id: 'username',
       label: 'User',
       render: (_, row) => (
@@ -391,7 +419,7 @@ const PredictionsPage = () => {
           </Typography>
           {row.fixtureId && (
             <Typography variant="caption" sx={{ color: colors.textSecondary, fontSize: 10 }}>
-              ID: {String(row.fixtureId).substring(0, 8)}...
+              ID: {String(row.fixtureId).replace('FIX_', 'MATCH_').substring(0, 10)}...
             </Typography>
           )}
         </Box>

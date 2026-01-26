@@ -1233,16 +1233,16 @@ const SettingsPage = () => {
         </Box>
         <DialogContent sx={{ padding: 3 }}>
           <Alert
-            severity="error"
+            severity="warning"
             icon={<Warning />}
             sx={{
               mb: 2.5,
-              backgroundColor: `${colors.error}1A`,
-              border: `1px solid ${colors.error}4D`,
+              backgroundColor: `${colors.warning}1A`,
+              border: `1px solid ${colors.warning}4D`,
             }}
           >
             <Typography variant="body2">
-              This will restore all settings to system-defined default values. This action cannot be undone and will be logged as a critical system action.
+              This will reset date format, time format, and timezone handling to system defaults. Platform status, app name, and maintenance message will remain unchanged. This action will be logged.
             </Typography>
           </Alert>
           <Typography variant="body2" sx={{ fontWeight: 700, mb: 1.5 }}>
@@ -1252,34 +1252,35 @@ const SettingsPage = () => {
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
               <Typography sx={{ fontSize: 14, color: colors.textSecondary }}>→</Typography>
               <Typography variant="body2" sx={{ fontSize: 13 }}>
-                Platform Status: <strong>Online</strong>
-              </Typography>
-            </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-              <Typography sx={{ fontSize: 14, color: colors.textSecondary }}>→</Typography>
-              <Typography variant="body2" sx={{ fontSize: 13 }}>
-                Time Format: <strong>12-hour</strong>
-              </Typography>
-            </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-              <Typography sx={{ fontSize: 14, color: colors.textSecondary }}>→</Typography>
-              <Typography variant="body2" sx={{ fontSize: 13 }}>
                 Date Format: <strong>DD/MM/YYYY</strong>
               </Typography>
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
               <Typography sx={{ fontSize: 14, color: colors.textSecondary }}>→</Typography>
               <Typography variant="body2" sx={{ fontSize: 13 }}>
-                Maintenance Message: <strong>Default message</strong>
+                Time Format: <strong>12-hour (AM/PM)</strong>
               </Typography>
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <Typography sx={{ fontSize: 14, color: colors.textSecondary }}>→</Typography>
               <Typography variant="body2" sx={{ fontSize: 13 }}>
-                App Versions: <strong>1.0.0</strong>
+                Timezone Handling: <strong>System Default (UTC)</strong>
               </Typography>
             </Box>
           </Box>
+          <Alert
+            severity="info"
+            icon={<Info />}
+            sx={{
+              mt: 2.5,
+              backgroundColor: `${colors.info}1A`,
+              border: `1px solid ${colors.info}33`,
+            }}
+          >
+            <Typography variant="body2" sx={{ fontSize: 12 }}>
+              <strong>Note:</strong> Platform Status, App Name, and Maintenance Message will <strong>NOT</strong> be reset.
+            </Typography>
+          </Alert>
         </DialogContent>
         <DialogActions sx={{ 
           padding: { xs: 2, md: 2.5 }, 
