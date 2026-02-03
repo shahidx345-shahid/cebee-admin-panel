@@ -368,9 +368,9 @@ const PredictionDetailsPage = () => {
           <CardContent sx={{ p: 3 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <Typography variant="h6" sx={{ fontWeight: 700, color: colors.brandBlack }}>
-                  Prediction #{index + 1}
-                </Typography>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: colors.brandBlack }}>
+                Prediction #{index + 1}
+              </Typography>
                 <Chip
                   label={`ID: ${pred.id || 'N/A'}`}
                   size="small"

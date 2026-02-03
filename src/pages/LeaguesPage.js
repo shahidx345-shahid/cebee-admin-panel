@@ -15,6 +15,7 @@ import {
   IconButton,
   Menu,
   ListItemText,
+  Alert,
 } from '@mui/material';
 import {
   Add,
@@ -35,9 +36,12 @@ import {
 import { colors, constants } from '../config/theme';
 import SearchBar from '../components/common/SearchBar';
 import DataTable from '../components/common/DataTable';
-// Firebase imports removed
-import { db } from '../config/firebase';
 import { format } from 'date-fns';
+import { 
+  getLeagues, 
+  updateLeague, 
+  deactivateLeague 
+} from '../services/leaguesService';
 
 const LeaguesPage = () => {
   const navigate = useNavigate();
@@ -53,158 +57,228 @@ const LeaguesPage = () => {
   const [selectedLeague, setSelectedLeague] = useState(null);
   const [dateFilterAnchor, setDateFilterAnchor] = useState(null);
   const [typeFilterAnchor, setTypeFilterAnchor] = useState(null);
+  const [error, setError] = useState('');
+  const [statistics, setStatistics] = useState({
+    total: 0,
+    active: 0,
+    maxActive: 5,
+    activeDisplay: 'Active: 0/5'
+  });
 
   const loadLeagues = async () => {
     setLoading(true);
-    // Directly use sample data
-    const leaguesData = getSampleLeagues();
-    setLeagues(leaguesData);
-    setFilteredLeagues(leaguesData);
-    setLoading(false);
+    setError('');
+    
+    try {
+      // Map frontend filters to backend API parameters
+      const apiParams = {
+        page: page + 1, // Backend uses 1-based pagination
+        limit: rowsPerPage,
+        search: searchQuery || undefined,
+        type: typeFilter !== 'all' ? typeFilter : undefined,
+        sort: mapSortToBackend(selectedSort),
+      };
+
+      // Remove undefined values
+      Object.keys(apiParams).forEach(key => 
+        apiParams[key] === undefined && delete apiParams[key]
+      );
+
+      const result = await getLeagues(apiParams);
+
+      if (result.success && result.data) {
+        // Format leagues to match existing structure
+        const formattedLeagues = result.data.leagues?.map(league => ({
+          id: league._id || league.league_id,
+          league_id: league._id || league.league_id,
+          name: league.league_name || league.name,
+          league_name: league.league_name || league.name,
+          type: league.type || league.leagueType || 'Domestic',
+          leagueType: league.leagueType || league.type,
+          isActive: league.status === 'Active',
+          status: league.status,
+          logo: league.logo,
+          country: league.country,
+          priority: league.priority || 0,
+          createdAt: league.createdAt ? new Date(league.createdAt) : new Date(),
+          createdDateFormatted: league.createdDateFormatted,
+        })) || [];
+
+        setLeagues(formattedLeagues);
+        setFilteredLeagues(formattedLeagues);
+
+        // Update statistics
+        if (result.data.statistics) {
+          setStatistics(result.data.statistics);
+        }
+
+        // Update pagination if needed
+        if (result.data.pagination) {
+          // Pagination is handled by backend, so we might need to adjust
+        }
+      } else {
+        setError(result.error || 'Failed to load leagues');
+        // Fallback to empty array
+        setLeagues([]);
+        setFilteredLeagues([]);
+      }
+    } catch (error) {
+      console.error('Error loading leagues:', error);
+      setError('An unexpected error occurred while loading leagues');
+      setLeagues([]);
+      setFilteredLeagues([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Map frontend sort to backend sort parameter
+  const mapSortToBackend = (frontendSort) => {
+    const sortMap = {
+      'nameAZ': 'name-asc',
+      'nameZA': 'name-desc',
+      'typeAZ': 'type-asc',
+      'typeZA': 'type-desc',
+      'dateNewest': 'newest',
+      'dateOldest': 'oldest',
+    };
+    return sortMap[frontendSort] || 'newest';
   };
 
   useEffect(() => {
     loadLeagues();
-  }, []);
+  }, [page, rowsPerPage, searchQuery, typeFilter, selectedSort]);
 
+  // Filtering and sorting is now handled by backend API
+  // We just set filteredLeagues to leagues since backend does the filtering
   useEffect(() => {
-    const filterAndSortLeagues = () => {
-      let filtered = [...leagues];
+    setFilteredLeagues(leagues);
+  }, [leagues]);
 
-      // Search filter
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase();
-        filtered = filtered.filter(
-          (league) =>
-            league.name?.toLowerCase().includes(query) ||
-            league.id?.toLowerCase().includes(query)
-        );
-      }
-
-      // Type filter
-      if (typeFilter !== 'all') {
-        filtered = filtered.filter((league) => league.type === typeFilter);
-      }
-
-      // Sort
-      switch (selectedSort) {
-        case 'nameAZ':
-          filtered.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-          break;
-        case 'nameZA':
-          filtered.sort((a, b) => (b.name || '').localeCompare(a.name || ''));
-          break;
-        case 'typeAZ':
-          filtered.sort((a, b) => (a.type || '').localeCompare(b.type || ''));
-          break;
-        case 'typeZA':
-          filtered.sort((a, b) => (b.type || '').localeCompare(a.type || ''));
-          break;
-        case 'dateNewest':
-          filtered.sort((a, b) => {
-            const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
-            const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
-            return dateB - dateA;
-          });
-          break;
-        case 'dateOldest':
-          filtered.sort((a, b) => {
-            const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
-            const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
-            return dateA - dateB;
-          });
-          break;
-        default:
-          break;
-      }
-
-      setFilteredLeagues(filtered);
-    };
-    filterAndSortLeagues();
-  }, [leagues, searchQuery, typeFilter, selectedSort]);
-
-  const getSampleLeagues = () => {
-    return [
-      {
-        id: 'LEAGUE_001',
-        name: 'Africa Cup of Nations',
-        type: 'International',
-        isActive: false,
-        createdAt: new Date('2025-11-26'),
-      },
-      {
-        id: 'LEAGUE_002',
-        name: 'UEFA Europa League',
-        type: 'International',
-        isActive: false,
-        createdAt: new Date('2025-11-21'),
-      },
-      {
-        id: 'LEAGUE_003',
-        name: 'Premier League',
-        type: 'Domestic',
-        isActive: true,
-        createdAt: new Date('2025-10-15'),
-      },
-      {
-        id: 'LEAGUE_004',
-        name: 'La Liga',
-        type: 'Domestic',
-        isActive: true,
-        createdAt: new Date('2025-10-12'),
-      },
-      {
-        id: 'LEAGUE_005',
-        name: 'Bundesliga',
-        type: 'Domestic',
-        isActive: true,
-        createdAt: new Date('2025-10-10'),
-      },
-      {
-        id: 'LEAGUE_006',
-        name: 'Serie A',
-        type: 'Domestic',
-        isActive: true,
-        createdAt: new Date('2025-10-08'),
-      },
-      {
-        id: 'LEAGUE_007',
-        name: 'Ligue 1',
-        type: 'Domestic',
-        isActive: true,
-        createdAt: new Date('2025-10-05'),
-      },
-      {
-        id: 'LEAGUE_008',
-        name: 'Champions League',
-        type: 'International',
-        isActive: false,
-        createdAt: new Date('2025-09-20'),
-      },
-    ];
-  };
 
 
 
   const toggleLeagueStatus = async (league) => {
+    // Store original values for potential revert (before any updates)
+    const originalIsActive = league.isActive;
+    const originalStatus = league.status;
+    
     try {
-      // Check if we're trying to activate and already have 5 active leagues
-      const activeCount = leagues.filter((l) => l.isActive).length;
-      if (!league.isActive && activeCount >= 5) {
-        alert('Maximum 5 active leagues allowed');
+      // Calculate current active count from leagues array BEFORE any changes
+      const currentActiveCount = leagues.filter((l) => l.isActive).length;
+      
+      // Check if we're trying to activate and already have max active leagues
+      if (!league.isActive && currentActiveCount >= statistics.maxActive) {
+        alert(`Maximum ${statistics.maxActive} active leagues allowed`);
         return;
       }
 
-      // Mock update - Update local state
-      const updatedLeagues = leagues.map(l =>
-        l.id === league.id ? { ...l, isActive: !l.isActive } : l
+      const newStatus = league.isActive ? 'Inactive' : 'Active';
+      const newIsActive = !league.isActive;
+      
+      // Optimistically update the UI immediately using functional updates
+      setLeagues(prevLeagues => {
+        const updated = prevLeagues.map(l => 
+          l.id === league.id 
+            ? { ...l, isActive: newIsActive, status: newStatus }
+            : l
+        );
+        // Calculate new active count from updated array
+        const newActiveCount = updated.filter(l => l.isActive).length;
+        // Update statistics based on the new count
+        setStatistics(prevStats => ({
+          ...prevStats,
+          active: newActiveCount,
+          activeDisplay: `Active: ${newActiveCount}/${prevStats.maxActive}`
+        }));
+        return updated;
+      });
+      
+      setFilteredLeagues(prevFiltered => 
+        prevFiltered.map(l => 
+          l.id === league.id 
+            ? { ...l, isActive: newIsActive, status: newStatus }
+            : l
+        )
       );
-      setLeagues(updatedLeagues);
-      setFilteredLeagues(updatedLeagues);
+      
+      // Make the API call
+      console.log('Toggling league status:', {
+        leagueId: league.id,
+        leagueName: league.name,
+        currentStatus: league.status,
+        newStatus: newStatus,
+        isActivating: newIsActive
+      });
+      
+      const result = await updateLeague(league.id, { status: newStatus });
+      
+      console.log('Update league API response:', result);
 
-      console.log('Mock: Toggled league status for', league.name);
+      if (!result.success) {
+        console.error('Failed to update league status:', result.error);
+        
+        // Revert optimistic update on error using functional updates
+        setLeagues(prevLeagues => {
+          const reverted = prevLeagues.map(l => 
+            l.id === league.id 
+              ? { ...l, isActive: originalIsActive, status: originalStatus }
+              : l
+          );
+          const revertedCount = reverted.filter(l => l.isActive).length;
+          setStatistics(prevStats => ({
+            ...prevStats,
+            active: revertedCount,
+            activeDisplay: `Active: ${revertedCount}/${prevStats.maxActive}`
+          }));
+          return reverted;
+        });
+        
+        setFilteredLeagues(prevFiltered => 
+          prevFiltered.map(l => 
+            l.id === league.id 
+              ? { ...l, isActive: originalIsActive, status: originalStatus }
+              : l
+          )
+        );
+        
+        alert(result.error || 'Failed to update league status');
+      } else {
+        console.log('League status updated successfully:', {
+          leagueId: league.id,
+          newStatus: newStatus,
+          responseData: result.data
+        });
+        // If successful, optimistic update remains - no need to do anything
+      }
     } catch (error) {
       console.error('Error toggling league status:', error);
+      
+      // Revert optimistic update on error using functional updates
+      setLeagues(prevLeagues => {
+        const reverted = prevLeagues.map(l => 
+          l.id === league.id 
+            ? { ...l, isActive: originalIsActive, status: originalStatus }
+            : l
+        );
+        const revertedCount = reverted.filter(l => l.isActive).length;
+        setStatistics(prevStats => ({
+          ...prevStats,
+          active: revertedCount,
+          activeDisplay: `Active: ${revertedCount}/${prevStats.maxActive}`
+        }));
+        return reverted;
+      });
+      
+      setFilteredLeagues(prevFiltered => 
+        prevFiltered.map(l => 
+          l.id === league.id 
+            ? { ...l, isActive: originalIsActive, status: originalStatus }
+            : l
+        )
+      );
+      
+      alert('An unexpected error occurred');
     }
   };
 
@@ -275,7 +349,7 @@ const LeaguesPage = () => {
             checked={row.isActive || false}
             onChange={() => toggleLeagueStatus(row)}
             size="small"
-            disabled={activeCount >= 5 && !row.isActive}
+            disabled={activeCount >= statistics.maxActive && !row.isActive}
             sx={{
               '& .MuiSwitch-switchBase.Mui-checked': {
                 color: colors.success,
@@ -324,13 +398,25 @@ const LeaguesPage = () => {
     },
   ];
 
-  const paginatedLeagues = filteredLeagues.slice(
-    page * rowsPerPage,
-    page * rowsPerPage + rowsPerPage
-  );
+  // Backend handles pagination, so we use filteredLeagues directly
+  const paginatedLeagues = filteredLeagues;
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%' }}>
+      {/* Error Alert */}
+      {error && (
+        <Alert
+          severity="error"
+          sx={{
+            mb: 3,
+            borderRadius: '12px',
+          }}
+          onClose={() => setError('')}
+        >
+          {error}
+        </Alert>
+      )}
+
       {/* Header */}
       <Box sx={{ mb: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
@@ -615,7 +701,7 @@ const LeaguesPage = () => {
               <CheckCircle sx={{ fontSize: 14, color: colors.brandWhite }} />
             </Box>
           }
-          label={`Active: ${activeCount}/5`}
+          label={statistics.activeDisplay || `Active: ${activeCount}/${statistics.maxActive}`}
           sx={{
             flex: 1,
             backgroundColor: '#FFF5F5',
@@ -741,9 +827,22 @@ const LeaguesPage = () => {
           <KeyboardArrowRight sx={{ fontSize: 18, color: colors.textSecondary }} />
         </MenuItem>
         <MenuItem
-          onClick={() => {
+          onClick={async () => {
             handleMenuClose();
-            // TODO: Add delete confirmation dialog
+            if (window.confirm(`Are you sure you want to deactivate "${selectedLeague?.name}"? This will also deactivate all teams in this league.`)) {
+              try {
+                const result = await deactivateLeague(selectedLeague?.id);
+                if (result.success) {
+                  alert(result.message || 'League deactivated successfully');
+                  await loadLeagues(); // Reload leagues
+                } else {
+                  alert(result.error || 'Failed to deactivate league');
+                }
+              } catch (error) {
+                console.error('Error deactivating league:', error);
+                alert('An unexpected error occurred');
+              }
+            }
           }}
           sx={{
             px: 2,

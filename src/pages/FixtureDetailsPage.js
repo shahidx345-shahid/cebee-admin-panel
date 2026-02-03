@@ -96,14 +96,16 @@ const FixtureDetailsPage = () => {
           const status = fixtureData.status || fixtureData.matchStatus || 'scheduled';
           // Map fixture status to flow status
           const statusMap = {
-            'scheduled': 'scheduled',
-            'published': 'published',
+            'scheduled': 'predictionOpen',
+            'published': 'predictionOpen',
+            'predictionOpen': 'predictionOpen',
+            'predictionLock': 'predictionLock',
             'live': 'live',
-            'resultsProcessing': 'resultsProcessing',
-            'pending': 'resultsProcessing',
+            'resultsProcessing': 'resultPending',
+            'pending': 'resultPending',
             'completed': 'completed',
           };
-          setSelectedFlowStatus(statusMap[status] || 'scheduled');
+          setSelectedFlowStatus(statusMap[status] || 'predictionOpen');
 
           // Return sample predictions 
           const samplePredictions = getSamplePredictions(id);
@@ -124,14 +126,16 @@ const FixtureDetailsPage = () => {
     if (fixture) {
       const status = fixture.status || fixture.matchStatus || 'scheduled';
       const statusMap = {
-        'scheduled': 'scheduled',
-        'published': 'published',
+        'scheduled': 'predictionOpen',
+        'published': 'predictionOpen',
+        'predictionOpen': 'predictionOpen',
+        'predictionLock': 'predictionLock',
         'live': 'live',
-        'resultsProcessing': 'resultsProcessing',
-        'pending': 'resultsProcessing',
+        'resultsProcessing': 'resultPending',
+        'pending': 'resultPending',
         'completed': 'completed',
       };
-      setSelectedFlowStatus(statusMap[status] || 'scheduled');
+      setSelectedFlowStatus(statusMap[status] || 'predictionOpen');
     }
   }, [fixture?.status, fixture?.matchStatus]);
 
@@ -979,8 +983,8 @@ const FixtureDetailsPage = () => {
               sx={{
                 position: 'absolute',
                 top: '20px',
-                left: '10%',
-                right: '10%',
+                left: '8%',
+                right: '8%',
                 height: '3px',
                 bgcolor: '#E5E7EB',
                 zIndex: 0,
@@ -991,18 +995,21 @@ const FixtureDetailsPage = () => {
               sx={{
                 position: 'absolute',
                 top: '20px',
-                left: '10%',
+                left: '8%',
                 width: (() => {
                   const statusOrder = {
-                    'scheduled': 0,
-                    'published': 1,
+                    'predictionOpen': 0,
+                    'predictionLock': 1,
                     'live': 2,
+                    'resultPending': 3,
                     'resultsProcessing': 3,
                     'pending': 3,
                     'completed': 4,
                   };
                   const selectedOrder = statusOrder[selectedFlowStatus] ?? 0;
-                  return `${(selectedOrder / 4) * 100}%`;
+                  const totalSteps = 4;
+                  const progressPercent = (selectedOrder / totalSteps) * 84; // 84% is the width between 8% and 92%
+                  return `${progressPercent}%`;
                 })(),
                 height: '3px',
                 bgcolor: colors.brandRed,
@@ -1013,17 +1020,18 @@ const FixtureDetailsPage = () => {
             
             {/* Status Steps */}
             {[
-              { key: 'scheduled', label: 'Scheduled', order: 0 },
-              { key: 'published', label: 'Published', order: 1 },
+              { key: 'predictionOpen', label: 'Prediction Open', order: 0 },
+              { key: 'predictionLock', label: 'Prediction Lock', order: 1 },
               { key: 'live', label: 'Live', order: 2 },
-              { key: 'resultsProcessing', label: 'Result Pending', order: 3 },
+              { key: 'resultPending', label: 'Result Pending', order: 3 },
               { key: 'completed', label: 'Completed', order: 4 },
             ].map((step, index) => {
               // Map selected status to order
               const statusOrder = {
-                'scheduled': 0,
-                'published': 1,
+                'predictionOpen': 0,
+                'predictionLock': 1,
                 'live': 2,
+                'resultPending': 3,
                 'resultsProcessing': 3,
                 'pending': 3,
                 'completed': 4,
@@ -1107,20 +1115,20 @@ const FixtureDetailsPage = () => {
           mt: 2, 
           p: 2, 
           borderRadius: '12px', 
-          bgcolor: selectedFlowStatus === 'scheduled' ? '#FFE5E5' :
-                   selectedFlowStatus === 'published' ? '#E3F2FD' :
+          bgcolor: selectedFlowStatus === 'predictionOpen' ? '#E3F2FD' :
+                   selectedFlowStatus === 'predictionLock' ? '#FFF4E6' :
                    selectedFlowStatus === 'live' ? '#FFE5E5' :
-                   selectedFlowStatus === 'resultsProcessing' || selectedFlowStatus === 'pending' ? '#FFF4E6' :
+                   selectedFlowStatus === 'resultPending' || selectedFlowStatus === 'resultsProcessing' || selectedFlowStatus === 'pending' ? '#FFF4E6' :
                    selectedFlowStatus === 'completed' ? '#ECFDF5' : '#F3F4F6',
           textAlign: 'center',
         }}>
           <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack }}>
             Current Status: <span style={{ color: colors.brandRed, textTransform: 'uppercase' }}>
-              {selectedFlowStatus === 'scheduled' ? 'Scheduled' :
-               selectedFlowStatus === 'published' ? 'Published' :
+              {selectedFlowStatus === 'predictionOpen' ? 'Prediction Open' :
+               selectedFlowStatus === 'predictionLock' ? 'Prediction Lock' :
                selectedFlowStatus === 'live' ? 'Live' :
-               selectedFlowStatus === 'resultsProcessing' || selectedFlowStatus === 'pending' ? 'Result Pending' :
-               selectedFlowStatus === 'completed' ? 'Completed' : 'Scheduled'}
+               selectedFlowStatus === 'resultPending' || selectedFlowStatus === 'resultsProcessing' || selectedFlowStatus === 'pending' ? 'Result Pending' :
+               selectedFlowStatus === 'completed' ? 'Completed' : 'Prediction Open'}
             </span>
           </Typography>
         </Box>
@@ -1520,47 +1528,47 @@ const FixtureDetailsPage = () => {
                 <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, color: colors.brandBlack }}>
                   {fixture?.homeTeam}
                 </Typography>
-                <TextField
-                  fullWidth
-                  type="number"
-                  value={scoreForm.homeScore}
-                  onChange={(e) => setScoreForm({ ...scoreForm, homeScore: e.target.value })}
+              <TextField
+                fullWidth
+                type="number"
+                value={scoreForm.homeScore}
+                onChange={(e) => setScoreForm({ ...scoreForm, homeScore: e.target.value })}
                   required
-                  InputProps={{
-                    inputProps: { min: 0 }
-                  }}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: '12px',
-                    }
-                  }}
-                />
+                InputProps={{
+                  inputProps: { min: 0 }
+                }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '12px',
+                  }
+                }}
+              />
               </Grid>
               <Grid item xs={2} sx={{ textAlign: 'center', pb: 1 }}>
                 <Typography variant="h6" sx={{ fontWeight: 700, color: colors.brandBlack }}>
                   -
-                </Typography>
-              </Grid>
+              </Typography>
+            </Grid>
               <Grid item xs={5}>
                 <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, color: colors.brandBlack }}>
                   {fixture?.awayTeam}
                 </Typography>
-                <TextField
-                  fullWidth
-                  type="number"
-                  value={scoreForm.awayScore}
-                  onChange={(e) => setScoreForm({ ...scoreForm, awayScore: e.target.value })}
+              <TextField
+                fullWidth
+                type="number"
+                value={scoreForm.awayScore}
+                onChange={(e) => setScoreForm({ ...scoreForm, awayScore: e.target.value })}
                   required
-                  InputProps={{
-                    inputProps: { min: 0 }
-                  }}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: '12px',
-                    }
-                  }}
-                />
-              </Grid>
+                InputProps={{
+                  inputProps: { min: 0 }
+                }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '12px',
+                  }
+                }}
+              />
+            </Grid>
             </Grid>
             <Typography variant="caption" sx={{ color: colors.textSecondary, mt: 1, display: 'block' }}>
               This also determines total Goal Range outcome

@@ -40,6 +40,7 @@ const menuItems = [
   { title: 'Poll Management', icon: Poll, route: constants.routes.polls },
   { title: 'Fixture Management', icon: CalendarToday, route: constants.routes.fixtures },
   { title: 'League Management', icon: SportsSoccer, route: '/leagues' },
+  { title: 'Team Management', icon: Group, route: '/teams' },
   { title: 'Predictions Management', icon: BarChart, route: constants.routes.predictions },
   { title: 'Leaderboard Control', icon: EmojiEvents, route: constants.routes.leaderboard },
   { title: 'Rewards Management', icon: CardGiftcard, route: constants.routes.rewards },

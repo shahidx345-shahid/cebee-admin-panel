@@ -33,6 +33,7 @@ import {
   MoreVert,
   AccessTime,
   List as ListIcon,
+  Event as EventIcon,
 } from '@mui/icons-material';
 import { colors, constants } from '../config/theme';
 import SearchBar from '../components/common/SearchBar';
@@ -47,6 +48,9 @@ const PredictionsPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('ongoing');
   const [selectedSort, setSelectedSort] = useState('dateNewest');
+  const [selectedCmd, setSelectedCmd] = useState('current'); // 'current', 'all', or specific cmd ID
+  const [cmds, setCmds] = useState([]);
+  const [currentCmd, setCurrentCmd] = useState(null);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [sortAnchor, setSortAnchor] = useState(null);
@@ -64,9 +68,6 @@ const PredictionsPage = () => {
     loadPredictions();
   }, []);
 
-  useEffect(() => {
-    filterAndSortPredictions();
-  }, [predictions, searchQuery, selectedStatus, selectedSort]);
 
   const generateDummyPredictions = () => {
     const users = ['john_doe', 'jane_smith', 'mike_wilson', 'sarah_jones', 'david_brown'];
@@ -101,6 +102,8 @@ const PredictionsPage = () => {
             predictionTime: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000), // Last 7 days
             status: 'ongoing',
             predictionStatus: 'ongoing',
+            cmdId: 'cmd_001',
+            cmdName: 'CMd-05',
           });
         }
       });
@@ -129,6 +132,8 @@ const PredictionsPage = () => {
             predictionStatus: isCorrect ? 'correct' : 'incorrect',
             actualResult: `${Math.floor(Math.random() * 3)} - ${Math.floor(Math.random() * 3)}`,
             spAwarded: isCorrect ? Math.floor(Math.random() * 100) + 10 : 0,
+            cmdId: matchIdx < 2 ? 'cmd_001' : 'cmd_002',
+            cmdName: matchIdx < 2 ? 'CMd-05' : 'CMd-04',
           });
         }
       });
@@ -142,6 +147,30 @@ const PredictionsPage = () => {
       setLoading(true);
       // Data loading simulation
       await new Promise(resolve => setTimeout(resolve, 800));
+
+      // Load CMds
+      const mockCmds = [
+        {
+          id: 'cmd_001',
+          name: 'CMd-05',
+          status: 'current',
+        },
+        {
+          id: 'cmd_002',
+          name: 'CMd-04',
+          status: 'completed',
+        },
+        {
+          id: 'cmd_003',
+          name: 'CMd-03',
+          status: 'completed',
+        },
+      ];
+      setCmds(mockCmds);
+      const current = mockCmds.find(cmd => cmd.status === 'current');
+      if (current) {
+        setCurrentCmd(current);
+      }
 
       const dummyData = generateDummyPredictions();
       setPredictions(dummyData);
@@ -182,6 +211,8 @@ const PredictionsPage = () => {
           predictions: [],
           totalPredictions: 0,
           status: 'mixed', // Will be calculated based on individual predictions
+          cmdId: pred.cmdId,
+          cmdName: pred.cmdName,
         });
       }
 
@@ -218,8 +249,24 @@ const PredictionsPage = () => {
           group.userEmail?.toLowerCase().includes(query) ||
           group.matchName?.toLowerCase().includes(query) ||
           group.homeTeam?.toLowerCase().includes(query) ||
-          group.awayTeam?.toLowerCase().includes(query)
+          group.awayTeam?.toLowerCase().includes(query) ||
+          group.cmdName?.toLowerCase().includes(query)
       );
+    }
+
+    // CMd filter
+    if (selectedCmd && selectedCmd !== 'all') {
+      if (selectedCmd === 'current') {
+        // Filter by current CMd
+        if (currentCmd) {
+          filtered = filtered.filter((group) => group.cmdId === currentCmd.id);
+        } else {
+          filtered = [];
+        }
+      } else {
+        // Filter by specific CMd ID
+        filtered = filtered.filter((group) => group.cmdId === selectedCmd);
+      }
     }
 
     if (selectedStatus === 'ongoing') {
@@ -271,6 +318,10 @@ const PredictionsPage = () => {
 
     setFilteredPredictions(filtered);
   };
+
+  useEffect(() => {
+    filterAndSortPredictions();
+  }, [predictions, searchQuery, selectedStatus, selectedSort, selectedCmd, currentCmd]);
 
   const getStatusChip = (status) => {
     const statusMap = {
@@ -414,9 +465,25 @@ const PredictionsPage = () => {
       label: 'Match',
       render: (_, row) => (
         <Box>
-          <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack }}>
-            {row.matchName || `${row.homeTeam || 'TBD'} vs ${row.awayTeam || 'TBD'}`}
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack }}>
+              {row.matchName || `${row.homeTeam || 'TBD'} vs ${row.awayTeam || 'TBD'}`}
+            </Typography>
+            {row.cmdName && (
+              <Chip
+                label={row.cmdName}
+                size="small"
+                sx={{
+                  backgroundColor: colors.info,
+                  color: colors.brandWhite,
+                  fontWeight: 600,
+                  fontSize: 9,
+                  height: 20,
+                  borderRadius: '4px',
+                }}
+              />
+            )}
+          </Box>
           {row.fixtureId && (
             <Typography variant="caption" sx={{ color: colors.textSecondary, fontSize: 10 }}>
               ID: {String(row.fixtureId).replace('FIX_', 'MATCH_').substring(0, 10)}...
@@ -712,6 +779,82 @@ const PredictionsPage = () => {
           </Card>
         </Grid>
       </Grid>
+
+      {/* CMd Filter */}
+      <Card
+        sx={{
+          mb: 3,
+          borderRadius: '16px',
+          backgroundColor: colors.brandWhite,
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+          padding: 2,
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <EventIcon sx={{ fontSize: 20, color: colors.brandRed }} />
+            <Typography variant="body1" sx={{ fontWeight: 600, color: colors.brandBlack }}>
+              Filter by CMd:
+            </Typography>
+          </Box>
+          <Button
+            variant={selectedCmd === 'current' ? 'contained' : 'outlined'}
+            onClick={() => setSelectedCmd('current')}
+            sx={{
+              backgroundColor: selectedCmd === 'current' ? colors.brandRed : 'transparent',
+              color: selectedCmd === 'current' ? colors.brandWhite : colors.brandBlack,
+              borderColor: colors.brandRed,
+              textTransform: 'none',
+              fontWeight: 600,
+              borderRadius: '8px',
+              '&:hover': {
+                backgroundColor: selectedCmd === 'current' ? colors.brandDarkRed : `${colors.brandRed}0A`,
+              },
+            }}
+          >
+            {currentCmd ? currentCmd.name : 'Current CMd'}
+          </Button>
+          {cmds
+            .filter(cmd => cmd.status === 'completed')
+            .map((cmd) => (
+              <Button
+                key={cmd.id}
+                variant={selectedCmd === cmd.id ? 'contained' : 'outlined'}
+                onClick={() => setSelectedCmd(cmd.id)}
+                sx={{
+                  backgroundColor: selectedCmd === cmd.id ? colors.textSecondary : 'transparent',
+                  color: selectedCmd === cmd.id ? colors.brandWhite : colors.brandBlack,
+                  borderColor: colors.textSecondary,
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  borderRadius: '8px',
+                  '&:hover': {
+                    backgroundColor: selectedCmd === cmd.id ? colors.textSecondary : `${colors.textSecondary}0A`,
+                  },
+                }}
+              >
+                {cmd.name}
+              </Button>
+            ))}
+          <Button
+            variant={selectedCmd === 'all' ? 'contained' : 'outlined'}
+            onClick={() => setSelectedCmd('all')}
+            sx={{
+              backgroundColor: selectedCmd === 'all' ? colors.info : 'transparent',
+              color: selectedCmd === 'all' ? colors.brandWhite : colors.brandBlack,
+              borderColor: colors.info,
+              textTransform: 'none',
+              fontWeight: 600,
+              borderRadius: '8px',
+              '&:hover': {
+                backgroundColor: selectedCmd === 'all' ? colors.info : `${colors.info}0A`,
+              },
+            }}
+          >
+            All-time
+          </Button>
+        </Box>
+      </Card>
 
       {/* Status Toggle Buttons - Tabs Container */}
       <Box

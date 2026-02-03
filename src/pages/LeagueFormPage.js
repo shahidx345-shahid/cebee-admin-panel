@@ -35,6 +35,7 @@ import {
   CheckCircle,
 } from '@mui/icons-material';
 import { colors, constants } from '../config/theme';
+import { createLeague, updateLeague, getLeague } from '../services/leaguesService';
 
 const LeagueFormPage = () => {
   const navigate = useNavigate();
@@ -42,6 +43,7 @@ const LeagueFormPage = () => {
   const isEditMode = !!id;
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
   const [logoFile, setLogoFile] = useState(null);
   const [logoPreview, setLogoPreview] = useState('');
   const fileInputRef = useRef(null);
@@ -52,27 +54,54 @@ const LeagueFormPage = () => {
     logoUrl: '',
     isActive: false,
     priority: '',
+    country: '',
+    league_code: '',
   });
 
   useEffect(() => {
     const loadLeagueData = async () => {
       try {
         setLoading(true);
-        // Simulate network
-        await new Promise(resolve => setTimeout(resolve, 800));
+        setError('');
 
-        // Mock data
         if (id) {
-          setFormData({
-            name: 'Mock Premier League',
-            type: 'domestic',
-            logoUrl: '',
-            isActive: true,
-            priority: '1',
-          });
+          const result = await getLeague(id);
+          
+          if (result.success && result.data?.league) {
+            const league = result.data.league;
+            
+            // Normalize leagueType: convert "Domestic"/"International"/"Cup" to "domestic"/"international"/"cup"
+            // Backend returns "Domestic", "International", or "Cup", form uses "domestic", "international", or "cup"
+            let normalizedType = 'domestic';
+            const leagueType = (league.leagueType || league.type || '').toLowerCase();
+            if (leagueType === 'international') {
+              normalizedType = 'international';
+            } else if (leagueType === 'cup') {
+              normalizedType = 'cup';
+            } else if (leagueType === 'domestic') {
+              normalizedType = 'domestic';
+            }
+            
+            setFormData({
+              name: league.league_name || league.name || '',
+              type: normalizedType,
+              logoUrl: league.logo || league.logoUrl || '',
+              isActive: league.status === 'Active',
+              priority: league.priority?.toString() || '0',
+              country: league.country || '',
+              league_code: league.league_code || '',
+            });
+            
+            if (league.logo) {
+              setLogoPreview(league.logo);
+            }
+          } else {
+            setError(result.error || 'Failed to load league data');
+          }
         }
       } catch (error) {
         console.error('Error loading league:', error);
+        setError('An unexpected error occurred while loading league data');
       } finally {
         setLoading(false);
       }
@@ -83,7 +112,7 @@ const LeagueFormPage = () => {
     } else {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, isEditMode]);
 
   const handleChange = (field, value) => {
     setFormData({ ...formData, [field]: value });
@@ -123,17 +152,78 @@ const LeagueFormPage = () => {
   };
 
   const handleSave = async () => {
+    // Validate required fields
+    if (!formData.name || !formData.name.trim()) {
+      setError('League name is required');
+      return;
+    }
+
+    if (!formData.type || !formData.type.trim()) {
+      setError('League type is required');
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+
     try {
-      setSaving(true);
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Map form data to backend format
+      // Normalize type: form uses "domestic", "international", or "cup"
+      // Backend expects "Domestic", "International", or "Cup"
+      const normalizedType = (formData.type || 'domestic').toLowerCase();
+      let leagueType = 'Domestic'; // Default
+      
+      if (normalizedType === 'international') {
+        leagueType = 'International';
+      } else if (normalizedType === 'cup') {
+        leagueType = 'Cup';
+      } else if (normalizedType === 'domestic') {
+        leagueType = 'Domestic';
+      }
+      
+      const leagueData = {
+        league_name: formData.name.trim(),
+        leagueType: leagueType,
+        logo: formData.logoUrl || null,
+        status: formData.isActive ? 'Active' : 'Inactive',
+        priority: formData.priority ? parseInt(formData.priority) : 0,
+        country: formData.country?.trim() || null,
+        league_code: formData.league_code?.trim().toUpperCase() || null,
+      };
+      
+      // Debug log to verify data being sent
+      console.log('Saving league - Full data:', {
+        formData: formData,
+        formType: formData.type,
+        normalizedType,
+        backendLeagueType: leagueType,
+        leagueData: leagueData,
+        isEditMode,
+        leagueId: id
+      });
 
-      console.log('League saved:', formData);
-      alert('League saved successfully (Mock)');
+      let result;
+      
+      if (isEditMode) {
+        // Update existing league
+        result = await updateLeague(id, leagueData);
+      } else {
+        // Create new league
+        result = await createLeague(leagueData);
+      }
 
-      navigate('/leagues');
+      if (result.success) {
+        // Show success message
+        alert(result.message || `League ${isEditMode ? 'updated' : 'created'} successfully!`);
+        
+        // Navigate back to leagues list
+        navigate('/leagues');
+      } else {
+        setError(result.error || `Failed to ${isEditMode ? 'update' : 'create'} league`);
+      }
     } catch (error) {
       console.error('Error saving league:', error);
-      alert('Failed to save league');
+      setError(error.message || 'An unexpected error occurred. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -204,6 +294,20 @@ const LeagueFormPage = () => {
 
       {/* Form */}
       <Card sx={{ padding: 3, borderRadius: '16px' }}>
+        {/* Error Alert */}
+        {error && (
+          <Alert
+            severity="error"
+            sx={{
+              mb: 3,
+              borderRadius: '12px',
+            }}
+            onClose={() => setError('')}
+          >
+            {error}
+          </Alert>
+        )}
+
         {/* Section Header */}
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
           <Box
@@ -531,9 +635,9 @@ const LeagueFormPage = () => {
               </Button>
               <Button
                 variant="contained"
-                startIcon={<CheckCircle />}
+                startIcon={saving ? <CircularProgress size={20} sx={{ color: colors.brandWhite }} /> : <CheckCircle />}
                 onClick={handleSave}
-                disabled={saving || !formData.name}
+                disabled={saving || !formData.name?.trim()}
                 sx={{
                   background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
                   borderRadius: '12px',
@@ -541,11 +645,15 @@ const LeagueFormPage = () => {
                   fontWeight: 600,
                   px: 3,
                   '&:disabled': {
-                    backgroundColor: colors.backgroundLight,
+                    backgroundColor: '#9CA3AF',
+                    color: colors.brandWhite,
                   },
                 }}
               >
-                {saving ? 'Creating...' : isEditMode ? 'Update League' : 'Create League'}
+                {saving 
+                  ? (isEditMode ? 'Updating...' : 'Creating...') 
+                  : (isEditMode ? 'Update League' : 'Create League')
+                }
               </Button>
             </Box>
           </Grid>

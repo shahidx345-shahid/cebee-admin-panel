@@ -8,6 +8,9 @@ import DashboardPage from './pages/DashboardPage';
 import UsersPage from './pages/UsersPage';
 import FixturesPage from './pages/FixturesPage';
 import LeaguesPage from './pages/LeaguesPage';
+import TeamsPage from './pages/TeamsPage';
+import TeamHistoryPage from './pages/TeamHistoryPage';
+import PlayersPage from './pages/PlayersPage';
 import PredictionsPage from './pages/PredictionsPage';
 import LeaderboardPage from './pages/LeaderboardPage';
 import RewardsPage from './pages/RewardsPage';
@@ -88,6 +91,9 @@ function App() {
                 <Route path="/leagues" element={<LeaguesPage />} />
                 <Route path="/leagues/add" element={<LeagueFormPage />} />
                 <Route path="/leagues/edit/:id" element={<LeagueFormPage />} />
+                <Route path="/teams" element={<TeamsPage />} />
+                <Route path="/teams/history/:teamId" element={<TeamHistoryPage />} />
+                <Route path="/teams/:teamId/players" element={<PlayersPage />} />
                 <Route path={constants.routes.predictions} element={<PredictionsPage />} />
                 <Route path="/predictions/details/:id" element={<PredictionDetailsPage />} />
                 <Route path={constants.routes.leaderboard} element={<LeaderboardPage />} />

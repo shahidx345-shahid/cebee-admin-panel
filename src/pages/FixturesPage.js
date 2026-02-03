@@ -47,6 +47,7 @@ import {
   Info,
   Person,
   KeyboardArrowRight,
+  Event as EventIcon,
 } from '@mui/icons-material';
 import { colors, constants } from '../config/theme';
 import SearchBar from '../components/common/SearchBar';
@@ -63,6 +64,9 @@ const FixturesPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('scheduled');
   const [selectedSort, setSelectedSort] = useState('dateNewest');
+  const [selectedCmd, setSelectedCmd] = useState('current'); // 'current', 'all', or specific cmd ID
+  const [cmds, setCmds] = useState([]);
+  const [currentCmd, setCurrentCmd] = useState(null);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [resultsModalOpen, setResultsModalOpen] = useState(false);
@@ -89,6 +93,8 @@ const FixturesPage = () => {
         status: 'scheduled',
         predictions: 1543,
         hot: true,
+        cmdId: 'cmd_001',
+        cmdName: 'CMd-05',
       },
       {
         id: 'MATCH_002',
@@ -100,6 +106,8 @@ const FixturesPage = () => {
         status: 'scheduled',
         predictions: 2891,
         hot: true,
+        cmdId: 'cmd_001',
+        cmdName: 'CMd-05',
       },
       {
         id: 'MATCH_003',
@@ -111,6 +119,8 @@ const FixturesPage = () => {
         status: 'scheduled',
         predictions: 1876,
         hot: false,
+        cmdId: 'cmd_001',
+        cmdName: 'CMd-05',
       },
       {
         id: 'MATCH_004',
@@ -122,6 +132,8 @@ const FixturesPage = () => {
         status: 'resultsProcessing',
         predictions: 1245,
         hot: false,
+        cmdId: 'cmd_002',
+        cmdName: 'CMd-04',
       },
     ];
   };
@@ -130,6 +142,31 @@ const FixturesPage = () => {
     setLoading(true);
     // Use sample data immediately
     const fixturesData = getSampleFixtures();
+    
+    // Load CMds
+    const mockCmds = [
+      {
+        id: 'cmd_001',
+        name: 'CMd-05',
+        status: 'current',
+      },
+      {
+        id: 'cmd_002',
+        name: 'CMd-04',
+        status: 'completed',
+      },
+      {
+        id: 'cmd_003',
+        name: 'CMd-03',
+        status: 'completed',
+      },
+    ];
+    setCmds(mockCmds);
+    const current = mockCmds.find(cmd => cmd.status === 'current');
+    if (current) {
+      setCurrentCmd(current);
+    }
+    
     setFixtures(fixturesData);
     setFilteredFixtures(fixturesData);
     setLoading(false);
@@ -152,8 +189,24 @@ const FixturesPage = () => {
             fixture.awayTeam?.toLowerCase().includes(query) ||
             fixture.matchId?.toLowerCase().includes(query) ||
             fixture.id?.toLowerCase().includes(query) ||
-            fixture.league?.toLowerCase().includes(query)
+            fixture.league?.toLowerCase().includes(query) ||
+            fixture.cmdName?.toLowerCase().includes(query)
         );
+      }
+
+      // CMd filter
+      if (selectedCmd && selectedCmd !== 'all') {
+        if (selectedCmd === 'current') {
+          // Filter by current CMd
+          if (currentCmd) {
+            filtered = filtered.filter((fixture) => fixture.cmdId === currentCmd.id);
+          } else {
+            filtered = [];
+          }
+        } else {
+          // Filter by specific CMd ID
+          filtered = filtered.filter((fixture) => fixture.cmdId === selectedCmd);
+        }
       }
 
       // Status filter - map match flow states to backend statuses
@@ -221,7 +274,7 @@ const FixturesPage = () => {
       setFilteredFixtures(filtered);
     };
     filterAndSortFixtures();
-  }, [fixtures, searchQuery, selectedStatus, selectedSort]);
+  }, [fixtures, searchQuery, selectedStatus, selectedSort, selectedCmd, currentCmd]);
 
   const handleCloseResultsModal = () => {
     setResultsModalOpen(false);
@@ -459,18 +512,34 @@ const FixturesPage = () => {
       id: 'matchId',
       label: 'Match ID',
       render: (_, row) => (
-        <Chip
-          label={row.id?.substring(0, 10) || row.matchId || 'N/A'}
-          sx={{
-            backgroundColor: '#FFE5E5',
-            color: colors.brandRed,
-            fontWeight: 600,
-            fontSize: 11,
-            height: 28,
-            borderRadius: '8px',
-            border: 'none',
-          }}
-        />
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Chip
+            label={row.id?.substring(0, 10) || row.matchId || 'N/A'}
+            sx={{
+              backgroundColor: '#FFE5E5',
+              color: colors.brandRed,
+              fontWeight: 600,
+              fontSize: 11,
+              height: 28,
+              borderRadius: '8px',
+              border: 'none',
+            }}
+          />
+          {row.cmdName && (
+            <Chip
+              label={row.cmdName}
+              size="small"
+              sx={{
+                backgroundColor: colors.info,
+                color: colors.brandWhite,
+                fontWeight: 600,
+                fontSize: 10,
+                height: 22,
+                borderRadius: '6px',
+              }}
+            />
+          )}
+        </Box>
       ),
     },
     {
@@ -814,6 +883,82 @@ const FixturesPage = () => {
         </Box>
       </Card>
 
+      {/* CMd Filter */}
+      <Card
+        sx={{
+          mb: 3,
+          borderRadius: '16px',
+          backgroundColor: colors.brandWhite,
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+          padding: 2,
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <EventIcon sx={{ fontSize: 20, color: colors.brandRed }} />
+            <Typography variant="body1" sx={{ fontWeight: 600, color: colors.brandBlack }}>
+              Filter by CMd:
+            </Typography>
+          </Box>
+          <Button
+            variant={selectedCmd === 'current' ? 'contained' : 'outlined'}
+            onClick={() => setSelectedCmd('current')}
+            sx={{
+              backgroundColor: selectedCmd === 'current' ? colors.brandRed : 'transparent',
+              color: selectedCmd === 'current' ? colors.brandWhite : colors.brandBlack,
+              borderColor: colors.brandRed,
+              textTransform: 'none',
+              fontWeight: 600,
+              borderRadius: '8px',
+              '&:hover': {
+                backgroundColor: selectedCmd === 'current' ? colors.brandDarkRed : `${colors.brandRed}0A`,
+              },
+            }}
+          >
+            {currentCmd ? currentCmd.name : 'Current CMd'}
+          </Button>
+          {cmds
+            .filter(cmd => cmd.status === 'completed')
+            .map((cmd) => (
+              <Button
+                key={cmd.id}
+                variant={selectedCmd === cmd.id ? 'contained' : 'outlined'}
+                onClick={() => setSelectedCmd(cmd.id)}
+                sx={{
+                  backgroundColor: selectedCmd === cmd.id ? colors.textSecondary : 'transparent',
+                  color: selectedCmd === cmd.id ? colors.brandWhite : colors.brandBlack,
+                  borderColor: colors.textSecondary,
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  borderRadius: '8px',
+                  '&:hover': {
+                    backgroundColor: selectedCmd === cmd.id ? colors.textSecondary : `${colors.textSecondary}0A`,
+                  },
+                }}
+              >
+                {cmd.name}
+              </Button>
+            ))}
+          <Button
+            variant={selectedCmd === 'all' ? 'contained' : 'outlined'}
+            onClick={() => setSelectedCmd('all')}
+            sx={{
+              backgroundColor: selectedCmd === 'all' ? colors.info : 'transparent',
+              color: selectedCmd === 'all' ? colors.brandWhite : colors.brandBlack,
+              borderColor: colors.info,
+              textTransform: 'none',
+              fontWeight: 600,
+              borderRadius: '8px',
+              '&:hover': {
+                backgroundColor: selectedCmd === 'all' ? colors.info : `${colors.info}0A`,
+              },
+            }}
+          >
+            All-time
+          </Button>
+        </Box>
+      </Card>
+
       {/* Search, Sort, and Add Fixture Row */}
       <Box sx={{ 
         display: 'flex', 
@@ -827,7 +972,7 @@ const FixturesPage = () => {
           <SearchBar
             value={searchQuery}
             onChange={setSearchQuery}
-            placeholder="Search by team name or match ID..."
+            placeholder="Search by team name, match ID, or CMd..."
           />
         </Box>
         <FormControl sx={{ minWidth: { xs: '100%', md: 200 }, maxWidth: '100%', position: 'relative' }}>
