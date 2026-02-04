@@ -38,6 +38,7 @@ import {
 import { colors } from '../config/theme';
 import SearchBar from '../components/common/SearchBar';
 import DataTable from '../components/common/DataTable';
+import { getPolls, closePoll } from '../services/pollsService';
 
 import { format } from 'date-fns';
 
@@ -63,74 +64,36 @@ const PollsPage = () => {
       try {
         setLoading(true);
 
-        // Static demo data
-        const demoPolls = [
-          {
-            id: '1',
-            pollId: 'POLL_005',
-            leagueName: 'Ligue 1',
-            status: 'closed',
-            voteCount: 18765,
-            startTime: new Date('2026-01-12T15:59:00'),
-            closeTime: new Date('2026-01-17T15:59:00'),
-            createdAt: new Date('2026-01-10T15:59:00'),
-            matches: [
-              { homeTeam: 'PSG', awayTeam: 'Marseille' },
-              { homeTeam: 'Monaco', awayTeam: 'Lyon' },
-              { homeTeam: 'Lille', awayTeam: 'Rennes' }
-            ]
-          },
-          {
-            id: '2',
-            pollId: 'POLL_006',
-            leagueName: 'Premier League',
-            status: 'closed',
-            voteCount: 16543,
-            startTime: new Date('2026-01-02T15:59:00'),
-            closeTime: new Date('2026-01-07T15:59:00'),
-            createdAt: new Date('2025-12-30T15:59:00'),
-            matches: [
-              { homeTeam: 'Man City', awayTeam: 'Liverpool' },
-              { homeTeam: 'Arsenal', awayTeam: 'Chelsea' },
-              { homeTeam: 'Spurs', awayTeam: 'Newcastle' }
-            ]
-          },
-          {
-            id: '3',
-            pollId: 'POLL_007',
-            leagueName: 'La Liga',
-            status: 'active',
-            voteCount: 14321,
-            startTime: new Date('2025-12-28T15:59:00'),
-            closeTime: new Date('2026-02-02T15:59:00'),
-            createdAt: new Date('2025-12-26T15:59:00'),
-            matches: [
-              { homeTeam: 'Real Madrid', awayTeam: 'Barcelona' },
-              { homeTeam: 'Atletico Madrid', awayTeam: 'Sevilla' },
-              { homeTeam: 'Valencia', awayTeam: 'Real Betis' }
-            ]
-          },
-          {
-            id: '4',
-            pollId: 'POLL_008',
-            leagueName: 'Bundesliga',
-            status: 'scheduled',
-            voteCount: 0,
-            startTime: new Date('2026-02-05T15:59:00'),
-            closeTime: new Date('2026-02-10T15:59:00'),
-            createdAt: new Date('2026-01-20T15:59:00'),
-            matches: [
-              { homeTeam: 'Bayern Munich', awayTeam: 'Dortmund' },
-              { homeTeam: 'Leipzig', awayTeam: 'Leverkusen' },
-              { homeTeam: 'Frankfurt', awayTeam: 'Wolfsburg' }
-            ]
-          },
-        ];
+        const result = await getPolls();
+        if (result.success && result.data?.polls) {
+          // Format polls to match the expected structure
+          const formattedPolls = result.data.polls.map(poll => ({
+            id: poll._id || poll.poll_id || poll.id,
+            pollId: poll.poll_id || poll.pollId || `POLL_${String(poll.order || 0).padStart(3, '0')}`,
+            leagueId: poll.league_id || poll.leagueId,
+            leagueName: poll.league_name || poll.leagueName || 'Unknown League',
+            status: poll.status || poll.pollStatus || 'scheduled',
+            pollStatus: poll.pollStatus || poll.status,
+            voteCount: poll.vote_count || poll.voteCount || 0,
+            startTime: poll.start_time ? new Date(poll.start_time) : poll.startTime ? new Date(poll.startTime) : new Date(),
+            closeTime: poll.close_time ? new Date(poll.close_time) : poll.closeTime ? new Date(poll.closeTime) : new Date(),
+            createdAt: poll.created_at ? new Date(poll.created_at) : new Date(),
+            matches: poll.fixtures ? poll.fixtures.map(f => ({
+              homeTeam: f.team_a_name || f.teamAName || 'Team A',
+              awayTeam: f.team_b_name || f.teamBName || 'Team B',
+            })) : [],
+          }));
 
-        setPolls(demoPolls);
-        setFilteredPolls(demoPolls);
+          setPolls(formattedPolls);
+          setFilteredPolls(formattedPolls);
+        } else {
+          setPolls([]);
+          setFilteredPolls([]);
+        }
       } catch (error) {
         console.error('Error loading polls:', error);
+        setPolls([]);
+        setFilteredPolls([]);
       } finally {
         setLoading(false);
       }
@@ -211,23 +174,47 @@ const PollsPage = () => {
     if (!pollToClose) return;
 
     try {
-      // Update local state
-      const updatedPolls = polls.map((p) =>
-        p.id === pollToClose.id ? { ...p, status: 'closed' } : p
-      );
-      setPolls(updatedPolls);
-      setFilteredPolls(updatedPolls);
-      setClosePollDialogOpen(false);
-      setPollToClose(null);
-      alert('Poll closed successfully!');
+      const result = await closePoll(pollToClose.id);
+      
+      if (result.success) {
+        // Update local state
+        const updatedPolls = polls.map((p) =>
+          p.id === pollToClose.id ? { ...p, status: 'closed', pollStatus: 'closed' } : p
+        );
+        setPolls(updatedPolls);
+        setFilteredPolls(updatedPolls);
+        setClosePollDialogOpen(false);
+        setPollToClose(null);
+        alert(result.message || 'Poll closed successfully!');
+      } else {
+        alert(result.error || 'Failed to close poll');
+      }
     } catch (error) {
       console.error('Error closing poll:', error);
-      alert('Failed to close poll');
+      alert('Failed to close poll: ' + (error.message || 'Unknown error'));
     }
   };
 
   const handlePollClick = (poll) => {
-    setPollDetails(poll);
+    // Ensure dates are properly parsed
+    const pollWithDates = {
+      ...poll,
+      startTime: poll.startTime instanceof Date 
+        ? poll.startTime 
+        : poll.start_time 
+          ? new Date(poll.start_time) 
+          : poll.startTime 
+            ? new Date(poll.startTime) 
+            : new Date(),
+      closeTime: poll.closeTime instanceof Date 
+        ? poll.closeTime 
+        : poll.close_time 
+          ? new Date(poll.close_time) 
+          : poll.closeTime 
+            ? new Date(poll.closeTime) 
+            : new Date(Date.now() + 24 * 60 * 60 * 1000), // Default to 24 hours later if missing
+    };
+    setPollDetails(pollWithDates);
     setDetailsDialogOpen(true);
   };
 

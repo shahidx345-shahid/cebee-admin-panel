@@ -37,6 +37,9 @@ import { colors, constants } from '../config/theme';
 import { DateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { format, differenceInHours, differenceInDays } from 'date-fns';
+import { getPolls, getPoll, createPoll, updatePoll } from '../services/pollsService';
+import { getLeagues } from '../services/leaguesService';
+import { getTeams } from '../services/teamsService';
 
 const PollFormPage = () => {
   const navigate = useNavigate();
@@ -48,6 +51,8 @@ const PollFormPage = () => {
   const [leagueFixtures, setLeagueFixtures] = useState([]);
   const [polls, setPolls] = useState([]);
   const [availableTeams, setAvailableTeams] = useState([]);
+  const [loadingTeams, setLoadingTeams] = useState(false);
+  const [teamsError, setTeamsError] = useState('');
   const [selectedFixtures, setSelectedFixtures] = useState([
     { matchNum: 1, teamA: '', teamB: '' },
     { matchNum: 2, teamA: '', teamB: '' },
@@ -66,29 +71,49 @@ const PollFormPage = () => {
     const loadData = async () => {
       try {
         setLoading(true);
-        // Simulate network
-        await new Promise(resolve => setTimeout(resolve, 600));
 
-        // Mock Leagues
-        setLeagues([
-          { id: 'premier_league', name: 'Premier League', isActive: true },
-          { id: 'la_liga', name: 'La Liga', isActive: true },
-          { id: 'ligue_1', name: 'Ligue 1', isActive: true },
-        ]);
+        // Fetch leagues
+        const leaguesResult = await getLeagues({ status: 'Active' });
+        if (leaguesResult.success && leaguesResult.data?.leagues) {
+          const formattedLeagues = leaguesResult.data.leagues.map(league => ({
+            id: league._id || league.league_id,
+            name: league.league_name || league.name,
+            isActive: league.status === 'Active',
+          }));
+          setLeagues(formattedLeagues);
+        }
 
-        // Mock Polls
-        setPolls([
-          { id: '1', leagueId: 'la_liga', status: 'active' },
-          { id: '2', leagueId: 'premier_league', status: 'closed' }
-        ]);
+        // Fetch all polls to check rules
+        const pollsResult = await getPolls();
+        if (pollsResult.success && pollsResult.data?.polls) {
+          setPolls(pollsResult.data.polls);
+        }
 
-        if (isEditMode) {
-          // Mock existing poll data
-          setFormData({
-            leagueId: 'premier_league',
-            startTime: new Date(),
-            closeTime: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
-          });
+        // If editing, fetch the poll data
+        if (isEditMode && id) {
+          const pollResult = await getPoll(id);
+          if (pollResult.success && pollResult.data) {
+            const poll = pollResult.data;
+            setFormData({
+              leagueId: poll.league_id || poll.leagueId,
+              startTime: poll.start_time ? new Date(poll.start_time) : new Date(),
+              closeTime: poll.close_time ? new Date(poll.close_time) : new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+            });
+
+            // Load fixtures if they exist
+            if (poll.fixtures && Array.isArray(poll.fixtures)) {
+              const fixtures = poll.fixtures.map((f, index) => ({
+                matchNum: f.match_num || f.matchNum || index + 1,
+                teamA: f.team_a_id || f.teamAId || '',
+                teamB: f.team_b_id || f.teamBId || '',
+              }));
+              // Ensure we have exactly 5 fixtures
+              while (fixtures.length < 5) {
+                fixtures.push({ matchNum: fixtures.length + 1, teamA: '', teamB: '' });
+              }
+              setSelectedFixtures(fixtures.slice(0, 5));
+            }
+          }
         }
       } catch (error) {
         console.error('Error loading data:', error);
@@ -105,62 +130,43 @@ const PollFormPage = () => {
       if (!leagueId) {
         setAvailableTeams([]);
         setLeagueFixtures([]);
+        setLoadingTeams(false);
+        setTeamsError('');
         return;
       }
+      
+      setLoadingTeams(true);
+      setTeamsError('');
+      setAvailableTeams([]);
+      
       try {
-        // Mock teams based on league
-        const allTeams = {
-          premier_league: [
-            { id: 'team_pl_1', name: 'Arsenal', leagueId: 'premier_league' },
-            { id: 'team_pl_2', name: 'Chelsea', leagueId: 'premier_league' },
-            { id: 'team_pl_3', name: 'Liverpool', leagueId: 'premier_league' },
-            { id: 'team_pl_4', name: 'Manchester City', leagueId: 'premier_league' },
-            { id: 'team_pl_5', name: 'Manchester United', leagueId: 'premier_league' },
-            { id: 'team_pl_6', name: 'Tottenham', leagueId: 'premier_league' },
-            { id: 'team_pl_7', name: 'Newcastle', leagueId: 'premier_league' },
-            { id: 'team_pl_8', name: 'Aston Villa', leagueId: 'premier_league' },
-            { id: 'team_pl_9', name: 'Brighton', leagueId: 'premier_league' },
-            { id: 'team_pl_10', name: 'West Ham', leagueId: 'premier_league' },
-          ],
-          la_liga: [
-            { id: 'team_ll_1', name: 'Real Madrid', leagueId: 'la_liga' },
-            { id: 'team_ll_2', name: 'Barcelona', leagueId: 'la_liga' },
-            { id: 'team_ll_3', name: 'Atletico Madrid', leagueId: 'la_liga' },
-            { id: 'team_ll_4', name: 'Sevilla', leagueId: 'la_liga' },
-            { id: 'team_ll_5', name: 'Valencia', leagueId: 'la_liga' },
-            { id: 'team_ll_6', name: 'Real Sociedad', leagueId: 'la_liga' },
-            { id: 'team_ll_7', name: 'Villarreal', leagueId: 'la_liga' },
-            { id: 'team_ll_8', name: 'Real Betis', leagueId: 'la_liga' },
-            { id: 'team_ll_9', name: 'Athletic Bilbao', leagueId: 'la_liga' },
-            { id: 'team_ll_10', name: 'Osasuna', leagueId: 'la_liga' },
-          ],
-          ligue_1: [
-            { id: 'team_l1_1', name: 'PSG', leagueId: 'ligue_1' },
-            { id: 'team_l1_2', name: 'Marseille', leagueId: 'ligue_1' },
-            { id: 'team_l1_3', name: 'Lyon', leagueId: 'ligue_1' },
-            { id: 'team_l1_4', name: 'Monaco', leagueId: 'ligue_1' },
-            { id: 'team_l1_5', name: 'Lille', leagueId: 'ligue_1' },
-            { id: 'team_l1_6', name: 'Nice', leagueId: 'ligue_1' },
-            { id: 'team_l1_7', name: 'Lens', leagueId: 'ligue_1' },
-            { id: 'team_l1_8', name: 'Rennes', leagueId: 'ligue_1' },
-            { id: 'team_l1_9', name: 'Montpellier', leagueId: 'ligue_1' },
-            { id: 'team_l1_10', name: 'Nantes', leagueId: 'ligue_1' },
-          ],
-        };
-
-        const teams = allTeams[leagueId] || [];
-        setAvailableTeams(teams);
+        // Fetch teams for the selected league using teamsService (same pattern as TeamsPage)
+        const teamsResult = await getTeams({ 
+          league_id: leagueId, 
+          status: 'Active' 
+        });
         
-        // Keep legacy fixtures for display reference
-        const fixtures = [
-          { id: 'f1', homeTeam: 'Team A', awayTeam: 'Team B' },
-          { id: 'f2', homeTeam: 'Team C', awayTeam: 'Team D' },
-        ];
-        setLeagueFixtures(fixtures);
+        if (teamsResult.success && teamsResult.data?.teams) {
+          const formattedTeams = teamsResult.data.teams.map(team => ({
+            id: team._id || team.team_id,
+            name: team.team_name || team.name,
+            leagueId: team.league_id || leagueId,
+          }));
+          setAvailableTeams(formattedTeams);
+          setTeamsError('');
+        } else {
+          setAvailableTeams([]);
+          setTeamsError(teamsResult.error || 'No teams found for this league');
+        }
+        
+        // Clear fixtures as they're not needed for team selection
+        setLeagueFixtures([]);
       } catch (error) {
         console.error('Error loading teams:', error);
         setAvailableTeams([]);
-        setLeagueFixtures([]);
+        setTeamsError(error.message || 'Failed to load teams');
+      } finally {
+        setLoadingTeams(false);
       }
     };
 
@@ -169,10 +175,38 @@ const PollFormPage = () => {
     } else {
       setAvailableTeams([]);
       setLeagueFixtures([]);
+      setLoadingTeams(false);
+      setTeamsError('');
     }
   }, [formData.leagueId]);
 
   const handleChange = (field, value) => {
+    console.log('handleChange called:', { field, value, currentFormData: formData });
+    
+    // Ensure closeTime is always after startTime
+    if (field === 'startTime' && value) {
+      const newStartTime = value instanceof Date ? value : new Date(value);
+      const currentCloseTime = formData.closeTime instanceof Date ? formData.closeTime : new Date(formData.closeTime);
+      
+      // If new start time is after or equal to close time, adjust close time to be 24 hours after start
+      if (newStartTime >= currentCloseTime) {
+        const newCloseTime = new Date(newStartTime.getTime() + 24 * 60 * 60 * 1000); // 24 hours later
+        setFormData({ ...formData, startTime: newStartTime, closeTime: newCloseTime });
+        return;
+      }
+    }
+    
+    if (field === 'closeTime' && value) {
+      const newCloseTime = value instanceof Date ? value : new Date(value);
+      const currentStartTime = formData.startTime instanceof Date ? formData.startTime : new Date(formData.startTime);
+      
+      // Ensure close time is at least 1 hour after start time
+      if (newCloseTime <= currentStartTime) {
+        alert('Close time must be after start time. Please select a later date/time.');
+        return;
+      }
+    }
+    
     setFormData({ ...formData, [field]: value });
   };
 
@@ -186,20 +220,62 @@ const PollFormPage = () => {
     );
   };
 
+  // Get all teams that are already selected across all fixtures
+  const getSelectedTeamIds = (currentMatchNum) => {
+    const selectedIds = new Set();
+    selectedFixtures.forEach(fixture => {
+      if (fixture.matchNum !== currentMatchNum) {
+        if (fixture.teamA) selectedIds.add(fixture.teamA);
+        if (fixture.teamB) selectedIds.add(fixture.teamB);
+      }
+    });
+    return selectedIds;
+  };
+
+  // Check if a team is available for selection in a specific fixture
+  const isTeamAvailable = (teamId, fixture, teamType) => {
+    if (!teamId) return true; // Empty selection is always allowed
+    
+    // Can't select the same team as the opposite team in the same match
+    if (teamType === 'teamA' && fixture.teamB === teamId) return false;
+    if (teamType === 'teamB' && fixture.teamA === teamId) return false;
+    
+    // Can't select a team that's already selected in another fixture
+    const selectedInOtherFixtures = getSelectedTeamIds(fixture.matchNum);
+    if (selectedInOtherFixtures.has(teamId)) return false;
+    
+    return true;
+  };
+
   const validateFixtures = () => {
     // Check all matches have both teams
     const allMatchesComplete = selectedFixtures.every(f => f.teamA && f.teamB);
     
-    // Check no team plays itself
+    // Check no team plays itself in the same match
     const noSelfMatchups = selectedFixtures.every(f => f.teamA !== f.teamB);
+    
+    // Check no team is used more than once across all fixtures
+    const allSelectedTeams = [];
+    selectedFixtures.forEach(f => {
+      if (f.teamA) allSelectedTeams.push(f.teamA);
+      if (f.teamB) allSelectedTeams.push(f.teamB);
+    });
+    const uniqueTeams = new Set(allSelectedTeams);
+    const noDuplicateTeams = allSelectedTeams.length === uniqueTeams.size;
     
     // Check exactly 5 matches
     const exactlyFive = selectedFixtures.length === 5;
     
-    return allMatchesComplete && noSelfMatchups && exactlyFive;
+    return allMatchesComplete && noSelfMatchups && noDuplicateTeams && exactlyFive;
   };
 
   const handleSave = async () => {
+    // Validate league is selected
+    if (!formData.leagueId || !formData.leagueId.trim()) {
+      alert('Please select a league before saving.');
+      return;
+    }
+
     // Validate fixtures first
     if (!validateFixtures()) {
       alert('Please select both teams for all 5 matches before saving.');
@@ -209,11 +285,28 @@ const PollFormPage = () => {
     try {
       setSaving(true);
 
-      // Mock save
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Ensure dates are valid Date objects and closeTime is after startTime
+      const startTime = formData.startTime instanceof Date ? formData.startTime : new Date(formData.startTime);
+      let closeTime = formData.closeTime instanceof Date ? formData.closeTime : new Date(formData.closeTime);
+      
+      // Validate closeTime is after startTime (minimum 1 hour difference)
+      if (closeTime <= startTime) {
+        alert('Close time must be after start time. Please adjust the dates.');
+        setSaving(false);
+        return;
+      }
+      
+      // Ensure minimum 24 hours duration
+      const minCloseTime = new Date(startTime.getTime() + 24 * 60 * 60 * 1000);
+      if (closeTime < minCloseTime) {
+        alert('Poll duration must be at least 24 hours. Close time will be adjusted to 24 hours after start time.');
+        closeTime = minCloseTime;
+      }
 
       const pollData = {
-        ...formData,
+        leagueId: formData.leagueId,
+        startTime: startTime,
+        closeTime: closeTime,
         fixtures: selectedFixtures.map(f => ({
           matchNum: f.matchNum,
           teamAId: f.teamA,
@@ -223,13 +316,28 @@ const PollFormPage = () => {
         }))
       };
 
-      console.log('Poll saved:', pollData);
-      alert('Poll saved successfully with 5 team matchups!');
+      console.log('Poll data being sent:', pollData); // Debug log
+      console.log('Start time:', startTime.toISOString());
+      console.log('Close time:', closeTime.toISOString());
 
-      navigate(constants.routes.polls);
+      let result;
+      if (isEditMode) {
+        result = await updatePoll(id, pollData);
+      } else {
+        result = await createPoll(pollData);
+      }
+
+      if (result.success) {
+        alert(result.message || (isEditMode ? 'Poll updated successfully!' : 'Poll created successfully!'));
+        navigate(constants.routes.polls);
+      } else {
+        const errorMessage = result.error || result.data?.error?.message || result.data?.message || 'Failed to save poll';
+        console.error('Poll save error:', { result, pollData });
+        alert(errorMessage);
+      }
     } catch (error) {
       console.error('Error saving poll:', error);
-      alert('Failed to save poll');
+      alert('Failed to save poll: ' + (error.message || 'Unknown error'));
     } finally {
       setSaving(false);
     }
@@ -438,7 +546,23 @@ const PollFormPage = () => {
                       Teams / Matches in this Poll
                     </Typography>
                   </Box>
-                  {availableTeams.length > 0 ? (
+                  {loadingTeams ? (
+                    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 4 }}>
+                      <CircularProgress size={32} sx={{ color: colors.brandRed }} />
+                      <Typography variant="body2" sx={{ ml: 2, color: colors.textSecondary }}>
+                        Loading teams...
+                      </Typography>
+                    </Box>
+                  ) : teamsError ? (
+                    <Alert severity="warning" sx={{ mb: 1 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600, fontSize: 13 }}>
+                        {teamsError}
+                      </Typography>
+                      <Typography variant="caption" sx={{ fontSize: 12 }}>
+                        Please ensure the league has active teams assigned.
+                      </Typography>
+                    </Alert>
+                  ) : availableTeams.length > 0 ? (
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                       <Alert severity="info" sx={{ mb: 1 }}>
                         <Typography variant="body2" sx={{ fontWeight: 600, fontSize: 13 }}>
@@ -489,15 +613,23 @@ const PollFormPage = () => {
                               <MenuItem value="">
                                 <em>Select Team A</em>
                               </MenuItem>
-                              {availableTeams.map((team) => (
-                                <MenuItem 
-                                  key={team.id} 
-                                  value={team.id}
-                                  disabled={fixture.teamB === team.id}
-                                >
-                                  {team.name}
-                                </MenuItem>
-                              ))}
+                              {availableTeams.map((team) => {
+                                const isDisabled = !isTeamAvailable(team.id, fixture, 'teamA');
+                                return (
+                                  <MenuItem 
+                                    key={team.id} 
+                                    value={team.id}
+                                    disabled={isDisabled}
+                                  >
+                                    {team.name}
+                                    {isDisabled && team.id !== fixture.teamA && (
+                                      <Typography component="span" variant="caption" sx={{ ml: 1, color: colors.textSecondary, fontStyle: 'italic' }}>
+                                        (Already selected)
+                                      </Typography>
+                                    )}
+                                  </MenuItem>
+                                );
+                              })}
                             </Select>
                           </FormControl>
 
@@ -535,15 +667,23 @@ const PollFormPage = () => {
                               <MenuItem value="">
                                 <em>Select Team B</em>
                               </MenuItem>
-                              {availableTeams.map((team) => (
-                                <MenuItem 
-                                  key={team.id} 
-                                  value={team.id}
-                                  disabled={fixture.teamA === team.id}
-                                >
-                                  {team.name}
-                                </MenuItem>
-                              ))}
+                              {availableTeams.map((team) => {
+                                const isDisabled = !isTeamAvailable(team.id, fixture, 'teamB');
+                                return (
+                                  <MenuItem 
+                                    key={team.id} 
+                                    value={team.id}
+                                    disabled={isDisabled}
+                                  >
+                                    {team.name}
+                                    {isDisabled && team.id !== fixture.teamB && (
+                                      <Typography component="span" variant="caption" sx={{ ml: 1, color: colors.textSecondary, fontStyle: 'italic' }}>
+                                        (Already selected)
+                                      </Typography>
+                                    )}
+                                  </MenuItem>
+                                );
+                              })}
                             </Select>
                           </FormControl>
 
@@ -572,9 +712,14 @@ const PollFormPage = () => {
                       )}
                     </Box>
                   ) : (
-                    <Typography variant="body2" sx={{ color: colors.textSecondary, fontStyle: 'italic' }}>
-                      Select a league above to choose teams for the poll.
-                    </Typography>
+                    <Alert severity="info" sx={{ mb: 1 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600, fontSize: 13 }}>
+                        No teams available
+                      </Typography>
+                      <Typography variant="caption" sx={{ fontSize: 12 }}>
+                        Select a league above to load teams for the poll.
+                      </Typography>
+                    </Alert>
                   )}
                 </Box>
               </Grid>
@@ -888,7 +1033,7 @@ const PollFormPage = () => {
             variant="contained"
             startIcon={<Add />}
             onClick={handleSave}
-            disabled={saving || !rules.onePollPerLeague || !rules.maxFiveActive || !rules.closeAfterStart || !rules.durationValid || !validateFixtures()}
+            disabled={saving || !formData.leagueId || !rules.onePollPerLeague || !rules.maxFiveActive || !rules.closeAfterStart || !rules.durationValid || !validateFixtures()}
             sx={{
               background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
               borderRadius: '20px',

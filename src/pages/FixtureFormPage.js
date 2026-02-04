@@ -36,6 +36,9 @@ import { colors, constants } from '../config/theme';
 import { DateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { format } from 'date-fns';
+import { getLeagues } from '../services/leaguesService';
+import { getCmds, getCurrentCmd, createCmd, updateCmdStatus } from '../services/cmdsService';
+import { getTeams } from '../services/teamsService';
 
 const FixtureFormPage = () => {
   const navigate = useNavigate();
@@ -46,6 +49,8 @@ const FixtureFormPage = () => {
   const [leagues, setLeagues] = useState([]);
   const [cmds, setCmds] = useState([]);
   const [currentCmd, setCurrentCmd] = useState(null);
+  const [teams, setTeams] = useState([]);
+  const [loadingTeams, setLoadingTeams] = useState(false);
   const [showNewCmdForm, setShowNewCmdForm] = useState(false);
   const [newCmdForm, setNewCmdForm] = useState({
     name: '',
@@ -69,50 +74,65 @@ const FixtureFormPage = () => {
     const initialize = async () => {
       try {
         setLoading(true);
-        // Simulate network
-        await new Promise(resolve => setTimeout(resolve, 800));
 
-        // Mock Leagues
-        setLeagues([
-          { id: 'premier_league', name: 'Premier League', isActive: true },
-          { id: 'la_liga', name: 'La Liga', isActive: true },
-          { id: 'champions_league', name: 'Champions League', isActive: true },
-        ]);
+        // Fetch leagues from database
+        const leaguesResult = await getLeagues({ status: 'Active' });
+        if (leaguesResult.success && leaguesResult.data?.leagues) {
+          const formattedLeagues = leaguesResult.data.leagues.map(league => ({
+            id: league._id || league.league_id,
+            league_id: league._id || league.league_id,
+            name: league.league_name || league.name,
+            league_name: league.league_name || league.name,
+            isActive: league.status === 'Active',
+            status: league.status,
+          }));
+          setLeagues(formattedLeagues);
+        } else {
+          console.error('Failed to load leagues:', leaguesResult.error);
+          setLeagues([]);
+        }
 
-        // Mock CMds - Load existing CMds
-        const mockCmds = [
-          {
-            id: 'cmd_001',
-            name: 'CMd-05',
-            startDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-            endDate: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000),
-            status: 'current',
-            fixtureCount: 12,
-          },
-          {
-            id: 'cmd_002',
-            name: 'CMd-04',
-            startDate: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
-            endDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-            status: 'completed',
-            fixtureCount: 15,
-          },
-          {
-            id: 'cmd_003',
-            name: 'CMd-03',
-            startDate: new Date(Date.now() - 17 * 24 * 60 * 60 * 1000),
-            endDate: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
-            status: 'completed',
-            fixtureCount: 18,
-          },
-        ];
-        setCmds(mockCmds);
-        
-        // Set current CMd (only one can be current)
-        const current = mockCmds.find(cmd => cmd.status === 'current');
-        if (current) {
-          setCurrentCmd(current);
-          setFormData(prev => ({ ...prev, cmdId: current.id }));
+        // Fetch CMds from database
+        let currentCmdId = '';
+        const cmdsResult = await getCmds();
+        if (cmdsResult.success && cmdsResult.data) {
+          const formattedCmds = cmdsResult.data.map(cmd => ({
+            id: cmd.id || cmd._id,
+            name: cmd.name,
+            startDate: cmd.startDate ? new Date(cmd.startDate) : new Date(),
+            endDate: cmd.endDate ? new Date(cmd.endDate) : new Date(),
+            status: cmd.status,
+            fixtureCount: cmd.fixtureCount || 0,
+          }));
+          setCmds(formattedCmds);
+          
+          // Set current CMd (only one can be current)
+          const current = formattedCmds.find(cmd => cmd.status === 'current');
+          if (current) {
+            setCurrentCmd(current);
+            currentCmdId = current.id;
+            setFormData(prev => ({ ...prev, cmdId: current.id }));
+          }
+        } else {
+          // Try to get current CMd if getCmds fails
+          const currentCmdResult = await getCurrentCmd();
+          if (currentCmdResult.success && currentCmdResult.data) {
+            const current = {
+              id: currentCmdResult.data.id || currentCmdResult.data._id,
+              name: currentCmdResult.data.name,
+              startDate: currentCmdResult.data.startDate ? new Date(currentCmdResult.data.startDate) : new Date(),
+              endDate: currentCmdResult.data.endDate ? new Date(currentCmdResult.data.endDate) : new Date(),
+              status: currentCmdResult.data.status,
+              fixtureCount: currentCmdResult.data.fixtureCount || 0,
+            };
+            setCurrentCmd(current);
+            currentCmdId = current.id;
+            setCmds([current]);
+            setFormData(prev => ({ ...prev, cmdId: current.id }));
+          } else {
+            console.error('Failed to load CMds:', cmdsResult.error || currentCmdResult.error);
+            setCmds([]);
+          }
         }
 
         // Mock Fixture Data if Edit Mode
@@ -124,7 +144,7 @@ const FixtureFormPage = () => {
             venue: 'wembley',
             kickoffTime: new Date(),
             matchStatus: 'scheduled',
-            cmdId: current?.id || '',
+            cmdId: currentCmdId,
           });
         }
       } catch (error) {
@@ -136,56 +156,179 @@ const FixtureFormPage = () => {
     initialize();
   }, [id, isEditMode]);
 
+  // Load teams when league is selected
+  useEffect(() => {
+    const loadTeams = async () => {
+      if (!formData.leagueId) {
+        setTeams([]);
+        return;
+      }
+
+      setLoadingTeams(true);
+      try {
+        const teamsResult = await getTeams({ 
+          league_id: formData.leagueId, 
+          status: 'Active' 
+        });
+        
+        if (teamsResult.success && teamsResult.data?.teams) {
+          // Sort teams: featured teams first (by priority or featured flag), then alphabetically
+          const formattedTeams = teamsResult.data.teams
+            .map(team => ({
+              id: team._id || team.team_id,
+              team_id: team._id || team.team_id,
+              name: team.team_name || team.name,
+              team_name: team.team_name || team.name,
+              priority: team.priority || 0,
+              featured: team.featured || false,
+              isFeatured: team.featured || team.priority > 0,
+            }))
+            .sort((a, b) => {
+              // Featured teams first
+              if (a.isFeatured && !b.isFeatured) return -1;
+              if (!a.isFeatured && b.isFeatured) return 1;
+              // Then by priority (higher first)
+              if (a.priority !== b.priority) return (b.priority || 0) - (a.priority || 0);
+              // Then alphabetically
+              return a.name.localeCompare(b.name);
+            });
+          
+          setTeams(formattedTeams);
+        } else {
+          setTeams([]);
+        }
+      } catch (error) {
+        console.error('Error loading teams:', error);
+        setTeams([]);
+      } finally {
+        setLoadingTeams(false);
+      }
+    };
+
+    loadTeams();
+  }, [formData.leagueId]);
+
   const handleChange = (field, value) => {
-    setFormData({ ...formData, [field]: value });
+    // Clear team selections if league changes
+    if (field === 'leagueId') {
+      setFormData(prev => ({ ...prev, [field]: value, homeTeam: '', awayTeam: '' }));
+    } else {
+      setFormData({ ...formData, [field]: value });
+    }
   };
 
-  const handleCreateCmd = () => {
+  const handleCreateCmd = async () => {
     if (!newCmdForm.name || !newCmdForm.startDate || !newCmdForm.endDate) {
       alert('Please fill all CMd fields');
       return;
     }
 
-    // If setting as current, mark all other CMds as completed
-    if (newCmdForm.status === 'current') {
-      setCmds(prev => prev.map(cmd => ({ ...cmd, status: 'completed' })));
+    try {
+      const result = await createCmd({
+        name: newCmdForm.name,
+        startDate: newCmdForm.startDate,
+        endDate: newCmdForm.endDate,
+        status: newCmdForm.status,
+      });
+
+      if (result.success && result.data) {
+        const newCmd = {
+          id: result.data.id || result.data._id,
+          name: result.data.name,
+          startDate: result.data.startDate ? new Date(result.data.startDate) : newCmdForm.startDate,
+          endDate: result.data.endDate ? new Date(result.data.endDate) : newCmdForm.endDate,
+          status: result.data.status,
+          fixtureCount: result.data.fixtureCount || 0,
+        };
+
+        // Reload all CMds to get updated statuses
+        const cmdsResult = await getCmds();
+        if (cmdsResult.success && cmdsResult.data) {
+          const formattedCmds = cmdsResult.data.map(cmd => ({
+            id: cmd.id || cmd._id,
+            name: cmd.name,
+            startDate: cmd.startDate ? new Date(cmd.startDate) : new Date(),
+            endDate: cmd.endDate ? new Date(cmd.endDate) : new Date(),
+            status: cmd.status,
+            fixtureCount: cmd.fixtureCount || 0,
+          }));
+          setCmds(formattedCmds);
+          
+          // Set current CMd if status is current
+          if (newCmdForm.status === 'current') {
+            setCurrentCmd(newCmd);
+            setFormData(prev => ({ ...prev, cmdId: newCmd.id }));
+          }
+        } else {
+          // Fallback: just add the new CMd
+          setCmds(prev => [...prev, newCmd]);
+          if (newCmdForm.status === 'current') {
+            setCurrentCmd(newCmd);
+            setFormData(prev => ({ ...prev, cmdId: newCmd.id }));
+          }
+        }
+
+        alert(result.message || 'CMd created successfully');
+        
+        // Reset form
+        setNewCmdForm({
+          name: '',
+          startDate: new Date(),
+          endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+          status: 'current',
+        });
+        setShowNewCmdForm(false);
+      } else {
+        alert(result.error || 'Failed to create CMd');
+      }
+    } catch (error) {
+      console.error('Error creating CMd:', error);
+      alert('An unexpected error occurred while creating CMd');
     }
-
-    const newCmd = {
-      id: `cmd_${Date.now()}`,
-      name: newCmdForm.name,
-      startDate: newCmdForm.startDate,
-      endDate: newCmdForm.endDate,
-      status: newCmdForm.status,
-      fixtureCount: 0,
-    };
-
-    setCmds(prev => [...prev, newCmd]);
-    
-    if (newCmdForm.status === 'current') {
-      setCurrentCmd(newCmd);
-      setFormData(prev => ({ ...prev, cmdId: newCmd.id }));
-    }
-
-    // Reset form
-    setNewCmdForm({
-      name: '',
-      startDate: new Date(),
-      endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-      status: 'current',
-    });
-    setShowNewCmdForm(false);
   };
 
-  const handleSelectCmd = (cmdId) => {
-    // If selecting a CMd as current, mark all others as completed
-    setCmds(prev => prev.map(cmd => 
-      cmd.id === cmdId ? { ...cmd, status: 'current' } : { ...cmd, status: 'completed' }
-    ));
-    const selectedCmd = cmds.find(cmd => cmd.id === cmdId);
-    if (selectedCmd) {
-      setCurrentCmd(selectedCmd);
-      setFormData(prev => ({ ...prev, cmdId: selectedCmd.id }));
+  const handleSelectCmd = async (cmdId) => {
+    try {
+      // Update the selected CMd status to 'current' via API
+      const result = await updateCmdStatus(cmdId, 'current');
+      
+      if (result.success) {
+        // Reload all CMds to get updated statuses
+        const cmdsResult = await getCmds();
+        if (cmdsResult.success && cmdsResult.data) {
+          const formattedCmds = cmdsResult.data.map(cmd => ({
+            id: cmd.id || cmd._id,
+            name: cmd.name,
+            startDate: cmd.startDate ? new Date(cmd.startDate) : new Date(),
+            endDate: cmd.endDate ? new Date(cmd.endDate) : new Date(),
+            status: cmd.status,
+            fixtureCount: cmd.fixtureCount || 0,
+          }));
+          setCmds(formattedCmds);
+          
+          // Set current CMd
+          const selectedCmd = formattedCmds.find(cmd => cmd.id === cmdId);
+          if (selectedCmd) {
+            setCurrentCmd(selectedCmd);
+            setFormData(prev => ({ ...prev, cmdId: selectedCmd.id }));
+          }
+        } else {
+          // Fallback: update local state
+          setCmds(prev => prev.map(cmd => 
+            cmd.id === cmdId ? { ...cmd, status: 'current' } : { ...cmd, status: 'completed' }
+          ));
+          const selectedCmd = cmds.find(cmd => cmd.id === cmdId);
+          if (selectedCmd) {
+            setCurrentCmd(selectedCmd);
+            setFormData(prev => ({ ...prev, cmdId: selectedCmd.id }));
+          }
+        }
+      } else {
+        alert(result.error || 'Failed to update CMd status');
+      }
+    } catch (error) {
+      console.error('Error selecting CMd:', error);
+      alert('An unexpected error occurred while selecting CMd');
     }
   };
 
@@ -698,48 +841,148 @@ const FixtureFormPage = () => {
 
           <Grid container spacing={3}>
             <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Home Team"
-                placeholder="Enter home team name"
-                value={formData.homeTeam}
-                onChange={(e) => handleChange('homeTeam', e.target.value)}
-                required
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Shield sx={{ fontSize: 20, color: colors.brandRed }} />
-                    </InputAdornment>
-                  ),
-                }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
+              <FormControl fullWidth required>
+                <InputLabel>Home Team *</InputLabel>
+                <Select
+                  value={formData.homeTeam}
+                  onChange={(e) => handleChange('homeTeam', e.target.value)}
+                  label="Home Team *"
+                  disabled={!formData.leagueId || loadingTeams}
+                  sx={{
                     borderRadius: '12px',
-                  },
-                }}
-              />
+                    '& .MuiOutlinedInput-notchedOutline': {
+                      borderRadius: '12px',
+                    },
+                  }}
+                  MenuProps={{
+                    PaperProps: {
+                      sx: {
+                        borderRadius: '12px',
+                        mt: 1,
+                        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.15)',
+                        '& .MuiMenuItem-root': {
+                          px: 2,
+                          py: 1.5,
+                          '&.Mui-selected': {
+                            backgroundColor: `${colors.brandRed}15`,
+                            color: colors.brandRed,
+                            '&:hover': {
+                              backgroundColor: `${colors.brandRed}20`,
+                            },
+                          },
+                        },
+                      },
+                    },
+                  }}
+                >
+                  {loadingTeams ? (
+                    <MenuItem disabled>
+                      <CircularProgress size={20} sx={{ mr: 1 }} />
+                      Loading teams...
+                    </MenuItem>
+                  ) : teams.length === 0 ? (
+                    <MenuItem disabled>
+                      {formData.leagueId ? 'No teams found for this league' : 'Please select a league first'}
+                    </MenuItem>
+                  ) : (
+                    teams.map((team) => (
+                      <MenuItem key={team.id} value={team.name}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
+                          {team.isFeatured && (
+                            <Star sx={{ fontSize: 16, color: colors.brandRed }} />
+                          )}
+                          <Typography sx={{ flex: 1 }}>{team.name}</Typography>
+                          {team.isFeatured && (
+                            <Chip
+                              label="Featured"
+                              size="small"
+                              sx={{
+                                backgroundColor: `${colors.brandRed}15`,
+                                color: colors.brandRed,
+                                fontWeight: 600,
+                                fontSize: 10,
+                                height: 20,
+                              }}
+                            />
+                          )}
+                        </Box>
+                      </MenuItem>
+                    ))
+                  )}
+                </Select>
+              </FormControl>
             </Grid>
             <Grid item xs={12} md={6}>
-              <TextField
-                fullWidth
-                label="Away Team"
-                placeholder="Enter away team name"
-                value={formData.awayTeam}
-                onChange={(e) => handleChange('awayTeam', e.target.value)}
-                required
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Shield sx={{ fontSize: 20, color: colors.brandRed }} />
-                    </InputAdornment>
-                  ),
-                }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
+              <FormControl fullWidth required>
+                <InputLabel>Away Team *</InputLabel>
+                <Select
+                  value={formData.awayTeam}
+                  onChange={(e) => handleChange('awayTeam', e.target.value)}
+                  label="Away Team *"
+                  disabled={!formData.leagueId || loadingTeams}
+                  sx={{
                     borderRadius: '12px',
-                  },
-                }}
-              />
+                    '& .MuiOutlinedInput-notchedOutline': {
+                      borderRadius: '12px',
+                    },
+                  }}
+                  MenuProps={{
+                    PaperProps: {
+                      sx: {
+                        borderRadius: '12px',
+                        mt: 1,
+                        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.15)',
+                        '& .MuiMenuItem-root': {
+                          px: 2,
+                          py: 1.5,
+                          '&.Mui-selected': {
+                            backgroundColor: `${colors.brandRed}15`,
+                            color: colors.brandRed,
+                            '&:hover': {
+                              backgroundColor: `${colors.brandRed}20`,
+                            },
+                          },
+                        },
+                      },
+                    },
+                  }}
+                >
+                  {loadingTeams ? (
+                    <MenuItem disabled>
+                      <CircularProgress size={20} sx={{ mr: 1 }} />
+                      Loading teams...
+                    </MenuItem>
+                  ) : teams.length === 0 ? (
+                    <MenuItem disabled>
+                      {formData.leagueId ? 'No teams found for this league' : 'Please select a league first'}
+                    </MenuItem>
+                  ) : (
+                    teams.map((team) => (
+                      <MenuItem key={team.id} value={team.name}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
+                          {team.isFeatured && (
+                            <Star sx={{ fontSize: 16, color: colors.brandRed }} />
+                          )}
+                          <Typography sx={{ flex: 1 }}>{team.name}</Typography>
+                          {team.isFeatured && (
+                            <Chip
+                              label="Featured"
+                              size="small"
+                              sx={{
+                                backgroundColor: `${colors.brandRed}15`,
+                                color: colors.brandRed,
+                                fontWeight: 600,
+                                fontSize: 10,
+                                height: 20,
+                              }}
+                            />
+                          )}
+                        </Box>
+                      </MenuItem>
+                    ))
+                  )}
+                </Select>
+              </FormControl>
             </Grid>
             <Grid item xs={12}>
               <FormControl fullWidth>

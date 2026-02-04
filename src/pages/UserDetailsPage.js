@@ -38,7 +38,7 @@ import SearchBar from '../components/common/SearchBar';
 
 import { format } from 'date-fns';
 import { VerifiedUser, Security, Edit, Gavel, TimerOff, AssignmentInd } from '@mui/icons-material';
-import { MockDataService } from '../services/mockDataService';
+import { getUserDetails, requestKYC, verifyKYC, rejectKYC, expireKYC, flagUser } from '../services/usersService';
 
 const UserDetailsPage = () => {
   const navigate = useNavigate();
@@ -76,102 +76,152 @@ const UserDetailsPage = () => {
     loadUserData();
   }, [id]);
 
-  const generateDummyUserData = (userId) => {
-    const countries = ['United States', 'United Kingdom', 'Canada', 'Australia', 'Germany', 'France', 'Spain', 'Italy', 'Brazil', 'India', 'Nigeria', 'South Africa', 'Kenya', 'Ghana'];
-    const isFlagged = Math.random() > 0.8;
-    return {
-      id: userId,
-      username: 'john_doe_0',
-      email: 'john_doe_0@example.com',
-      fullName: 'John Doe',
-      firstName: 'John',
-      lastName: 'Doe',
-      country: countries[Math.floor(Math.random() * countries.length)],
-      isActive: true,
-      isVerified: true,
-      isBlocked: false,
-      isDeleted: false,
-      isDeactivated: false,
-      isFlagged: isFlagged,
-      flagReason: isFlagged ? 'Multiple failed login attempts from different IPs' : '',
-      flagSource: isFlagged ? (Math.random() > 0.5 ? 'System Flagged' : 'Admin Flagged') : null,
-      adminNotes: 'User requires manual review for high withdrawal amounts.',
-      fraudFlags: isFlagged ? ['Suspicious IP', 'Multiple Accounts'] : [],
-      spTotal: 2450,
-      spCurrent: 1200,
-      cpTotal: 350,
-      cpCurrent: 150,
-      totalPredictions: 45,
-      totalReferrals: 23,
-      predictionAccuracy: 68.5,
-      totalPolls: 12,
-      createdAt: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000),
-      lastLogin: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-      kycRequestedAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000),
-      spFromPredictions: 1800,
-      spFromDailyLogin: 650,
-      cpFromReferrals: 200,
-      cpFromEngagement: 150,
-    };
-  };
-
   const loadUserData = async () => {
     try {
       setLoading(true);
 
-      // Fetch KYC data from MockService (parallel to user data loading logic if we had real backend)
-      const kyc = await MockDataService.getKycData(id);
-      if (kyc) {
-        setKycData({
-          ...kyc,
-          submittedAt: kyc.submittedAt ? new Date(kyc.submittedAt) : null,
-          verifiedAt: kyc.verifiedAt ? new Date(kyc.verifiedAt) : null,
+      if (!id) {
+        console.error('User ID is missing');
+        setUser(null);
+        return;
+      }
+
+      const result = await getUserDetails(id, { activityLimit: 50 });
+      
+      if (result.success && result.data) {
+        const data = result.data;
+        
+        // Map backend response to frontend format
+        const profile = data.profile || {};
+        const kyc = data.kyc || {};
+        const points = data.points || {};
+        const breakdown = data.breakdown || {};
+        const activityLog = data.activityLog || [];
+
+        // Helper function to safely parse dates
+        const parseDate = (dateString) => {
+          if (!dateString) return null;
+          try {
+            const parsed = new Date(dateString);
+            return isNaN(parsed.getTime()) ? null : parsed;
+          } catch (e) {
+            console.warn('Failed to parse date:', dateString, e);
+            return null;
+          }
+        };
+
+        // Set user data
+        setUser({
+          id: profile._id || profile.userId || id,
+          userId: profile.userId || profile._id || id,
+          username: profile.username || 'N/A',
+          email: profile.email || 'N/A',
+          fullName: profile.fullName || 'N/A',
+          country: profile.country || null,
+          isActive: profile.isActive ?? true,
+          isVerified: profile.isVerified ?? false,
+          isBlocked: profile.isBlocked ?? false,
+          isFlagged: profile.status === 'Flagged' || (profile.fraudFlags && profile.fraudFlags.length > 0) || !!profile.flagReason,
+          flagReason: profile.flagReason || '',
+          flagSource: profile.flagSource || null,
+          fraudFlags: profile.fraudFlags || [],
+          spTotal: points.totalSPEarned || 0,
+          spCurrent: points.currentSPBalance || 0,
+          cpTotal: points.totalCPEarned || 0,
+          cpCurrent: points.currentCPBalance || 0,
+          totalPredictions: points.totalPredictionsMade || 0,
+          totalReferrals: points.totalReferrals || 0,
+          predictionAccuracy: points.predictionAccuracy || 0,
+          totalPolls: points.totalPollsParticipated || 0,
+          createdAt: parseDate(profile.registrationDate) || new Date(),
+          lastLogin: parseDate(profile.lastLogin),
+          spFromPredictions: breakdown.sp?.fromPredictions || 0,
+          spFromDailyLogin: breakdown.sp?.fromDailyLoginBonus || 0,
+          cpFromReferrals: breakdown.cp?.fromReferrals || 0,
+          cpFromEngagement: breakdown.cp?.fromEngagement || 0,
+          adminNotes: '', // Not available in backend response
         });
+
+        // Set KYC data
+        setKycData({
+          status: kyc.status || 'not_submitted',
+          submittedAt: parseDate(kyc.submittedAt),
+          verifiedAt: parseDate(kyc.verifiedAt),
+          verifiedBy: kyc.verifiedBy || null,
+          riskLevel: kyc.riskLevel || 'none',
+          notes: kyc.internalNotes || '',
+        });
+
+        // Map activity logs
+        const mappedActivities = (activityLog || []).map((log, index) => {
+          try {
+            return {
+              id: index + 1,
+              type: log.activity || 'UNKNOWN',
+              description: log.details || '',
+              timestamp: parseDate(log.timestamp) ? parseDate(log.timestamp).toISOString() : new Date().toISOString(),
+              icon: log.type || 'info',
+            };
+          } catch (e) {
+            console.warn('Error mapping activity log:', log, e);
+            return {
+              id: index + 1,
+              type: 'UNKNOWN',
+              description: 'Activity log entry',
+              timestamp: new Date().toISOString(),
+              icon: 'info',
+            };
+          }
+        });
+        setActivities(mappedActivities);
+      } else {
+        console.error('Failed to load user:', result.error);
+        setUser(null);
       }
-
-      let userData = null;
-      // Use dummy data if no real data exists
-      if (!userData) {
-        userData = generateDummyUserData(id);
-      }
-
-      setUser(userData);
-
-      // Demo Log Activities - Enhanced
-      setActivities([
-        { id: 1, type: 'LOGIN', description: 'User logged in from IP 192.168.1.1', timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), icon: 'login' },
-        { id: 2, type: 'PREDICTION_MADE', description: 'Placed prediction on Arsenal vs Chelsea (2-1)', timestamp: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(), icon: 'prediction' },
-        { id: 3, type: 'REWARD_EARNED', description: 'Earned 50 SP from correct prediction', timestamp: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(), icon: 'reward' },
-        { id: 4, type: 'POLL_VOTE', description: 'Voted in "Premier League Top Team" poll', timestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(), icon: 'poll' },
-        { id: 5, type: 'REFERRAL', description: 'Referred new user (john_smith_23) - 10 CP earned', timestamp: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(), icon: 'referral' },
-        { id: 6, type: 'REWARD_CLAIM', description: 'Claimed Daily Login Bonus (25 SP)', timestamp: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(), icon: 'reward' },
-        { id: 7, type: 'PROFILE_UPDATE', description: 'Updated profile information', timestamp: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), icon: 'profile' },
-        { id: 8, type: 'KYC_SUBMISSION', description: 'Submitted ID Document for verification', timestamp: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(), icon: 'kyc' },
-        { id: 9, type: 'PASSWORD_CHANGE', description: 'Changed account password', timestamp: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(), icon: 'security' },
-        { id: 10, type: 'ACCOUNT_CREATED', description: 'Account created successfully', timestamp: new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString(), icon: 'account' },
-      ]);
     } catch (error) {
       console.error('Error loading user:', error);
-      const dummyData = generateDummyUserData(id);
-      setUser(dummyData);
-      setActivities([]);
+      setUser(null);
     } finally {
       setLoading(false);
     }
   };
+
   const handleKycUpdate = async (updates) => {
+    try {
+      let result;
+      
+      if (updates.status === 'pending' || updates.status === 'under_review') {
+        result = await requestKYC(id);
+      } else if (updates.status === 'verified') {
+        result = await verifyKYC(id, updates.riskLevel || 'none');
+      } else if (updates.status === 'rejected') {
+        result = await rejectKYC(id, updates.reason || '');
+      } else if (updates.status === 'expired' || updates.status === 'not_submitted') {
+        result = await expireKYC(id);
+      }
+
+      if (result && result.success) {
+        // Update local state
     setKycData((prev) => ({
       ...prev,
-      ...updates
-    }));
-    try {
-      await MockDataService.updateKycData(id, updates);
+          ...updates,
+          ...(result.data?.kyc || {}),
+        }));
+        
+        // Reload user data to get latest
+        await loadUserData();
+      } else if (result) {
+        console.error('Failed to update KYC:', result.error);
+        alert(result.error || 'Failed to update KYC');
+      }
     } catch (error) {
       console.error('Failed to update KYC data:', error);
+      alert('An error occurred while updating KYC');
     }
   };
 
   const getAccountStatusChip = (user) => {
+    if (!user) return null;
     if (user.isBlocked) {
       return <Chip label="Blocked" color="error" size="small" sx={{ fontWeight: 700 }} />;
     }
@@ -188,6 +238,36 @@ const UserDetailsPage = () => {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
         <CircularProgress sx={{ color: colors.brandRed }} />
+      </Box>
+    );
+  }
+
+  if (!user) {
+    return (
+      <Box sx={{ width: '100%', maxWidth: '100%' }}>
+        <Button
+          startIcon={<ArrowBack />}
+          onClick={() => navigate(constants.routes.users)}
+          sx={{
+            mb: 3,
+            color: colors.brandRed,
+            textTransform: 'none',
+            fontWeight: 600,
+            '&:hover': {
+              backgroundColor: `${colors.brandRed}0D`,
+            },
+          }}
+        >
+          Back to Users
+        </Button>
+        <Alert severity="error" sx={{ borderRadius: '12px' }}>
+          <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
+            User Not Found
+          </Typography>
+          <Typography variant="body2">
+            The user you're looking for doesn't exist or couldn't be loaded.
+          </Typography>
+        </Alert>
       </Box>
     );
   }
@@ -212,7 +292,7 @@ const UserDetailsPage = () => {
       </Button>
 
       {/* Flagged Banner - Enhanced with flag source */}
-      {user.isFlagged && (
+      {user && user.isFlagged && (
         <Alert
           severity="error"
           sx={{ mb: 3, borderRadius: '12px', border: `2px solid ${colors.error}` }}
@@ -258,6 +338,7 @@ const UserDetailsPage = () => {
       )}
 
       {/* User Info Card - New Layout */}
+      {user && (
       <Card sx={{ p: 4, mb: 3, borderRadius: '16px' }}>
         <Grid container spacing={4}>
           <Grid item xs={12} md={3} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -334,8 +415,10 @@ const UserDetailsPage = () => {
           </Grid>
         </Grid>
       </Card>
+      )}
 
       {/* Admin Notes */}
+      {user && (
       <Card sx={{ p: 3, mb: 3, borderRadius: '16px', bgcolor: '#FFF8F6', border: `1px solid ${colors.brandRed}20` }}>
         <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
           <AssignmentInd sx={{ color: colors.brandRed }} />
@@ -345,6 +428,7 @@ const UserDetailsPage = () => {
           {user.adminNotes || 'No verification notes specific to this user.'}
         </Typography>
       </Card>
+      )}
 
       {/* KYC Verification Section */}
       <Card sx={{ padding: 3, mb: 3, borderRadius: '16px', border: `1px solid ${colors.divider}` }}>
@@ -367,7 +451,7 @@ const UserDetailsPage = () => {
             <Grid container spacing={2}>
               <Grid item xs={6} md={4}>
                 <Typography variant="caption" sx={{ color: colors.textSecondary }}>Requested Date</Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>{user.kycRequestedAt ? format(user.kycRequestedAt, 'MMM dd, yyyy') : '-'}</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>{kycData.submittedAt ? format(kycData.submittedAt, 'MMM dd, yyyy') : '-'}</Typography>
               </Grid>
               <Grid item xs={6} md={4}>
                 <Typography variant="caption" sx={{ color: colors.textSecondary }}>Submitted At</Typography>
@@ -459,13 +543,13 @@ const UserDetailsPage = () => {
           <Grid item xs={12} md={4}>
             <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 1.5 }}>Admin Actions</Typography>
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              <Button variant="outlined" startIcon={<AssignmentInd />} size="small" onClick={() => handleKycUpdate({ status: 'pending', submittedAt: new Date().toISOString() })}>
+              <Button variant="outlined" startIcon={<AssignmentInd />} size="small" onClick={() => handleKycUpdate({ status: 'pending' })}>
                 Request KYC
               </Button>
-              <Button variant="contained" color="success" startIcon={<CheckCircle />} size="small" onClick={() => handleKycUpdate({ status: 'verified', verifiedAt: new Date().toISOString(), verifiedBy: 'Admin' })}>
+              <Button variant="contained" color="success" startIcon={<CheckCircle />} size="small" onClick={() => handleKycUpdate({ status: 'verified', riskLevel: 'none' })}>
                 Mark as Verified
               </Button>
-              <Button variant="outlined" color="error" startIcon={<Gavel />} size="small" onClick={() => handleKycUpdate({ status: 'rejected', verifiedAt: new Date().toISOString(), verifiedBy: 'Admin' })}>
+              <Button variant="outlined" color="error" startIcon={<Gavel />} size="small" onClick={() => handleKycUpdate({ status: 'rejected', reason: '' })}>
                 Mark as Rejected
               </Button>
               <Button variant="text" color="warning" startIcon={<TimerOff />} size="small" onClick={() => handleKycUpdate({ status: 'expired' })}>
@@ -491,19 +575,15 @@ const UserDetailsPage = () => {
                   color="success" 
                   startIcon={<CheckCircle />} 
                   size="small" 
-                  onClick={() => {
-                    setUser(prev => ({
-                      ...prev,
-                      isFlagged: false,
-                      flagReason: '',
-                      flagSource: null,
-                      fraudFlags: [],
-                    }));
-                    console.log(`[SYSTEM LOG] User ${user.id} unflagged by Admin at ${new Date().toISOString()}`);
-                    alert('User unflagged successfully');
+                  onClick={async () => {
+                    // Note: Backend doesn't have an unflag endpoint, 
+                    // but we can clear flags by updating the user
+                    // For now, we'll just reload the data
+                    await loadUserData();
+                    alert('User status refreshed');
                   }}
                 >
-                  Unflag User
+                  Refresh Status
                 </Button>
               )}
             </Box>
@@ -512,6 +592,8 @@ const UserDetailsPage = () => {
       </Card>
 
       {/* Points & Performance */}
+      {user && (
+      <>
       <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
         Points & Performance
       </Typography>
@@ -749,6 +831,8 @@ const UserDetailsPage = () => {
           </Card>
         </Grid>
       </Grid>
+      </>
+      )}
 
       {/* Activity Log */}
       <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>
@@ -778,13 +862,26 @@ const UserDetailsPage = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {activities.map((activity) => (
-                  <TableRow key={activity.id}>
-                    <TableCell>{format(new Date(activity.timestamp), 'MMM dd, yyyy • HH:mm')}</TableCell>
-                    <TableCell>{activity.type}</TableCell>
-                    <TableCell>{activity.description}</TableCell>
-                  </TableRow>
-                ))}
+                {activities.map((activity) => {
+                  let formattedDate = 'N/A';
+                  try {
+                    if (activity.timestamp) {
+                      const date = new Date(activity.timestamp);
+                      if (!isNaN(date.getTime())) {
+                        formattedDate = format(date, 'MMM dd, yyyy • HH:mm');
+                      }
+                    }
+                  } catch (e) {
+                    console.warn('Error formatting activity timestamp:', activity.timestamp, e);
+                  }
+                  return (
+                    <TableRow key={activity.id}>
+                      <TableCell>{formattedDate}</TableCell>
+                      <TableCell>{activity.type || 'N/A'}</TableCell>
+                      <TableCell>{activity.description || 'N/A'}</TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </TableContainer>
@@ -813,10 +910,10 @@ const UserDetailsPage = () => {
               You are about to flag this user:
             </Typography>
             <Typography variant="body2" sx={{ fontSize: 13 }}>
-              • User: {user?.username || 'N/A'}
+              • User: {user && user.username ? user.username : 'N/A'}
             </Typography>
             <Typography variant="body2" sx={{ fontSize: 13 }}>
-              • User ID: {user?.id || 'N/A'}
+              • User ID: {user && user.id ? user.id : 'N/A'}
             </Typography>
           </Alert>
           <Typography variant="body2" sx={{ mb: 1, fontWeight: 600 }}>
@@ -851,22 +948,23 @@ const UserDetailsPage = () => {
             Cancel
           </Button>
           <Button 
-            onClick={() => {
+            onClick={async () => {
               if (!flagReason.trim()) {
                 alert('Please enter a reason for flagging this user');
                 return;
               }
-              setUser(prev => ({
-                ...prev,
-                isFlagged: true,
-                flagReason: flagReason.trim(),
-                flagSource: 'Admin Flagged',
-                fraudFlags: prev.fraudFlags || [],
-              }));
+              
+              const result = await flagUser(id, flagReason.trim(), []);
+              
+              if (result.success) {
               setFlagDialogOpen(false);
-              console.log(`[SYSTEM LOG] User ${user.id} flagged by Admin. Reason: ${flagReason} at ${new Date().toISOString()}`);
-              alert('User flagged successfully');
               setFlagReason('');
+                alert('User flagged successfully');
+                // Reload user data to get updated flag status
+                await loadUserData();
+              } else {
+                alert(result.error || 'Failed to flag user');
+              }
             }}
             variant="contained"
             startIcon={<Flag />}

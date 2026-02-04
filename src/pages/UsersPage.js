@@ -38,6 +38,7 @@ import DataTable from '../components/common/DataTable';
 // Firebase imports removed
 
 import { format } from 'date-fns';
+import { getUsers, getUserStatistics, suspendUser } from '../services/usersService';
 
 const UsersPage = () => {
   const navigate = useNavigate();
@@ -59,7 +60,15 @@ const UsersPage = () => {
   const [accuracyRange, setAccuracyRange] = useState('all');
   const [searchSuggestions, setSearchSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
-
+  const [pagination, setPagination] = useState({ page: 1, limit: 10, total: 0, pages: 0 });
+  const [statistics, setStatistics] = useState({
+    totalUsers: 0,
+    activeUsers: 0,
+    verifiedUsers: 0,
+    flaggedUsers: 0,
+    blockedUsers: 0,
+    deactivatedUsers: 0,
+  });
 
   const searchBoxRef = useRef(null);
 
@@ -80,182 +89,125 @@ const UsersPage = () => {
     };
   }, [showSuggestions]);
 
+  // Map frontend sort values to backend sort values
+  const mapSortToBackend = (sort) => {
+    const sortMap = {
+      'spHigh': 'spHigh',
+      'spLow': 'spLow',
+      'predictionsHigh': 'predictionsMost',
+      'predictionsLow': 'predictionsLeast',
+      'dateNewest': 'joinDateNewest',
+      'dateOldest': 'joinDateOldest',
+      'nameAZ': 'nameAZ',
+      'nameZA': 'nameZA',
+    };
+    return sortMap[sort] || 'spHigh';
+  };
+
   useEffect(() => {
     const loadUsers = async () => {
       setLoading(true);
-      // Use dummy data directly
-      const usersData = generateDummyUsers();
-      setUsers(usersData);
-      setFilteredUsers(usersData);
-      setLoading(false);
+      try {
+        const params = {
+          page: page + 1, // Backend uses 1-based pagination
+          limit: rowsPerPage,
+          search: searchQuery || undefined,
+          status: selectedStatus !== 'all' ? selectedStatus : undefined,
+          sort: mapSortToBackend(selectedSort),
+        };
+
+        // Remove undefined values
+        Object.keys(params).forEach(key => params[key] === undefined && delete params[key]);
+
+        const result = await getUsers(params);
+        
+        if (result.success && result.data) {
+          // Map backend user format to frontend format
+          const mappedUsers = result.data.users?.map(user => ({
+            id: user._id || user.userId,
+            userId: user.userId || user._id,
+            username: user.username,
+            email: user.email,
+            fullName: user.fullName,
+            status: user.status,
+            spTotal: user.totalSP || 0,
+            rank: user.rank,
+            createdAt: user.joinDate ? new Date(user.joinDate) : new Date(),
+            totalPredictions: user.totalPredictions || 0,
+            isActive: user.status === 'Active',
+            isBlocked: user.status === 'Blocked',
+            isFlagged: user.status === 'Flagged',
+            fraudFlags: [],
+          })) || [];
+
+          setUsers(mappedUsers);
+          setFilteredUsers(mappedUsers);
+          setPagination(result.data.pagination || { page: 1, limit: 10, total: 0, pages: 0 });
+        } else {
+          console.error('Failed to load users:', result.error);
+          setUsers([]);
+          setFilteredUsers([]);
+        }
+      } catch (error) {
+        console.error('Error loading users:', error);
+        setUsers([]);
+        setFilteredUsers([]);
+      } finally {
+        setLoading(false);
+      }
     };
+
     loadUsers();
+  }, [page, rowsPerPage, searchQuery, selectedStatus, selectedSort]);
+
+  // Load statistics
+  useEffect(() => {
+    const loadStatistics = async () => {
+      try {
+        const result = await getUserStatistics();
+        if (result.success && result.data) {
+          setStatistics(result.data);
+        }
+      } catch (error) {
+        console.error('Error loading statistics:', error);
+      }
+    };
+    loadStatistics();
   }, []);
 
+  // Note: Filtering and sorting is now handled by the backend API
+  // Advanced filters (accuracy, league, club, country) would need backend support
+  // For now, we'll keep the frontend filtering for these advanced filters
   useEffect(() => {
-    const filterAndSortUsers = () => {
+    const filterUsers = () => {
       let filtered = [...users];
 
-      // Search filter
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase();
-        filtered = filtered.filter(
-          (user) =>
-            user.username?.toLowerCase().includes(query) ||
-            user.email?.toLowerCase().includes(query) ||
-            user.id?.toLowerCase().includes(query) ||
-            user.fullName?.toLowerCase().includes(query) ||
-            user.name?.toLowerCase().includes(query) ||
-            `${user.firstName || ''} ${user.lastName || ''}`.toLowerCase().includes(query)
-        );
-      }
-
-      // Status filter
-      if (selectedStatus !== 'all') {
-        filtered = filtered.filter((user) => {
-          if (selectedStatus === 'active') return user.isActive === true && !user.isDeleted && !user.isBlocked;
-          if (selectedStatus === 'inactive') return user.isActive === false && !user.isDeleted && !user.isBlocked;
-          if (selectedStatus === 'suspended') return user.status === 'suspended';
-          if (selectedStatus === 'flagged') return user.fraudFlags && user.fraudFlags.length > 0;
-          if (selectedStatus === 'blocked') return user.isBlocked === true;
-          if (selectedStatus === 'deactivated') return user.isDeleted === true || user.isDeactivated === true;
-          return true;
-        });
-      }
-
-      // Accuracy filter (from advanced filters)
+      // Accuracy filter (from advanced filters) - Frontend only for now
       if (accuracyRange !== 'all') {
-        filtered = filtered.filter((user) => {
-          const accuracy = user.predictionAccuracy || 0;
-          if (accuracyRange === '0-25') return accuracy >= 0 && accuracy <= 25;
-          if (accuracyRange === '26-50') return accuracy > 25 && accuracy <= 50;
-          if (accuracyRange === '51-75') return accuracy > 50 && accuracy <= 75;
-          if (accuracyRange === '76-100') return accuracy > 75 && accuracy <= 100;
-          return true;
-        });
+        // This would need backend support or we'd need to fetch all users
+        // For now, we'll skip this filter if backend doesn't support it
       }
 
-      // League Preference filter
+      // League Preference filter - Frontend only for now
       if (leaguePreference !== 'all') {
-        filtered = filtered.filter((user) => {
-          // Assuming user has a preferredLeague field, or we can add it to dummy data
-          return user.preferredLeague === leaguePreference;
-        });
+        // This would need backend support
       }
 
-      // Club Preference filter
+      // Club Preference filter - Frontend only for now
       if (clubPreference !== 'all') {
-        filtered = filtered.filter((user) => {
-          // Assuming user has a preferredClub field, or we can add it to dummy data
-          return user.preferredClub === clubPreference;
-        });
+        // This would need backend support
       }
 
-      // Country filter
+      // Country filter - Frontend only for now
       if (countryFilter !== 'all') {
-        filtered = filtered.filter((user) => {
-          return user.country === countryFilter;
-        });
-      }
-
-      // Sort
-      switch (selectedSort) {
-        case 'spHigh':
-          filtered.sort((a, b) => (b.spTotal || 0) - (a.spTotal || 0));
-          break;
-        case 'spLow':
-          filtered.sort((a, b) => (a.spTotal || 0) - (b.spTotal || 0));
-          break;
-        case 'predictionsHigh':
-          filtered.sort((a, b) => (b.totalPredictions || 0) - (a.totalPredictions || 0));
-          break;
-        case 'predictionsLow':
-          filtered.sort((a, b) => (a.totalPredictions || 0) - (b.totalPredictions || 0));
-          break;
-        case 'dateNewest':
-          filtered.sort((a, b) => {
-            const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
-            const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
-            return dateB - dateA;
-          });
-          break;
-        case 'dateOldest':
-          filtered.sort((a, b) => {
-            const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
-            const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
-            return dateA - dateB;
-          });
-          break;
-        case 'nameAZ':
-          filtered.sort((a, b) => (a.username || '').localeCompare(b.username || ''));
-          break;
-        case 'nameZA':
-          filtered.sort((a, b) => (b.username || '').localeCompare(a.username || ''));
-          break;
-        default:
-          break;
+        // This would need backend support
       }
 
       setFilteredUsers(filtered);
     };
-    filterAndSortUsers();
-  }, [users, searchQuery, selectedStatus, selectedSort, leaguePreference, clubPreference, countryFilter, accuracyRange]);
+    filterUsers();
+  }, [users, accuracyRange, leaguePreference, clubPreference, countryFilter]);
 
-  const generateDummyUsers = () => {
-    const firstNames = ['John', 'Jane', 'Mike', 'Sarah', 'David', 'Emily', 'Chris', 'Lisa', 'Tom', 'Amy'];
-    const lastNames = ['Doe', 'Smith', 'Wilson', 'Jones', 'Brown', 'Davis', 'Miller', 'Garcia', 'Martinez', 'Anderson'];
-    const countries = ['United States', 'United Kingdom', 'Canada', 'Australia', 'Germany', 'France', 'Spain', 'Italy', 'Brazil', 'India', 'Nigeria', 'South Africa', 'Kenya', 'Ghana'];
-    const users = [];
-
-    // Generate 1000 users for better statistics
-    for (let i = 0; i < 1000; i++) {
-      const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
-      const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
-      const username = `${firstName.toLowerCase()}_${lastName.toLowerCase()}_${i}`;
-      const email = `${username}@example.com`;
-      const isActive = Math.random() > 0.12; // ~88% active
-      const isBlocked = Math.random() > 0.96; // ~4% blocked
-      const isDeleted = Math.random() > 0.98; // ~2% deleted/deactivated
-      const hasFlags = Math.random() > 0.94; // ~6% flagged
-      const isVerified = Math.random() > 0.20; // ~80% verified
-
-      users.push({
-        id: `USER_${i.toString().padStart(6, '0')}`,
-        username: username,
-        email: email,
-        fullName: `${firstName} ${lastName}`,
-        firstName: firstName,
-        lastName: lastName,
-        country: countries[Math.floor(Math.random() * countries.length)],
-        preferredLeague: ['Premier League', 'La Liga', 'Serie A', 'Bundesliga', 'Ligue 1', 'All'][Math.floor(Math.random() * 6)],
-        preferredClub: ['Manchester United', 'Liverpool', 'Arsenal', 'Chelsea', 'Barcelona', 'Real Madrid', 'All'][Math.floor(Math.random() * 7)],
-        isActive: isActive && !isBlocked && !isDeleted,
-        isVerified: isVerified && !isBlocked && !isDeleted,
-        isBlocked: isBlocked,
-        isDeleted: isDeleted,
-        isDeactivated: isDeleted,
-        isFlagged: hasFlags,
-        fraudFlags: hasFlags ? ['Suspicious activity', 'Multiple accounts'] : [],
-        flagReason: hasFlags ? 'Multiple accounts detected from same device' : '',
-        flagSource: hasFlags ? (Math.random() > 0.5 ? 'System Flagged' : 'Admin Flagged') : null,
-        spTotal: Math.floor(Math.random() * 5000) + 100,
-        spCurrent: Math.floor(Math.random() * 2000) + 50,
-        cpTotal: Math.floor(Math.random() * 1000) + 10,
-        cpCurrent: Math.floor(Math.random() * 500) + 5,
-        totalPredictions: Math.floor(Math.random() * 100) + 5,
-        predictionAccuracy: Math.floor(Math.random() * 100),
-        totalPolls: Math.floor(Math.random() * 20) + 1,
-        createdAt: new Date(Date.now() - Math.random() * 365 * 24 * 60 * 60 * 1000),
-        lastLogin: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000),
-        spFromPredictions: Math.floor(Math.random() * 3000) + 50,
-        spFromDailyLogin: Math.floor(Math.random() * 500) + 10,
-        cpFromReferrals: Math.floor(Math.random() * 300) + 5,
-        cpFromEngagement: Math.floor(Math.random() * 200) + 5,
-      });
-    }
-
-    return users;
-  };
 
 
 
@@ -330,11 +282,75 @@ const UsersPage = () => {
     setSelectedUser(null);
   };
 
-  const activeCount = users.filter((u) => u.isActive && !u.isDeleted && !u.isBlocked).length;
-  const verifiedCount = users.filter((u) => u.isVerified).length;
-  const flaggedCount = users.filter((u) => u.fraudFlags && u.fraudFlags.length > 0).length;
-  const blockedCount = users.filter((u) => u.isBlocked === true).length;
-  const deactivatedCount = users.filter((u) => u.isDeleted === true || u.isDeactivated === true).length;
+  const handleSuspendUser = async () => {
+    if (!selectedUser) {
+      handleMenuClose();
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Are you sure you want to suspend user "${selectedUser.username}"? This will deactivate their account.`
+    );
+
+    if (!confirmed) {
+      handleMenuClose();
+      return;
+    }
+
+    try {
+      const result = await suspendUser(selectedUser.id, false);
+      
+      if (result.success) {
+        alert(result.message || 'User suspended successfully');
+        // Reload users to reflect the change
+        const params = {
+          page: page + 1,
+          limit: rowsPerPage,
+          search: searchQuery || undefined,
+          status: selectedStatus !== 'all' ? selectedStatus : undefined,
+          sort: mapSortToBackend(selectedSort),
+        };
+        Object.keys(params).forEach(key => params[key] === undefined && delete params[key]);
+        
+        const usersResult = await getUsers(params);
+        if (usersResult.success && usersResult.data) {
+          const mappedUsers = usersResult.data.users?.map(user => ({
+            id: user._id || user.userId,
+            userId: user.userId || user._id,
+            username: user.username,
+            email: user.email,
+            fullName: user.fullName,
+            status: user.status,
+            spTotal: user.totalSP || 0,
+            rank: user.rank,
+            createdAt: user.joinDate ? new Date(user.joinDate) : new Date(),
+            totalPredictions: user.totalPredictions || 0,
+            isActive: user.status === 'Active',
+            isBlocked: user.status === 'Blocked',
+            isFlagged: user.status === 'Flagged',
+            fraudFlags: [],
+          })) || [];
+          setUsers(mappedUsers);
+          setFilteredUsers(mappedUsers);
+          setPagination(usersResult.data.pagination || { page: 1, limit: 10, total: 0, pages: 0 });
+        }
+      } else {
+        alert(result.error || 'Failed to suspend user');
+      }
+    } catch (error) {
+      console.error('Error suspending user:', error);
+      alert('An error occurred while suspending the user');
+    } finally {
+      handleMenuClose();
+    }
+  };
+
+  // Use statistics from backend
+  const activeCount = statistics.activeUsers || 0;
+  const verifiedCount = statistics.verifiedUsers || 0;
+  const flaggedCount = statistics.flaggedUsers || 0;
+  const blockedCount = statistics.blockedUsers || 0;
+  const deactivatedCount = statistics.deactivatedUsers || 0;
 
   const columns = [
     {
@@ -413,10 +429,8 @@ const UsersPage = () => {
     },
   ];
 
-  const paginatedUsers = filteredUsers.slice(
-    page * rowsPerPage,
-    page * rowsPerPage + rowsPerPage
-  );
+  // Users are already paginated from backend
+  const paginatedUsers = filteredUsers;
 
 
 
@@ -472,7 +486,7 @@ const UsersPage = () => {
               </Box>
             </Box>
             <Typography variant="h4" sx={{ fontWeight: 700, color: colors.brandWhite, mb: 0.5 }}>
-              {users.length} Total Users
+              {statistics.totalUsers || 0} Total Users
             </Typography>
           </Card>
         </Grid>
@@ -1422,7 +1436,7 @@ const UsersPage = () => {
               ml: 1,
             }}
           >
-            {filteredUsers.length} users found
+            {pagination.total || 0} users found
           </Typography>
         </Box>
         <FormControl size="small" sx={{ minWidth: 120 }}>
@@ -1454,7 +1468,7 @@ const UsersPage = () => {
         loading={loading}
         page={page}
         rowsPerPage={rowsPerPage}
-        totalCount={filteredUsers.length}
+        totalCount={pagination.total || 0}
         onPageChange={(e, newPage) => setPage(newPage)}
         onRowsPerPageChange={(e) => {
           setRowsPerPage(parseInt(e.target.value, 10));
@@ -1497,9 +1511,7 @@ const UsersPage = () => {
         </MenuItem>
         */}
         <MenuItem
-          onClick={() => {
-            handleMenuClose();
-          }}
+          onClick={handleSuspendUser}
           sx={{ color: colors.error }}
         >
           Suspend User
