@@ -984,10 +984,7 @@ const SystemLogsPage = () => {
           totalCount={pagination.total || filteredLogs.length}
           onPageChange={handlePageChange}
           onRowsPerPageChange={handleRowsPerPageChange}
-          onRowsPerPageChange={(e) => {
-            setRowsPerPage(parseInt(e.target.value, 10));
-            setPage(0);
-          }}
+
           emptyMessage="No system logs found"
         />
       </Card>
