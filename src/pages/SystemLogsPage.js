@@ -91,7 +91,7 @@ const SystemLogsPage = () => {
       id: backendLog._id || backendLog.id,
       event: backendLog.action || backendLog.event,
       relatedUsername: backendLog.userId?.username || backendLog.userId?.email || null,
-      adminName: backendLog.adminId 
+      adminName: backendLog.adminId
         ? (backendLog.adminId.fullName || backendLog.adminId.username || backendLog.adminId.email || 'Admin')
         : 'Auto-Detection System',
       adminId: backendLog.adminId?._id?.toString() || backendLog.adminId?.toString() || 'auto-detection',
@@ -156,9 +156,9 @@ const SystemLogsPage = () => {
       if (typeFilter !== 'all') params.category = typeFilter;
       if (adminFilter !== 'all') params.adminUser = adminFilter;
       if (dateRangeFilter !== 'all') {
-        params.dateRange = dateRangeFilter === 'last7Days' ? 'last7days' : 
-                          dateRangeFilter === 'last30Days' ? 'last30days' : 
-                          dateRangeFilter;
+        params.dateRange = dateRangeFilter === 'last7Days' ? 'last7days' :
+          dateRangeFilter === 'last30Days' ? 'last30days' :
+            dateRangeFilter;
       }
 
       const response = await getSystemLogs(params);
@@ -168,7 +168,7 @@ const SystemLogsPage = () => {
         const mappedLogs = (response.data.logs || []).map(mapBackendToFrontend);
         setLogs(mappedLogs);
         setFilteredLogs(mappedLogs);
-        
+
         // Update pagination
         if (response.data.pagination) {
           setPagination(response.data.pagination);
@@ -984,7 +984,6 @@ const SystemLogsPage = () => {
           totalCount={pagination.total || filteredLogs.length}
           onPageChange={handlePageChange}
           onRowsPerPageChange={handleRowsPerPageChange}
-
           emptyMessage="No system logs found"
         />
       </Card>
@@ -1022,12 +1021,12 @@ const SystemLogsPage = () => {
         }}
       >
         {admins.map((admin) => (
-          <MenuItem 
-            key={admin.id} 
+          <MenuItem
+            key={admin.id}
             onClick={() => handleAdminMenuClose(admin.id === 'all' ? 'all' : admin.id)}
           >
             {admin.label}
-            </MenuItem>
+          </MenuItem>
         ))}
       </Menu>
 
