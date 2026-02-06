@@ -12,9 +12,12 @@ import {
   InputLabel,
   Grid,
   CircularProgress,
+  Alert,
+  Snackbar,
 } from '@mui/material';
 import { ArrowBack, Save } from '@mui/icons-material';
 import { colors, constants } from '../config/theme';
+import { getFaqById, createFaq, updateFaq } from '../services/faqService';
 
 const FaqFormPage = () => {
   const navigate = useNavigate();
@@ -22,11 +25,13 @@ const FaqFormPage = () => {
   const isEditMode = !!id;
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
 
   const [formData, setFormData] = useState({
     question: '',
     answer: '',
-    category: 'gettingStarted',
+    category: 'Getting Started',
     status: 'draft',
     order: 0,
   });
@@ -35,21 +40,29 @@ const FaqFormPage = () => {
     const loadFaqData = async () => {
       try {
         setLoading(true);
-        // Simulate network
-        await new Promise(resolve => setTimeout(resolve, 800));
+        setError(null);
 
-        // Mock data
-        if (id) {
+        const response = await getFaqById(id);
+        
+        if (response.success && response.data) {
+          const faq = response.data;
+          // Backend returns status as 'PUBLISHED', 'DRAFT', 'ARCHIVED' (uppercase)
+          // Convert to lowercase for form
+          const status = faq.status ? faq.status.toLowerCase() : 'draft';
+          
           setFormData({
-            question: 'How do I start?',
-            answer: 'Just sign up and play.',
-            category: 'gettingStarted',
-            status: 'published',
-            order: 1,
+            question: faq.question || '',
+            answer: faq.answer || '',
+            category: faq.category || 'Getting Started',
+            status: status,
+            order: faq.order || 0,
           });
+        } else {
+          setError(response.error || 'Failed to load FAQ');
         }
       } catch (error) {
         console.error('Error loading FAQ:', error);
+        setError('An unexpected error occurred while loading FAQ');
       } finally {
         setLoading(false);
       }
@@ -66,23 +79,51 @@ const FaqFormPage = () => {
 
   const handleChange = (field, value) => {
     setFormData({ ...formData, [field]: value });
+    // Clear error when user starts typing
+    if (error) setError(null);
   };
 
   const handleSave = async () => {
+    // Validation
+    if (!formData.question.trim()) {
+      setError('Question is required');
+      return;
+    }
+    if (!formData.answer.trim()) {
+      setError('Answer is required');
+      return;
+    }
+
     try {
       setSaving(true);
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      setError(null);
 
-      console.log('FAQ saved:', formData);
-      alert('FAQ saved successfully (Mock)');
+      let response;
+      if (isEditMode) {
+        response = await updateFaq(id, formData);
+      } else {
+        response = await createFaq(formData);
+      }
 
-      navigate(constants.routes.content);
+      if (response.success) {
+        setSuccessMessage(response.message || (isEditMode ? 'FAQ updated successfully' : 'FAQ created successfully'));
+        // Navigate after a short delay to show success message
+        setTimeout(() => {
+          navigate(constants.routes.content);
+        }, 1500);
+      } else {
+        setError(response.error || 'Failed to save FAQ');
+      }
     } catch (error) {
       console.error('Error saving FAQ:', error);
-      alert('Failed to save FAQ');
+      setError('An unexpected error occurred while saving FAQ');
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleCloseSnackbar = () => {
+    setSuccessMessage(null);
   };
 
   if (loading) {
@@ -137,22 +178,49 @@ const FaqFormPage = () => {
                 onChange={(e) => handleChange('category', e.target.value)}
                 label="Category"
               >
-                <MenuItem value="gettingStarted">Getting Started</MenuItem>
-                <MenuItem value="predictions">Predictions</MenuItem>
-                <MenuItem value="rewards">Rewards</MenuItem>
-                <MenuItem value="account">Account</MenuItem>
+                <MenuItem value="Getting Started">Getting Started</MenuItem>
+                <MenuItem value="Predictions">Predictions</MenuItem>
+                <MenuItem value="Rewards">Rewards</MenuItem>
+                <MenuItem value="Payments">Payments</MenuItem>
+                <MenuItem value="Security">Security</MenuItem>
+                <MenuItem value="Leaderboard">Leaderboard</MenuItem>
+                <MenuItem value="Account">Account</MenuItem>
+                <MenuItem value="Support">Support</MenuItem>
+                <MenuItem value="Matches">Matches</MenuItem>
               </Select>
             </FormControl>
           </Grid>
-          <Grid item xs={12} md={6}>
+          <Grid item xs={12} md={3}>
+            <FormControl fullWidth>
+              <InputLabel>Status</InputLabel>
+              <Select
+                value={formData.status}
+                onChange={(e) => handleChange('status', e.target.value)}
+                label="Status"
+              >
+                <MenuItem value="draft">Draft</MenuItem>
+                <MenuItem value="published">Published</MenuItem>
+                <MenuItem value="archived">Archived</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+          <Grid item xs={12} md={3}>
             <TextField
               fullWidth
               type="number"
               label="Order"
               value={formData.order}
               onChange={(e) => handleChange('order', parseInt(e.target.value) || 0)}
+              inputProps={{ min: 0 }}
             />
           </Grid>
+          {error && (
+            <Grid item xs={12}>
+              <Alert severity="error" onClose={() => setError(null)}>
+                {error}
+              </Alert>
+            </Grid>
+          )}
           <Grid item xs={12}>
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
               <Button
@@ -179,6 +247,17 @@ const FaqFormPage = () => {
           </Grid>
         </Grid>
       </Card>
+
+      <Snackbar
+        open={!!successMessage}
+        autoHideDuration={3000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert onClose={handleCloseSnackbar} severity="success" sx={{ width: '100%' }}>
+          {successMessage}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

@@ -65,27 +65,15 @@ export const getFixture = async (fixtureId) => {
 
 /**
  * Create new fixture
- * @param {object} fixtureData - Fixture data (homeTeam, awayTeam, leagueId, kickoffTime, venue, cmdId)
+ * @param {object} fixtureData - Fixture data
+ *   For CeBe/Regular: { home_team_id, away_team_id, leagueId, kickoffTime, publishDateTime, venue, isCeBeFeatured, cmdId }
+ *   For Community Featured: { selected_team_id, leagueId, kickoffTime, publishDateTime, venue, matchday, isCommunityFeatured, cmdId }
  * @returns {Promise<{success: boolean, data?: object, error?: string, message?: string}>}
  */
 export const createFixture = async (fixtureData) => {
   try {
-    // Validate required fields
-    if (!fixtureData.homeTeam || !fixtureData.homeTeam.trim()) {
-      return {
-        success: false,
-        error: 'Home team is required',
-      };
-    }
-
-    if (!fixtureData.awayTeam || !fixtureData.awayTeam.trim()) {
-      return {
-        success: false,
-        error: 'Away team is required',
-      };
-    }
-
-    if (!fixtureData.leagueId || !fixtureData.leagueId.trim()) {
+    // Validate required fields based on fixture type
+    if (!fixtureData.leagueId) {
       return {
         success: false,
         error: 'League ID is required',
@@ -99,27 +87,73 @@ export const createFixture = async (fixtureData) => {
       };
     }
 
+    if (!fixtureData.publishDateTime) {
+      return {
+        success: false,
+        error: 'Publish date time is required',
+      };
+    }
+
+    if (!fixtureData.venue) {
+      return {
+        success: false,
+        error: 'Venue is required',
+      };
+    }
+
     // Format the request body to match backend expectations
     const requestBody = {
-      homeTeam: fixtureData.homeTeam.trim(),
-      awayTeam: fixtureData.awayTeam.trim(),
       leagueId: fixtureData.leagueId,
       kickoffTime: fixtureData.kickoffTime instanceof Date 
         ? fixtureData.kickoffTime.toISOString() 
         : fixtureData.kickoffTime,
+      publishDateTime: fixtureData.publishDateTime instanceof Date 
+        ? fixtureData.publishDateTime.toISOString() 
+        : fixtureData.publishDateTime,
+      venue: fixtureData.venue,
     };
 
-    // Optional fields
-    if (fixtureData.venue) {
-      requestBody.venue = fixtureData.venue;
+    // Handle Community Featured fixtures
+    if (fixtureData.isCommunityFeatured) {
+      if (!fixtureData.selected_team_id) {
+        return {
+          success: false,
+          error: 'Selected team ID is required for Community Featured fixtures',
+        };
+      }
+      if (!fixtureData.matchday) {
+        return {
+          success: false,
+          error: 'Matchday is required for Community Featured fixtures',
+        };
+      }
+      requestBody.isCommunityFeatured = true;
+      requestBody.selected_team_id = fixtureData.selected_team_id;
+      requestBody.matchday = fixtureData.matchday;
+    } 
+    // Handle CeBe Featured or Regular fixtures
+    else {
+      if (!fixtureData.home_team_id || !fixtureData.away_team_id) {
+        return {
+          success: false,
+          error: 'Home team ID and away team ID are required',
+        };
+      }
+      requestBody.home_team_id = fixtureData.home_team_id;
+      requestBody.away_team_id = fixtureData.away_team_id;
+      
+      if (fixtureData.isCeBeFeatured) {
+        requestBody.isCeBeFeatured = true;
+      }
     }
 
+    // Optional fields
     if (fixtureData.cmdId) {
       requestBody.cmdId = fixtureData.cmdId;
     }
 
-    if (fixtureData.matchStatus) {
-      requestBody.matchStatus = fixtureData.matchStatus;
+    if (fixtureData.status) {
+      requestBody.status = fixtureData.status;
     }
 
     console.log('Creating fixture - fixtureData received:', fixtureData);
@@ -223,7 +257,7 @@ export const updateFixture = async (fixtureId, fixtureData) => {
 /**
  * Update fixture status
  * @param {string} fixtureId - Fixture ID
- * @param {string} status - New status (scheduled, published, predictionLocked, live, resultsProcessing, completed)
+ * @param {string} status - New status (scheduled, published, predictionOpen, predictionLock, live, resultPending, completed)
  * @returns {Promise<{success: boolean, data?: object, error?: string, message?: string}>}
  */
 export const updateFixtureStatus = async (fixtureId, status) => {
@@ -242,7 +276,8 @@ export const updateFixtureStatus = async (fixtureId, status) => {
       };
     }
 
-    const response = await apiPatch(`/fixtures/${fixtureId}/status`, { status });
+    // Backend uses PUT /fixtures/:id with status field in body
+    const response = await apiPut(`/fixtures/${fixtureId}`, { status, matchStatus: status });
     
     if (response.success) {
       return {
@@ -267,7 +302,7 @@ export const updateFixtureStatus = async (fixtureId, status) => {
 /**
  * Update fixture results
  * @param {string} fixtureId - Fixture ID
- * @param {object} resultsData - Results data (homeScore, awayScore, firstGoalScorer, firstGoalMinute, markCompleted)
+ * @param {object} resultsData - Results data (homeScore, awayScore, firstGoalScorer, firstGoalMinute)
  * @returns {Promise<{success: boolean, data?: object, error?: string, message?: string}>}
  */
 export const updateFixtureResults = async (fixtureId, resultsData) => {
@@ -294,24 +329,7 @@ export const updateFixtureResults = async (fixtureId, resultsData) => {
       };
     }
 
-    if (resultsData.markCompleted) {
-      // If marking as completed, first goal scorer and minute are required
-      if (!resultsData.firstGoalScorer || !resultsData.firstGoalScorer.trim()) {
-        return {
-          success: false,
-          error: 'First goal scorer is required when marking as completed',
-        };
-      }
-
-      if (!resultsData.firstGoalMinute || resultsData.firstGoalMinute === '') {
-        return {
-          success: false,
-          error: 'First goal minute is required when marking as completed',
-        };
-      }
-    }
-
-    // Format the request body
+    // Format the request body - backend expects homeScore, awayScore, firstGoalScorer, firstGoalMinute
     const requestBody = {
       homeScore: parseInt(resultsData.homeScore, 10),
       awayScore: parseInt(resultsData.awayScore, 10),
@@ -321,18 +339,15 @@ export const updateFixtureResults = async (fixtureId, resultsData) => {
       requestBody.firstGoalScorer = resultsData.firstGoalScorer.trim();
     }
 
-    if (resultsData.firstGoalMinute) {
+    if (resultsData.firstGoalMinute !== undefined && resultsData.firstGoalMinute !== null && resultsData.firstGoalMinute !== '') {
       requestBody.firstGoalMinute = parseInt(resultsData.firstGoalMinute, 10);
-    }
-
-    if (resultsData.markCompleted !== undefined) {
-      requestBody.markCompleted = resultsData.markCompleted;
     }
 
     console.log('Updating fixture results - resultsData received:', resultsData);
     console.log('Updating fixture results - requestBody being sent:', requestBody);
     
-    const response = await apiPatch(`/fixtures/${fixtureId}/results`, requestBody);
+    // Backend uses PUT /fixtures/:id/results
+    const response = await apiPut(`/fixtures/${fixtureId}/results`, requestBody);
     
     if (response.success) {
       return {
@@ -455,7 +470,7 @@ export const getFixturesByStatus = async (status, params = {}) => {
 };
 
 /**
- * Approve match details
+ * Approve match details (sets status to published/predictionOpen)
  * @param {string} fixtureId - Fixture ID
  * @returns {Promise<{success: boolean, data?: object, error?: string, message?: string}>}
  */
@@ -468,7 +483,12 @@ export const approveFixture = async (fixtureId) => {
       };
     }
 
-    const response = await apiPatch(`/fixtures/${fixtureId}/approve`, {});
+    // Backend doesn't have separate approve endpoint - use status update
+    // Approving typically means moving from scheduled to published/predictionOpen
+    const response = await apiPut(`/fixtures/${fixtureId}`, { 
+      status: 'predictionOpen',
+      matchStatus: 'predictionOpen'
+    });
     
     if (response.success) {
       return {
@@ -491,7 +511,7 @@ export const approveFixture = async (fixtureId) => {
 };
 
 /**
- * Publish fixture (move from scheduled to published)
+ * Publish fixture (move from scheduled to published/predictionOpen)
  * @param {string} fixtureId - Fixture ID
  * @returns {Promise<{success: boolean, data?: object, error?: string, message?: string}>}
  */
@@ -504,7 +524,12 @@ export const publishFixture = async (fixtureId) => {
       };
     }
 
-    const response = await apiPatch(`/fixtures/${fixtureId}/publish`, {});
+    // Backend doesn't have separate publish endpoint - use status update
+    // Publishing means moving to predictionOpen status
+    const response = await apiPut(`/fixtures/${fixtureId}`, { 
+      status: 'predictionOpen',
+      matchStatus: 'predictionOpen'
+    });
     
     if (response.success) {
       return {
@@ -527,7 +552,7 @@ export const publishFixture = async (fixtureId) => {
 };
 
 /**
- * Lock predictions for fixture
+ * Lock predictions for fixture (move to predictionLock status)
  * @param {string} fixtureId - Fixture ID
  * @returns {Promise<{success: boolean, data?: object, error?: string, message?: string}>}
  */
@@ -540,7 +565,12 @@ export const lockFixturePredictions = async (fixtureId) => {
       };
     }
 
-    const response = await apiPatch(`/fixtures/${fixtureId}/lock`, {});
+    // Backend doesn't have separate lock endpoint - use status update
+    // Locking means moving to predictionLock status
+    const response = await apiPut(`/fixtures/${fixtureId}`, { 
+      status: 'predictionLock',
+      matchStatus: 'predictionLock'
+    });
     
     if (response.success) {
       return {
@@ -563,7 +593,7 @@ export const lockFixturePredictions = async (fixtureId) => {
 };
 
 /**
- * Start live match
+ * Start live match (move to live status)
  * @param {string} fixtureId - Fixture ID
  * @returns {Promise<{success: boolean, data?: object, error?: string, message?: string}>}
  */
@@ -576,7 +606,12 @@ export const startLiveMatch = async (fixtureId) => {
       };
     }
 
-    const response = await apiPatch(`/fixtures/${fixtureId}/start-live`, {});
+    // Backend doesn't have separate start-live endpoint - use status update
+    // Starting live means moving to live status
+    const response = await apiPut(`/fixtures/${fixtureId}`, { 
+      status: 'live',
+      matchStatus: 'live'
+    });
     
     if (response.success) {
       return {
@@ -599,7 +634,7 @@ export const startLiveMatch = async (fixtureId) => {
 };
 
 /**
- * End match (move to resultsProcessing status)
+ * End match (move to resultPending status)
  * @param {string} fixtureId - Fixture ID
  * @returns {Promise<{success: boolean, data?: object, error?: string, message?: string}>}
  */
@@ -612,7 +647,8 @@ export const endMatch = async (fixtureId) => {
       };
     }
 
-    const response = await apiPatch(`/fixtures/${fixtureId}/end`, {});
+    // Backend uses PUT /fixtures/:id/end-match
+    const response = await apiPut(`/fixtures/${fixtureId}/end-match`, {});
     
     if (response.success) {
       return {
@@ -636,6 +672,7 @@ export const endMatch = async (fixtureId) => {
 
 /**
  * Get predictions for a fixture
+ * Uses the predictionsService for consistency
  * @param {string} fixtureId - Fixture ID
  * @param {object} params - Query parameters (page, limit, search, sort_by, sort_order)
  * @returns {Promise<{success: boolean, data?: object, error?: string}>}
@@ -649,20 +686,9 @@ export const getFixturePredictions = async (fixtureId, params = {}) => {
       };
     }
 
-    const response = await apiGet(`/fixtures/${fixtureId}/predictions`, params);
-    
-    if (response.success) {
-      return {
-        success: true,
-        data: response.data,
-      };
-    }
-    
-    return {
-      success: false,
-      error: response.error,
-      data: { predictions: [], pagination: {} },
-    };
+    // Import predictionsService dynamically to avoid circular dependencies
+    const { getPredictionsByFixture } = await import('./predictionsService');
+    return await getPredictionsByFixture(fixtureId, params);
   } catch (error) {
     return {
       success: false,
@@ -674,6 +700,7 @@ export const getFixturePredictions = async (fixtureId, params = {}) => {
 
 /**
  * Get fixture statistics
+ * NOTE: This endpoint may not exist in backend - statistics might be included in fixture details
  * @param {string} fixtureId - Fixture ID
  * @returns {Promise<{success: boolean, data?: object, error?: string}>}
  */
@@ -686,7 +713,8 @@ export const getFixtureStats = async (fixtureId) => {
       };
     }
 
-    const response = await apiGet(`/fixtures/${fixtureId}/stats`);
+    // Backend endpoint may not exist - try getting fixture details which may include stats
+    const response = await apiGet(`/fixtures/${fixtureId}`);
     
     if (response.success) {
       return {
@@ -709,6 +737,7 @@ export const getFixtureStats = async (fixtureId) => {
 
 /**
  * Get fixture timeline/events
+ * NOTE: This endpoint may not exist in backend
  * @param {string} fixtureId - Fixture ID
  * @returns {Promise<{success: boolean, data?: object, error?: string}>}
  */
@@ -721,18 +750,10 @@ export const getFixtureTimeline = async (fixtureId) => {
       };
     }
 
-    const response = await apiGet(`/fixtures/${fixtureId}/timeline`);
-    
-    if (response.success) {
-      return {
-        success: true,
-        data: response.data,
-      };
-    }
-    
+    // Backend endpoint may not exist - return empty for now
     return {
       success: false,
-      error: response.error,
+      error: 'Timeline endpoint not available',
       data: { events: [] },
     };
   } catch (error) {
@@ -746,6 +767,7 @@ export const getFixtureTimeline = async (fixtureId) => {
 
 /**
  * Bulk update fixture statuses
+ * NOTE: This endpoint does not exist in backend - update fixtures individually
  * @param {Array<string>} fixtureIds - Array of fixture IDs
  * @param {string} status - New status
  * @returns {Promise<{success: boolean, data?: object, error?: string, message?: string}>}
@@ -766,22 +788,28 @@ export const bulkUpdateFixtureStatus = async (fixtureIds, status) => {
       };
     }
 
-    const response = await apiPatch('/fixtures/bulk-status', {
-      fixtureIds,
-      status,
-    });
-    
-    if (response.success) {
+    // Backend doesn't have bulk endpoint - update each fixture individually
+    const results = await Promise.allSettled(
+      fixtureIds.map(fixtureId => 
+        apiPut(`/fixtures/${fixtureId}`, { status, matchStatus: status })
+      )
+    );
+
+    const successful = results.filter(r => r.status === 'fulfilled' && r.value.success).length;
+    const failed = results.length - successful;
+
+    if (successful > 0) {
       return {
         success: true,
-        data: response.data,
-        message: response.message || 'Fixture statuses updated successfully',
+        data: { updated: successful, failed },
+        message: `Updated ${successful} fixture(s)${failed > 0 ? `, ${failed} failed` : ''}`,
       };
     }
     
     return {
       success: false,
-      error: response.error || 'Failed to update fixture statuses',
+      error: 'Failed to update any fixtures',
+      data: { updated: 0, failed },
     };
   } catch (error) {
     return {
@@ -793,6 +821,7 @@ export const bulkUpdateFixtureStatus = async (fixtureIds, status) => {
 
 /**
  * Get fixture summary/overview
+ * NOTE: This endpoint may not exist in backend - use getFixture instead
  * @param {string} fixtureId - Fixture ID
  * @returns {Promise<{success: boolean, data?: object, error?: string}>}
  */
@@ -805,7 +834,8 @@ export const getFixtureSummary = async (fixtureId) => {
       };
     }
 
-    const response = await apiGet(`/fixtures/${fixtureId}/summary`);
+    // Backend endpoint may not exist - use getFixture instead
+    const response = await apiGet(`/fixtures/${fixtureId}`);
     
     if (response.success) {
       return {
@@ -822,6 +852,92 @@ export const getFixtureSummary = async (fixtureId) => {
     return {
       success: false,
       error: error.message || 'Failed to fetch fixture summary',
+    };
+  }
+};
+
+/**
+ * Get available matchdays from existing fixtures
+ * @param {string} leagueId - Optional league ID to filter matchdays
+ * @returns {Promise<{success: boolean, data?: string[], error?: string}>}
+ */
+export const getMatchdays = async (leagueId = null) => {
+  try {
+    // Fetch fixtures to get unique matchdays
+    const params = {
+      isCommunityFeatured: true,
+      limit: 1000, // Get enough fixtures to extract matchdays
+    };
+    
+    if (leagueId) {
+      params.leagueId = leagueId;
+    }
+    
+    const response = await apiGet('/fixtures', params);
+    
+    if (response.success) {
+      const fixtures = response.data?.fixtures || response.data || [];
+      // Extract unique matchdays from fixtures
+      const matchdays = [...new Set(
+        fixtures
+          .map(f => f.matchday)
+          .filter(m => m && m.trim() !== '')
+      )].sort();
+      
+      return {
+        success: true,
+        data: matchdays,
+      };
+    }
+    
+    return {
+      success: false,
+      error: response.error,
+      data: [],
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message || 'Failed to fetch matchdays',
+      data: [],
+    };
+  }
+};
+
+/**
+ * Get featured fixtures for a league (Community Featured)
+ * @param {string} leagueId - League ID
+ * @returns {Promise<{success: boolean, data?: object, error?: string}>}
+ */
+export const getFeaturedFixtures = async (leagueId) => {
+  try {
+    if (!leagueId) {
+      return {
+        success: false,
+        error: 'League ID is required',
+      };
+    }
+
+    // Backend endpoint: GET /api/fixtures/featured-fixture/:leagueId
+    const response = await apiGet(`/fixtures/featured-fixture/${leagueId}`);
+    
+    if (response.success) {
+      return {
+        success: true,
+        data: response.data,
+      };
+    }
+    
+    return {
+      success: false,
+      error: response.error,
+      data: { featuredFixture: null },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message || 'Failed to fetch featured fixtures',
+      data: { featuredFixture: null },
     };
   }
 };

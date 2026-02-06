@@ -27,13 +27,13 @@ const RewardFormPage = () => {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    type: 'points',
-    pointsRequired: 1000,
-    cashValue: 0,
+    rewardType: 'gift_card', // Default to gift card
+    giftCardPlatform: 'Amazon',
+    giftCardRegion: 'US',
+    usdAmount: 0,
     quantityAvailable: 100,
-    minRankRequired: 0,
-    tier: 'bronze',
-    status: 'inactive',
+    minRankRequired: 1,
+    status: 'active',
     isLimited: true,
     expiryDate: null,
   });
@@ -140,25 +140,80 @@ const RewardFormPage = () => {
           </Grid>
           <Grid item xs={12} md={6}>
             <FormControl fullWidth>
-              <InputLabel>Type</InputLabel>
+              <InputLabel>Reward Type</InputLabel>
               <Select
-                value={formData.type}
-                onChange={(e) => handleChange('type', e.target.value)}
-                label="Type"
+                value={formData.rewardType}
+                onChange={(e) => handleChange('rewardType', e.target.value)}
+                label="Reward Type"
               >
-                <MenuItem value="points">Points</MenuItem>
-                <MenuItem value="cash">Cash</MenuItem>
-                <MenuItem value="prize">Prize</MenuItem>
+                <MenuItem value="gift_card">Gift Card (Default)</MenuItem>
+                <MenuItem value="alternative">Alternative Non-Cash Reward (Requires Approval)</MenuItem>
               </Select>
             </FormControl>
+          </Grid>
+          {formData.rewardType === 'gift_card' && (
+            <>
+              <Grid item xs={12} md={6}>
+                <FormControl fullWidth>
+                  <InputLabel>Gift Card Platform</InputLabel>
+                  <Select
+                    value={formData.giftCardPlatform}
+                    onChange={(e) => handleChange('giftCardPlatform', e.target.value)}
+                    label="Gift Card Platform"
+                  >
+                    <MenuItem value="Amazon">Amazon</MenuItem>
+                    <MenuItem value="Google Play">Google Play</MenuItem>
+                    <MenuItem value="Apple">Apple</MenuItem>
+                    <MenuItem value="Steam">Steam</MenuItem>
+                    <MenuItem value="Other">Other</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <FormControl fullWidth>
+                  <InputLabel>Region</InputLabel>
+                  <Select
+                    value={formData.giftCardRegion}
+                    onChange={(e) => handleChange('giftCardRegion', e.target.value)}
+                    label="Region"
+                  >
+                    <MenuItem value="US">US</MenuItem>
+                    <MenuItem value="UK">UK</MenuItem>
+                    <MenuItem value="EU">EU</MenuItem>
+                    <MenuItem value="CA">Canada</MenuItem>
+                    <MenuItem value="Other">Other</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+            </>
+          )}
+          <Grid item xs={12} md={6}>
+            <TextField
+              fullWidth
+              type="number"
+              label="Reward Value (USD)"
+              value={formData.usdAmount}
+              onChange={(e) => handleChange('usdAmount', parseFloat(e.target.value) || 0)}
+              required
+            />
           </Grid>
           <Grid item xs={12} md={6}>
             <TextField
               fullWidth
               type="number"
-              label="Points Required"
-              value={formData.pointsRequired}
-              onChange={(e) => handleChange('pointsRequired', parseInt(e.target.value) || 0)}
+              label="Quantity Available"
+              value={formData.quantityAvailable}
+              onChange={(e) => handleChange('quantityAvailable', parseInt(e.target.value) || 0)}
+            />
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <TextField
+              fullWidth
+              type="number"
+              label="Minimum Rank Required"
+              value={formData.minRankRequired}
+              onChange={(e) => handleChange('minRankRequired', parseInt(e.target.value) || 1)}
+              helperText="Top 3 (1-3) for monthly leaderboard rewards"
             />
           </Grid>
           <Grid item xs={12}>

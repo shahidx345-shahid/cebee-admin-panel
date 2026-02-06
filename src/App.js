@@ -102,10 +102,10 @@ function App() {
                 <Route path="/rewards/add" element={<RewardFormPage />} />
                 <Route path="/rewards/edit/:id" element={<RewardFormPage />} />
                 <Route path="/rewards/details/:id" element={<RewardDetailsPage />} />
-                <Route path={constants.routes.notifications} element={<NotificationsPage />} />
                 <Route path="/notifications/create" element={<NotificationFormPage />} />
                 <Route path="/notifications/edit/:id" element={<NotificationFormPage />} />
                 <Route path="/notifications/details/:id" element={<PlaceholderPage title="Notification Details" />} />
+                <Route path={constants.routes.notifications} element={<NotificationsPage />} />
                 <Route path={constants.routes.content} element={<ContentUpdatesPage />} />
                 <Route path="/content-updates/faq/add" element={<FaqFormPage />} />
                 <Route path="/content-updates/faq/edit/:id" element={<FaqFormPage />} />

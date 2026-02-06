@@ -38,8 +38,9 @@ import { colors, constants } from '../config/theme';
 import SearchBar from '../components/common/SearchBar';
 import DataTable from '../components/common/DataTable';
 import { format } from 'date-fns';
+import { getLeaderboard, getLeaderboardStatistics } from '../services/leaderboardService';
 
-// Static leaderboard data
+// Static leaderboard data (fallback)
 const staticLeaderboardData = [
   {
     id: '1',
@@ -319,46 +320,120 @@ const staticLeaderboardData = [
 
 const LeaderboardPage = () => {
   const navigate = useNavigate();
-  // Generate monthly data from static data for demo purposes
-  const [entries, setEntries] = useState(() => {
-    const monthlyData = staticLeaderboardData.map(entry => ({
-      ...entry,
-      id: `${entry.id}_monthly`,
-      period: 'monthly',
-      points: Math.floor(entry.points / 10), // Simulate monthly points
-      spTotal: Math.floor(entry.spTotal / 10),
-      totalPredictions: Math.floor(entry.totalPredictions / 10),
-    }));
-    return [...staticLeaderboardData, ...monthlyData];
-  });
-
+  const [entries, setEntries] = useState([]);
   const [filteredEntries, setFilteredEntries] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedPeriod, setSelectedPeriod] = useState('monthly'); // Default to Monthly
   const [selectedSort, setSelectedSort] = useState('rankAsc');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [totalCount, setTotalCount] = useState(0);
+  const [statistics, setStatistics] = useState({
+    totalParticipants: 0,
+    topScorer: 'N/A',
+    averageAccuracy: '0.0',
+    totalPoints: 0,
+  });
   const [periodAnchor, setPeriodAnchor] = useState(null);
   const [sortAnchor, setSortAnchor] = useState(null);
   const [paginationAnchor, setPaginationAnchor] = useState(null);
   const [actionsAnchor, setActionsAnchor] = useState(null);
   const [selectedEntry, setSelectedEntry] = useState(null);
 
-  // Stats derived from filteredEntries (affected by period selection)
-  const totalParticipants = filteredEntries.length;
-  const topScorer = filteredEntries.length > 0
-    ? filteredEntries.reduce((max, entry) => (entry.spTotal > max.spTotal ? entry : max), filteredEntries[0]).username
-    : 'N/A';
-  const averageAccuracy = filteredEntries.length > 0
-    ? ((filteredEntries.reduce((sum, e) => sum + (e.accuracyRate || 0), 0) / filteredEntries.length)).toFixed(1)
-    : '0.0';
-  const totalPoints = filteredEntries.reduce((sum, e) => sum + (e.spTotal || e.points || 0), 0);
-
+  // Fetch leaderboard data
   useEffect(() => {
-    const filterAndSortEntries = () => {
-      let filtered = [...entries];
+    const fetchLeaderboard = async () => {
+      try {
+        setLoading(true);
+        setError(null);
 
+        // Map frontend sort to backend sort parameter
+        const sortMap = {
+          'rankAsc': 'rankLowToHigh',
+          'rankDesc': 'rankHighToLow',
+          'pointsHighest': 'pointsHighestFirst',
+          'pointsLowest': 'pointsLowestFirst',
+          'accuracyHighest': 'accuracyHighestFirst',
+          'accuracyLowest': 'accuracyLowestFirst',
+          'usernameAZ': 'usernameAZ',
+          'usernameZA': 'usernameZA',
+        };
+        
+        const backendSort = sortMap[selectedSort] || 'rankHighToLow';
+
+        // Map frontend period to backend period
+        let backendPeriod = selectedPeriod;
+        if (selectedPeriod === 'monthly') {
+          // For monthly, backend uses cmdId or last30days
+          // We'll use last30days for now (can be enhanced to get current CMd)
+          backendPeriod = 'last30days';
+        }
+
+        const params = {
+          period: backendPeriod,
+          search: searchQuery || undefined,
+          page: page + 1, // Backend uses 1-based pagination
+          limit: rowsPerPage,
+          sort: backendSort,
+        };
+
+        // Remove undefined values
+        Object.keys(params).forEach(key => params[key] === undefined && delete params[key]);
+
+        const [leaderboardResponse, statsResponse] = await Promise.all([
+          getLeaderboard(params),
+          getLeaderboardStatistics(selectedPeriod),
+        ]);
+
+        if (leaderboardResponse.success) {
+          const data = leaderboardResponse.data;
+          // Backend returns 'leaderboard' array, not 'entries'
+          const entriesList = data.leaderboard || [];
+          setEntries(entriesList);
+          setFilteredEntries(entriesList);
+          setTotalCount(data.pagination?.total || data.totalParticipants || entriesList.length || 0);
+
+          // Use statistics from stats endpoint if available
+          if (statsResponse.success && statsResponse.data) {
+            const stats = statsResponse.data;
+            setStatistics({
+              totalParticipants: stats.totalParticipants || 0,
+              topScorer: stats.topScorer || 'N/A',
+              averageAccuracy: stats.averageAccuracy?.toFixed(1) || '0.0',
+              totalPoints: stats.totalPoints || 0,
+            });
+          } else {
+            // Calculate statistics from entries as fallback
+            setStatistics({
+              totalParticipants: data.totalParticipants || entriesList.length || 0,
+              topScorer: entriesList.length > 0
+                ? (entriesList.reduce((max, entry) => {
+                    const entryPoints = entry.spTotal || entry.points || 0;
+                    const maxPoints = max.spTotal || max.points || 0;
+                    return entryPoints > maxPoints ? entry : max;
+                  }, entriesList[0])?.username || entriesList[0]?.userName || 'N/A')
+                : 'N/A',
+              averageAccuracy: entriesList.length > 0
+                ? ((entriesList.reduce((sum, e) => sum + (e.accuracyRate || e.accuracy || 0), 0) / entriesList.length)).toFixed(1)
+                : '0.0',
+              totalPoints: entriesList.reduce((sum, e) => sum + (e.spTotal || e.points || 0), 0),
+            });
+          }
+        } else {
+          // Fallback to static data on error
+          console.warn('Failed to fetch leaderboard:', leaderboardResponse.error);
+          const monthlyData = staticLeaderboardData.map(entry => ({
+            ...entry,
+            id: `${entry.id}_monthly`,
+            period: 'monthly',
+            points: Math.floor(entry.points / 10),
+            spTotal: Math.floor(entry.spTotal / 10),
+            totalPredictions: Math.floor(entry.totalPredictions / 10),
+          }));
+          const allData = [...staticLeaderboardData, ...monthlyData];
+          let filtered = allData.filter(e => e.period === selectedPeriod);
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
         filtered = filtered.filter(
@@ -368,44 +443,46 @@ const LeaderboardPage = () => {
             entry.id?.toLowerCase().includes(query)
         );
       }
-
-      if (selectedPeriod !== 'all') {
-        filtered = filtered.filter((entry) => entry.period === selectedPeriod);
-      }
-
-      switch (selectedSort) {
-        case 'rankAsc':
-          filtered.sort((a, b) => (a.rank || 0) - (b.rank || 0));
-          break;
-        case 'rankDesc':
-          filtered.sort((a, b) => (b.rank || 0) - (a.rank || 0));
-          break;
-        case 'pointsHighest':
-          filtered.sort((a, b) => (b.spTotal || 0) - (a.spTotal || 0));
-          break;
-        case 'pointsLowest':
-          filtered.sort((a, b) => (a.spTotal || 0) - (b.spTotal || 0));
-          break;
-        case 'accuracyHighest':
-          filtered.sort((a, b) => (b.accuracyRate || 0) - (a.accuracyRate || 0));
-          break;
-        case 'accuracyLowest':
-          filtered.sort((a, b) => (a.accuracyRate || 0) - (b.accuracyRate || 0));
-          break;
-        case 'usernameAZ':
-          filtered.sort((a, b) => (a.username || '').localeCompare(b.username || ''));
-          break;
-        case 'usernameZA':
-          filtered.sort((a, b) => (b.username || '').localeCompare(a.username || ''));
-          break;
-        default:
-          break;
-      }
-
+          setEntries(filtered);
+          setFilteredEntries(filtered);
+          setTotalCount(filtered.length);
+          
+          // Calculate stats from fallback data
+          setStatistics({
+            totalParticipants: filtered.length,
+            topScorer: filtered.length > 0
+              ? filtered.reduce((max, entry) => (entry.spTotal > max.spTotal ? entry : max), filtered[0]).username
+              : 'N/A',
+            averageAccuracy: filtered.length > 0
+              ? ((filtered.reduce((sum, e) => sum + (e.accuracyRate || 0), 0) / filtered.length)).toFixed(1)
+              : '0.0',
+            totalPoints: filtered.reduce((sum, e) => sum + (e.spTotal || e.points || 0), 0),
+          });
+        }
+      } catch (err) {
+        console.error('Error fetching leaderboard:', err);
+        setError(err.message || 'Failed to load leaderboard');
+        // Fallback to static data
+        const monthlyData = staticLeaderboardData.map(entry => ({
+          ...entry,
+          id: `${entry.id}_monthly`,
+          period: 'monthly',
+          points: Math.floor(entry.points / 10),
+          spTotal: Math.floor(entry.spTotal / 10),
+          totalPredictions: Math.floor(entry.totalPredictions / 10),
+        }));
+        const allData = [...staticLeaderboardData, ...monthlyData];
+        const filtered = allData.filter(e => e.period === selectedPeriod);
+        setEntries(filtered);
       setFilteredEntries(filtered);
+        setTotalCount(filtered.length);
+      } finally {
+        setLoading(false);
+      }
     };
-    filterAndSortEntries();
-  }, [entries, searchQuery, selectedPeriod, selectedSort]);
+
+    fetchLeaderboard();
+  }, [selectedPeriod, searchQuery, selectedSort, page, rowsPerPage]);
 
 
 
@@ -578,11 +655,6 @@ const LeaderboardPage = () => {
     },
   ];
 
-  const paginatedEntries = filteredEntries.slice(
-    page * rowsPerPage,
-    page * rowsPerPage + rowsPerPage
-  );
-
   return (
     <Box sx={{ width: '100%', maxWidth: '100%' }}>
       <Typography
@@ -635,7 +707,7 @@ const LeaderboardPage = () => {
               />
             </Box>
             <Typography variant="h4" sx={{ fontWeight: 700, color: colors.brandWhite, mb: 0.5 }}>
-              {totalParticipants}
+              {statistics.totalParticipants}
             </Typography>
             <Typography variant="body2" sx={{ color: `${colors.brandWhite}DD`, fontSize: 13 }}>
               Total Participants
@@ -679,7 +751,7 @@ const LeaderboardPage = () => {
               />
             </Box>
             <Typography variant="h4" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.5 }}>
-              {topScorer}
+              {statistics.topScorer}
             </Typography>
             <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13 }}>
               Top Scorer
@@ -723,7 +795,7 @@ const LeaderboardPage = () => {
               />
             </Box>
             <Typography variant="h4" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.5 }}>
-              {averageAccuracy}%
+              {statistics.averageAccuracy}%
             </Typography>
             <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13 }}>
               Average Accuracy
@@ -767,7 +839,7 @@ const LeaderboardPage = () => {
               />
             </Box>
             <Typography variant="h4" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.5 }}>
-              {totalPoints.toLocaleString()}
+              {statistics.totalPoints.toLocaleString()}
             </Typography>
             <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13 }}>
               Total Points
@@ -1165,7 +1237,7 @@ const LeaderboardPage = () => {
                 fontWeight: 500,
               }}
             >
-              {filteredEntries.length} participants
+              {totalCount} participants
             </Typography>
           </Box>
         </Box>
@@ -1222,18 +1294,18 @@ const LeaderboardPage = () => {
       {/* Data Table */}
       <DataTable
         columns={columns}
-        data={paginatedEntries}
+        data={filteredEntries}
         loading={loading}
         page={page}
         rowsPerPage={rowsPerPage}
-        totalCount={filteredEntries.length}
+        totalCount={totalCount}
         onPageChange={(e, newPage) => setPage(newPage)}
         onRowsPerPageChange={(e) => {
           setRowsPerPage(parseInt(e.target.value, 10));
           setPage(0);
         }}
         onRowClick={(row) => {
-          const realId = row.id.toString().replace('_monthly', '');
+          const realId = row.id?.toString().replace('_monthly', '') || row.userId || row.id;
           navigate(`/leaderboard/details/${realId}?period=${selectedPeriod}`);
         }}
         emptyMessage="No leaderboard entries found"
@@ -1260,7 +1332,7 @@ const LeaderboardPage = () => {
         <MenuItem
           onClick={() => {
             if (selectedEntry) {
-              const realId = selectedEntry.id.toString().replace('_monthly', '');
+              const realId = selectedEntry.id?.toString().replace('_monthly', '') || selectedEntry.userId || selectedEntry.id;
               navigate(`/leaderboard/details/${realId}?period=${selectedPeriod}`);
             }
             handleActionsClose();

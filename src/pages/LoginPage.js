@@ -43,6 +43,12 @@ const LoginPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Prevent multiple submissions
+    if (loading) {
+      return;
+    }
+    
     setError('');
     setLoading(true);
 
@@ -51,7 +57,14 @@ const LoginPage = () => {
       if (result.success) {
         navigate(constants.routes.dashboard);
       } else {
-        setError(result.error || 'Login failed. Please try again.');
+        // Show specific error message, especially for rate limiting
+        const errorMsg = result.error || 'Login failed. Please try again.';
+        setError(errorMsg);
+        
+        // If it's a rate limit error, show a more helpful message
+        if (result.status === 429) {
+          setError('Too many login attempts. Please wait a moment before trying again.');
+        }
       }
     } catch (err) {
       setError(err.message || 'An unexpected error occurred.');

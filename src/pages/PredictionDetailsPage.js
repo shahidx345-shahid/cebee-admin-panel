@@ -27,6 +27,7 @@ import {
 } from '@mui/icons-material';
 import { colors, constants } from '../config/theme';
 import { format } from 'date-fns';
+import { getPredictionGroup, formatPredictions, getPredictionById } from '../services/predictionsService';
 
 const PredictionDetailsPage = () => {
   const navigate = useNavigate();
@@ -35,131 +36,106 @@ const PredictionDetailsPage = () => {
   const [groupData, setGroupData] = useState(null);
   const [predictions, setPredictions] = useState([]);
 
-  const generateDummyPredictionData = (userId, matchId) => {
-    const users = {
-      'john_doe': { username: 'John Doe', email: 'john@example.com', country: 'Nigeria', totalPredictions: 45, accuracy: 68.5 },
-      'jane_smith': { username: 'Jane Smith', email: 'jane@example.com', country: 'Ghana', totalPredictions: 38, accuracy: 72.1 },
-      'mike_wilson': { username: 'Mike Wilson', email: 'mike@example.com', country: 'Kenya', totalPredictions: 52, accuracy: 65.3 },
-      'sarah_jones': { username: 'Sarah Jones', email: 'sarah@example.com', country: 'South Africa', totalPredictions: 41, accuracy: 70.2 },
-      'david_brown': { username: 'David Brown', email: 'david@example.com', country: 'Egypt', totalPredictions: 47, accuracy: 66.8 },
-    };
-
-    const matches = {
-      'MATCH_001': { homeTeam: 'Arsenal', awayTeam: 'Chelsea', matchName: 'Arsenal vs Chelsea', actualResult: '2-1', status: 'completed' },
-      'MATCH_002': { homeTeam: 'Liverpool', awayTeam: 'Manchester United', matchName: 'Liverpool vs Manchester United', actualResult: '1-1', status: 'completed' },
-      'MATCH_003': { homeTeam: 'Manchester City', awayTeam: 'Tottenham', matchName: 'Manchester City vs Tottenham', actualResult: null, status: 'ongoing' },
-      'MATCH_004': { homeTeam: 'Newcastle', awayTeam: 'Brighton', matchName: 'Newcastle vs Brighton', actualResult: '3-0', status: 'completed' },
-      // Support old FIX_ format for backward compatibility
-      'FIX_001': { homeTeam: 'Arsenal', awayTeam: 'Chelsea', matchName: 'Arsenal vs Chelsea', actualResult: '2-1', status: 'completed' },
-      'FIX_002': { homeTeam: 'Liverpool', awayTeam: 'Manchester United', matchName: 'Liverpool vs Manchester United', actualResult: '1-1', status: 'completed' },
-      'FIX_003': { homeTeam: 'Manchester City', awayTeam: 'Tottenham', matchName: 'Manchester City vs Tottenham', actualResult: null, status: 'ongoing' },
-      'FIX_004': { homeTeam: 'Newcastle', awayTeam: 'Brighton', matchName: 'Newcastle vs Brighton', actualResult: '3-0', status: 'completed' },
-    };
-
-    const user = users[userId] || { username: 'Unknown User', email: 'unknown@example.com', country: 'Nigeria', totalPredictions: 0, accuracy: 0 };
-    // Try MATCH_ format first, then FIX_ format, then default
-    const match = matches[matchId] || matches[matchId?.replace('MATCH_', 'FIX_')] || matches[matchId?.replace('FIX_', 'MATCH_')] || { homeTeam: 'Team A', awayTeam: 'Team B', matchName: 'Team A vs Team B', actualResult: null, status: 'ongoing' };
-
-    // Generate multiple predictions for this match
-    const predictionTypes = [
-      { type: 'correct_score', prediction: '2-1', spValue: 50 },
-      { type: 'match_result', prediction: 'Arsenal Win', spValue: 30 },
-      { type: 'both_teams_score', prediction: 'Yes', spValue: 20 },
-    ];
-
-    const predictions = predictionTypes.map((pred, idx) => {
-      const isCompleted = match.status === 'completed';
-      const isCorrect = isCompleted && (idx === 0 || idx === 1); // First two are correct
-
-      return {
-        id: `PRED_${userId}_${matchId}_00${idx + 1}`,
-        userId: userId,
-        username: user.username,
-        userEmail: user.email,
-        userCountry: user.country,
-        userTotalPredictions: user.totalPredictions,
-        userAccuracy: user.accuracy,
-        fixtureId: matchId,
-        matchId: matchId,
-        matchName: match.matchName,
-        homeTeam: match.homeTeam,
-        awayTeam: match.awayTeam,
-        predictionType: pred.type,
-        prediction: pred.prediction,
-        predictionTime: new Date(Date.now() - (idx + 1) * 2 * 60 * 60 * 1000),
-        status: isCompleted ? (isCorrect ? 'correct' : 'incorrect') : 'pending',
-        predictionStatus: isCompleted ? (isCorrect ? 'correct' : 'incorrect') : 'pending',
-        actualResult: match.actualResult,
-        matchStatus: match.status,
-        spStatus: isCompleted ? (isCorrect ? 'awarded' : 'not_awarded') : 'pending',
-        spValue: pred.spValue,
-        spAwarded: isCompleted && isCorrect ? pred.spValue : 0,
-        correctness: isCompleted ? (isCorrect ? 'won' : 'lost') : 'pending',
-      };
-    });
-
-    return predictions;
-  };
 
   useEffect(() => {
-    const loadPredictionGroup = async () => {
+    const loadPredictionDetails = async () => {
       try {
         setLoading(true);
-        await new Promise(resolve => setTimeout(resolve, 800));
-
+        
         const decodedId = decodeURIComponent(id);
-        const [userId, matchId] = decodedId.split('_');
+        
+        if (!decodedId) {
+          console.error('Invalid prediction ID');
+          setLoading(false);
+          return;
+        }
 
-        const predictionsData = generateDummyPredictionData(userId, matchId);
+        // Fetch prediction details from API using /api/predictions/admin/{id}
+        const result = await getPredictionById(decodedId);
 
-        if (predictionsData.length > 0) {
-          const firstPred = predictionsData[0];
+        if (result.success && result.data) {
+          const apiData = result.data;
+          const prediction = apiData.prediction || {};
+          const fixture = apiData.fixture || {};
+          const user = apiData.user || {};
+          const matchSummary = apiData.matchSummary || {};
+          
+          // Get actual result from fixture
+          let actualResult = null;
+          if (fixture.homeScore !== null && fixture.homeScore !== undefined && 
+              fixture.awayScore !== null && fixture.awayScore !== undefined) {
+            actualResult = `${fixture.homeScore}-${fixture.awayScore}`;
+          }
+          
+          // Format prediction data for display
+          const formattedPrediction = {
+            id: prediction._id || decodedId,
+            predictionId: prediction.predictionId || prediction._id,
+            predictionType: prediction.predictionType || 'match_result',
+            prediction: prediction.predictionValue || `${prediction.homeGoals || 0}-${prediction.awayGoals || 0}`,
+            predictedHomeScore: prediction.homeGoals || null,
+            predictedAwayScore: prediction.awayGoals || null,
+            firstGoalScorer: prediction.firstPlayer || '',
+            firstGoalMinute: prediction.firstGoalMinutes || null,
+            goalRange: prediction.goalRange || '',
+            predictionTime: prediction.predictedAt ? new Date(prediction.predictedAt) : new Date(),
+            status: prediction.status || 'ongoing',
+            predictionStatus: prediction.status || 'ongoing',
+            actualResult: actualResult,
+            matchStatus: fixture.status || 'ongoing',
+            spStatus: prediction.spStatus === 'AWARDED' ? 'awarded' : 
+                      prediction.spStatus === 'NOT AWARDED' ? 'not_awarded' : 'pending',
+            spAwarded: prediction.spAwarded || 0,
+            points: prediction.spAwarded || 0,
+            isCorrect: prediction.status === 'correct',
+            correctness: prediction.correctnessStatus === 'CORRECT' ? 'won' : 
+                        prediction.correctnessStatus === 'INCORRECT' ? 'lost' : 'pending',
+            scorelineCorrect: prediction.scorelineCorrect || false,
+            firstPlayerCorrect: prediction.firstPlayerCorrect || false,
+            goalRangeCorrect: prediction.goalRangeCorrect || false,
+            firstGoalMinutesCorrect: prediction.firstGoalMinutesCorrect || false,
+            evaluatedAt: prediction.evaluatedAt ? new Date(prediction.evaluatedAt) : null,
+          };
+          
           setGroupData({
-            userId: userId,
-            username: firstPred.username || 'Unknown User',
-            userEmail: firstPred.userEmail || '',
-            userCountry: firstPred.userCountry || '',
-            userTotalPredictions: firstPred.userTotalPredictions || 0,
-            userAccuracy: firstPred.userAccuracy || 0,
-            matchId: matchId,
-            matchName: firstPred.matchName || `${firstPred.homeTeam || 'TBD'} vs ${firstPred.awayTeam || 'TBD'}`,
-            homeTeam: firstPred.homeTeam || 'TBD',
-            awayTeam: firstPred.awayTeam || 'TBD',
-            fixtureId: firstPred.fixtureId || matchId,
-            matchStatus: firstPred.matchStatus || 'ongoing',
-            actualResult: firstPred.actualResult || null,
+            userId: user._id || '',
+            username: user.username || user.fullName || 'Unknown User',
+            userEmail: user.email || '',
+            userCountry: user.country || '',
+            userTotalPredictions: matchSummary.totalPredictions || 0,
+            userAccuracy: matchSummary.correctPredictions && matchSummary.totalPredictions 
+              ? ((matchSummary.correctPredictions / matchSummary.totalPredictions) * 100).toFixed(1) 
+              : 0,
+            matchId: fixture.matchId || fixture._id || '',
+            matchName: fixture.matchName || `${fixture.homeTeam || 'TBD'} vs ${fixture.awayTeam || 'TBD'}`,
+            homeTeam: fixture.homeTeam || 'TBD',
+            awayTeam: fixture.awayTeam || 'TBD',
+            fixtureId: fixture._id || '',
+            matchStatus: fixture.status || 'ongoing',
+            actualResult: actualResult,
+            totalPredictions: matchSummary.totalPredictions || 0,
+            totalSPWon: matchSummary.totalSPWon || 0,
           });
-          setPredictions(predictionsData);
+          
+          // Set as single prediction array for display
+          setPredictions([formattedPrediction]);
+        } else {
+          // API call failed - show error state
+          console.error('Failed to load prediction details from API:', result.error);
+          setGroupData(null);
+          setPredictions([]);
         }
       } catch (error) {
-        console.error('Error loading prediction group:', error);
-        const decodedId = decodeURIComponent(id);
-        const [userId, matchId] = decodedId.split('_');
-        const predictionsData = generateDummyPredictionData(userId, matchId);
-        const firstPred = predictionsData[0];
-        setGroupData({
-          userId: userId,
-          username: firstPred.username,
-          userEmail: firstPred.userEmail,
-          userCountry: firstPred.userCountry,
-          userTotalPredictions: firstPred.userTotalPredictions,
-          userAccuracy: firstPred.userAccuracy,
-          matchId: matchId,
-          matchName: firstPred.matchName,
-          homeTeam: firstPred.homeTeam,
-          awayTeam: firstPred.awayTeam,
-          fixtureId: matchId,
-          matchStatus: firstPred.matchStatus,
-          actualResult: firstPred.actualResult,
-        });
-        setPredictions(predictionsData);
+        console.error('Error loading prediction details:', error);
+        setGroupData(null);
+        setPredictions([]);
       } finally {
         setLoading(false);
       }
     };
 
     if (id) {
-      loadPredictionGroup();
+      loadPredictionDetails();
     }
   }, [id]);
 
@@ -273,7 +249,7 @@ const PredictionDetailsPage = () => {
               <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
                 <Chip
                   icon={<SportsSoccer sx={{ fontSize: 16 }} />}
-                  label={`${predictions.length} Predictions Made`}
+                  label={`${groupData.totalPredictions || predictions.length} Predictions Made`}
                   sx={{
                     backgroundColor: `${colors.brandWhite}20`,
                     color: colors.brandWhite,

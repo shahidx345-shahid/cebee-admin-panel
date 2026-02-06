@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Grid, Card, CardContent, Typography, Chip, Button, IconButton } from '@mui/material';
+import { Box, Grid, Card, CardContent, Typography, Chip, Button, IconButton, CircularProgress, Alert } from '@mui/material';
 import {
   People,
   CheckCircle,
@@ -17,6 +17,10 @@ import {
   KeyboardArrowRight,
 } from '@mui/icons-material';
 import { colors } from '../config/theme';
+import { getDashboardData } from '../services/dashboardService';
+import { useNavigate } from 'react-router-dom';
+import { constants } from '../config/theme';
+import { format, formatDistanceToNow } from 'date-fns';
 
 const StatCard = ({ title, value, subtitle, icon: Icon, color, isPrimary = false, delay = 0 }) => {
   return (
@@ -135,18 +139,85 @@ const StatCard = ({ title, value, subtitle, icon: Icon, color, isPrimary = false
 };
 
 const DashboardPage = () => {
-  // Static dashboard stats - no Firebase
-  const [dashboardStats] = useState({
-    totalUsers: 45678,
-    activeUsers: 34256,
-    totalSPIssued: 12458920,
-    estimatedRewardsValue: 249178,
+  const navigate = useNavigate();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(new Date());
+  const [dashboardData, setDashboardData] = useState({
+    stats: {
+      totalUsers: 0,
+      activeUsers: 0,
+      totalSPIssued: 0,
+      estimatedRewardsValue: 0,
+    },
+    todaySummary: {
+      totalMatches: 0,
+      completedMatches: 0,
+      liveMatches: 0,
+      pendingResults: 0,
+    },
+    nextFixture: null,
+    alerts: [],
   });
+
+  // Fetch dashboard data
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await getDashboardData();
+      
+      if (response.success) {
+        setDashboardData(response.data);
+        setLastUpdated(new Date());
+      } else {
+        setError(response.error || 'Failed to load dashboard data');
+        // Set default values on error
+        setDashboardData({
+          stats: {
+            totalUsers: 0,
+            activeUsers: 0,
+            totalSPIssued: 0,
+            estimatedRewardsValue: 0,
+          },
+          todaySummary: {
+            totalMatches: 0,
+            completedMatches: 0,
+            liveMatches: 0,
+            pendingResults: 0,
+          },
+          nextFixture: null,
+          alerts: [],
+        });
+      }
+    } catch (err) {
+      console.error('Error fetching dashboard data:', err);
+      setError(err.message || 'An unexpected error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Initial load
+  useEffect(() => {
+    fetchDashboardData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Auto-refresh every 10 minutes
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchDashboardData();
+    }, 10 * 60 * 1000); // 10 minutes
+
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const stats = [
     {
       title: 'Total Users',
-      value: dashboardStats.totalUsers.toLocaleString(),
+      value: dashboardData.stats.totalUsers.toLocaleString(),
       subtitle: 'All registered users',
       icon: People,
       color: colors.brandRed,
@@ -154,7 +225,7 @@ const DashboardPage = () => {
     },
     {
       title: 'Active Users',
-      value: dashboardStats.activeUsers.toLocaleString(),
+      value: dashboardData.stats.activeUsers.toLocaleString(),
       subtitle: 'Logged in last 30 days',
       icon: CheckCircle,
       color: colors.success,
@@ -162,7 +233,7 @@ const DashboardPage = () => {
     },
     {
       title: 'Total SP Issued',
-      value: dashboardStats.totalSPIssued.toLocaleString(),
+      value: dashboardData.stats.totalSPIssued.toLocaleString(),
       subtitle: 'Prediction-based SP only',
       icon: Star,
       color: '#FF9800', // Orange
@@ -170,13 +241,76 @@ const DashboardPage = () => {
     },
     {
       title: 'Estimated Rewards Value',
-      value: `$${dashboardStats.estimatedRewardsValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`,
+      value: `$${dashboardData.stats.estimatedRewardsValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`,
       subtitle: 'USD converted payouts',
       icon: AttachMoney,
       color: '#2196F3', // Blue
       isPrimary: false,
     },
   ];
+
+  // State for countdown timer
+  const [countdown, setCountdown] = useState('00:00:00');
+
+  // Format time remaining for next fixture with real-time updates
+  useEffect(() => {
+    if (!dashboardData.nextFixture?.kickoffTime) {
+      setCountdown('00:00:00');
+      return;
+    }
+
+    const updateCountdown = () => {
+      try {
+        const kickoff = new Date(dashboardData.nextFixture.kickoffTime);
+        const now = new Date();
+        const diff = kickoff - now;
+        
+        if (diff <= 0) {
+          setCountdown('00:00:00');
+          return;
+        }
+        
+        const hours = Math.floor(diff / (1000 * 60 * 60));
+        const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+        const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+        
+        setCountdown(`${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`);
+      } catch (e) {
+        setCountdown('00:00:00');
+      }
+    };
+
+    // Update immediately
+    updateCountdown();
+
+    // Update every second
+    const interval = setInterval(updateCountdown, 1000);
+
+    return () => clearInterval(interval);
+  }, [dashboardData.nextFixture?.kickoffTime]);
+
+  // Format alert time
+  const formatAlertTime = (timestamp) => {
+    if (!timestamp) return 'Unknown time';
+    try {
+      const date = new Date(timestamp);
+      return formatDistanceToNow(date, { addSuffix: true });
+    } catch (e) {
+      return 'Unknown time';
+    }
+  };
+
+  // Show loading only on initial load
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px', flexDirection: 'column', gap: 2 }}>
+        <CircularProgress sx={{ color: colors.brandRed }} />
+        <Typography variant="body2" sx={{ color: colors.textSecondary }}>
+          Loading dashboard data...
+        </Typography>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%' }}>
@@ -215,7 +349,7 @@ const DashboardPage = () => {
               fontWeight: 500,
             }}
           >
-            Last updated: Just now
+            Last updated: {lastUpdated ? formatDistanceToNow(lastUpdated, { addSuffix: true }) : 'Just now'}
           </Typography>
         </Box>
       </Box>
@@ -235,6 +369,17 @@ const DashboardPage = () => {
           <StatCard {...stats[3]} delay={300} />
         </Grid>
       </Grid>
+
+      {/* Error Alert */}
+      {error && (
+        <Alert 
+          severity="warning" 
+          sx={{ mb: 2, borderRadius: '12px' }}
+          onClose={() => setError(null)}
+        >
+          {error}
+        </Alert>
+      )}
 
       {/* Today Status Strip */}
       <Box
@@ -257,182 +402,200 @@ const DashboardPage = () => {
             fontWeight: 500,
           }}
         >
-          Today: 12 matches · 9 completed · 3 live · 0 pending results
+          Today: {dashboardData.todaySummary.totalMatches} matches · {dashboardData.todaySummary.completedMatches} completed · {dashboardData.todaySummary.liveMatches} live · {dashboardData.todaySummary.pendingResults} pending results
         </Typography>
       </Box>
 
       {/* Next Fixture Banner */}
-      <Card
-        sx={{
-          background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
-          borderRadius: '24px',
-          boxShadow: `0 8px 20px ${colors.brandRed}59`,
-          mb: { xs: 2.5, md: 3 },
-          padding: { xs: 2.25, md: 3 },
-        }}
-      >
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2.25 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            <Box
-              sx={{
-                padding: 1.25,
-                backgroundColor: `${colors.brandWhite}33`,
-                borderRadius: '12px',
-              }}
-            >
-              <SportsSoccer sx={{ fontSize: 22, color: colors.brandWhite }} />
-            </Box>
-            <Typography
-              variant="h6"
-              sx={{
-                fontWeight: 700,
-                color: colors.brandWhite,
-                fontSize: { xs: 18, md: 20 },
-              }}
-            >
-              Next Fixture
-            </Typography>
-          </Box>
-          <Chip
-            label="LIVE"
-            size="small"
-            sx={{
-              backgroundColor: `${colors.brandWhite}33`,
-              color: colors.brandWhite,
-              fontWeight: 700,
-              fontSize: 12,
-              border: `1px solid ${colors.brandWhite}4D`,
-            }}
-            icon={<TrendingUp sx={{ fontSize: 14, color: colors.brandWhite }} />}
-          />
-        </Box>
-
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-          <Box sx={{ flex: 1, textAlign: 'center' }}>
-            <Box
-              sx={{
-                width: { xs: 56, md: 70 },
-                height: { xs: 56, md: 70 },
-                margin: '0 auto',
-                backgroundColor: `${colors.brandWhite}26`,
-                borderRadius: '14px',
-                border: `2px solid ${colors.brandWhite}4D`,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                mb: 1.25,
-              }}
-            >
-              <SportsSoccer sx={{ fontSize: { xs: 30, md: 36 }, color: colors.brandWhite }} />
-            </Box>
-            <Typography
-              variant="body2"
-              sx={{
-                fontWeight: 700,
-                color: colors.brandWhite,
-                fontSize: { xs: 13, md: 15 },
-              }}
-            >
-              Manchester United
-            </Typography>
-          </Box>
-
-          <Box sx={{ padding: '0 12px', textAlign: 'center' }}>
-            <Typography
-              variant="body1"
-              sx={{
-                fontWeight: 900,
-                color: `${colors.brandWhite}B3`,
-                fontSize: { xs: 14, md: 18 },
-                letterSpacing: 2,
-                mb: 0.75,
-              }}
-            >
-              VS
-            </Typography>
-            <Box
-              sx={{
-                padding: '8px 14px',
-                backgroundColor: `${colors.brandWhite}33`,
-                borderRadius: '12px',
-                border: `1px solid ${colors.brandWhite}4D`,
-              }}
-            >
+      {dashboardData.nextFixture ? (
+        <Card
+          sx={{
+            background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
+            borderRadius: '24px',
+            boxShadow: `0 8px 20px ${colors.brandRed}59`,
+            mb: { xs: 2.5, md: 3 },
+            padding: { xs: 2.25, md: 3 },
+          }}
+        >
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2.25 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Box
+                sx={{
+                  padding: 1.25,
+                  backgroundColor: `${colors.brandWhite}33`,
+                  borderRadius: '12px',
+                }}
+              >
+                <SportsSoccer sx={{ fontSize: 22, color: colors.brandWhite }} />
+              </Box>
               <Typography
                 variant="h6"
                 sx={{
                   fontWeight: 700,
                   color: colors.brandWhite,
-                  fontSize: { xs: 18, md: 22 },
-                  fontVariantNumeric: 'tabular-nums',
+                  fontSize: { xs: 18, md: 20 },
                 }}
               >
-                02:45:30
+                Next Fixture
               </Typography>
-              <Typography
-                variant="caption"
+            </Box>
+            {dashboardData.nextFixture.status === 'live' && (
+              <Chip
+                label="LIVE"
+                size="small"
                 sx={{
-                  color: `${colors.brandWhite}CC`,
-                  fontSize: 10,
-                  fontWeight: 600,
+                  backgroundColor: `${colors.brandWhite}33`,
+                  color: colors.brandWhite,
+                  fontWeight: 700,
+                  fontSize: 12,
+                  border: `1px solid ${colors.brandWhite}4D`,
+                }}
+                icon={<TrendingUp sx={{ fontSize: 14, color: colors.brandWhite }} />}
+              />
+            )}
+          </Box>
+
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Box sx={{ flex: 1, textAlign: 'center' }}>
+              <Box
+                sx={{
+                  width: { xs: 56, md: 70 },
+                  height: { xs: 56, md: 70 },
+                  margin: '0 auto',
+                  backgroundColor: `${colors.brandWhite}26`,
+                  borderRadius: '14px',
+                  border: `2px solid ${colors.brandWhite}4D`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  mb: 1.25,
                 }}
               >
-                Hours remaining
+                <SportsSoccer sx={{ fontSize: { xs: 30, md: 36 }, color: colors.brandWhite }} />
+              </Box>
+              <Typography
+                variant="body2"
+                sx={{
+                  fontWeight: 700,
+                  color: colors.brandWhite,
+                  fontSize: { xs: 13, md: 15 },
+                }}
+              >
+                {dashboardData.nextFixture.homeTeam || 'TBD'}
+              </Typography>
+            </Box>
+
+            <Box sx={{ padding: '0 12px', textAlign: 'center' }}>
+              <Typography
+                variant="body1"
+                sx={{
+                  fontWeight: 900,
+                  color: `${colors.brandWhite}B3`,
+                  fontSize: { xs: 14, md: 18 },
+                  letterSpacing: 2,
+                  mb: 0.75,
+                }}
+              >
+                VS
+              </Typography>
+              <Box
+                sx={{
+                  padding: '8px 14px',
+                  backgroundColor: `${colors.brandWhite}33`,
+                  borderRadius: '12px',
+                  border: `1px solid ${colors.brandWhite}4D`,
+                }}
+              >
+                <Typography
+                  variant="h6"
+                  sx={{
+                    fontWeight: 700,
+                    color: colors.brandWhite,
+                    fontSize: { xs: 18, md: 22 },
+                    fontVariantNumeric: 'tabular-nums',
+                  }}
+                >
+                  {countdown}
+                </Typography>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    color: `${colors.brandWhite}CC`,
+                    fontSize: 10,
+                    fontWeight: 600,
+                  }}
+                >
+                  {dashboardData.nextFixture.kickoffTime ? format(new Date(dashboardData.nextFixture.kickoffTime), 'MMM dd, HH:mm') : 'TBD'}
+                </Typography>
+              </Box>
+            </Box>
+
+            <Box sx={{ flex: 1, textAlign: 'center' }}>
+              <Box
+                sx={{
+                  width: { xs: 56, md: 70 },
+                  height: { xs: 56, md: 70 },
+                  margin: '0 auto',
+                  backgroundColor: `${colors.brandWhite}26`,
+                  borderRadius: '14px',
+                  border: `2px solid ${colors.brandWhite}4D`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  mb: 1.25,
+                }}
+              >
+                <SportsSoccer sx={{ fontSize: { xs: 30, md: 36 }, color: colors.brandWhite }} />
+              </Box>
+              <Typography
+                variant="body2"
+                sx={{
+                  fontWeight: 700,
+                  color: colors.brandWhite,
+                  fontSize: { xs: 13, md: 15 },
+                }}
+              >
+                {dashboardData.nextFixture.awayTeam || 'TBD'}
               </Typography>
             </Box>
           </Box>
 
-          <Box sx={{ flex: 1, textAlign: 'center' }}>
-            <Box
-              sx={{
-                width: { xs: 56, md: 70 },
-                height: { xs: 56, md: 70 },
-                margin: '0 auto',
-                backgroundColor: `${colors.brandWhite}26`,
-                borderRadius: '14px',
-                border: `2px solid ${colors.brandWhite}4D`,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                mb: 1.25,
-              }}
-            >
-              <SportsSoccer sx={{ fontSize: { xs: 30, md: 36 }, color: colors.brandWhite }} />
-            </Box>
+          <Box
+            sx={{
+              padding: 1.5,
+              backgroundColor: `${colors.brandWhite}26`,
+              borderRadius: '12px',
+              border: `1px solid ${colors.brandWhite}33`,
+              textAlign: 'center',
+            }}
+          >
             <Typography
               variant="body2"
               sx={{
-                fontWeight: 700,
+                fontWeight: 600,
                 color: colors.brandWhite,
-                fontSize: { xs: 13, md: 15 },
+                fontSize: { xs: 12, md: 14 },
               }}
             >
-              Liverpool FC
+              {dashboardData.nextFixture.venue || 'TBD'} • {dashboardData.nextFixture.leagueName || 'TBD'}
             </Typography>
           </Box>
-        </Box>
-
-        <Box
+        </Card>
+      ) : (
+        <Card
           sx={{
-            padding: 1.5,
-            backgroundColor: `${colors.brandWhite}26`,
-            borderRadius: '12px',
-            border: `1px solid ${colors.brandWhite}33`,
+            background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
+            borderRadius: '24px',
+            mb: { xs: 2.5, md: 3 },
+            padding: { xs: 2.25, md: 3 },
             textAlign: 'center',
           }}
         >
-          <Typography
-            variant="body2"
-            sx={{
-              fontWeight: 600,
-              color: colors.brandWhite,
-              fontSize: { xs: 12, md: 14 },
-            }}
-          >
-            Old Trafford, Manchester • Premier League
+          <Typography variant="h6" sx={{ color: colors.brandWhite, fontWeight: 600 }}>
+            No upcoming fixtures
           </Typography>
-        </Box>
-      </Card>
+        </Card>
+      )}
 
       {/* High-Risk Admin Action Alerts */}
       <Card
@@ -479,13 +642,14 @@ const DashboardPage = () => {
                     fontSize: 12,
                   }}
                 >
-                  3 critical events require attention
+                  {dashboardData.alerts?.length || 0} critical events require attention
                 </Typography>
               </Box>
             </Box>
             <Button
               variant="contained"
               endIcon={<ArrowForward sx={{ fontSize: 16 }} />}
+              onClick={() => navigate(constants.routes.logs || '/logs')}
               sx={{
                 background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
                 borderRadius: '8px',
@@ -505,299 +669,128 @@ const DashboardPage = () => {
 
           {/* Alert Cards */}
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-            {/* Critical Alert 1 - SP Manual Adjustment */}
-            <Card
-              sx={{
-                backgroundColor: `${colors.error}0D`,
-                border: `1.5px solid ${colors.error}26`,
-                borderRadius: '12px',
-                padding: 1.5,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1.5,
-                cursor: 'pointer',
-                transition: 'all 0.3s ease',
-                '&:hover': {
-                  backgroundColor: `${colors.error}1A`,
-                  transform: 'translateX(4px)',
-                },
-              }}
-            >
-              <Box
-                sx={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: '10px',
-                  backgroundColor: `${colors.error}26`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                }}
-              >
-                <TrendingUp sx={{ fontSize: 20, color: colors.error }} />
-              </Box>
-              <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                  <Chip
-                    label="CRITICAL"
-                    size="small"
-                    sx={{
-                      backgroundColor: colors.error,
-                      color: colors.brandWhite,
-                      fontWeight: 700,
-                      fontSize: 10,
-                      height: 20,
-                      px: 0.5,
-                    }}
-                  />
-                </Box>
-                <Typography
-                  variant="body2"
-                  sx={{
-                    fontWeight: 700,
-                    color: colors.brandBlack,
-                    fontSize: 13,
-                    mb: 0.25,
-                  }}
-                >
-                  SP Manual Adjustment
-                </Typography>
-                <Typography
-                  variant="body2"
-                  sx={{
-                    color: colors.textSecondary,
-                    fontSize: 12,
-                    mb: 0.5,
-                  }}
-                >
-                  Admin "John Doe" manually adjusted 5,000 SP for user UID_12345
-                </Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <AccessTime sx={{ fontSize: 12, color: colors.textSecondary }} />
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      color: colors.textSecondary,
-                      fontSize: 11,
-                    }}
-                  >
-                    5 minutes ago
-                  </Typography>
-                </Box>
-              </Box>
-              <IconButton
-                size="small"
-                sx={{
-                  width: 32,
-                  height: 32,
-                  backgroundColor: colors.error,
-                  color: colors.brandWhite,
-                  flexShrink: 0,
-                  '&:hover': {
-                    backgroundColor: colors.brandDarkRed,
-                  },
-                }}
-              >
-                <KeyboardArrowRight sx={{ fontSize: 18 }} />
-              </IconButton>
-            </Card>
+            {dashboardData.alerts && dashboardData.alerts.length > 0 ? (
+              dashboardData.alerts.map((alert, index) => {
+                const isCritical = alert.severity === 'critical' || alert.severity === 'CRITICAL';
+                const alertColor = isCritical ? colors.error : colors.warning;
+                const alertIcon = alert.actionType === 'SP_ADJUSTMENT' || alert.actionType === 'sp_adjustment' 
+                  ? TrendingUp 
+                  : alert.actionType === 'ROLE_CHANGE' || alert.actionType === 'role_change'
+                  ? PersonAdd
+                  : Lock;
 
-            {/* Critical Alert 2 - Admin Role Changed */}
-            <Card
-              sx={{
-                backgroundColor: `${colors.error}0D`,
-                border: `1.5px solid ${colors.error}26`,
-                borderRadius: '12px',
-                padding: 1.5,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1.5,
-                cursor: 'pointer',
-                transition: 'all 0.3s ease',
-                '&:hover': {
-                  backgroundColor: `${colors.error}1A`,
-                  transform: 'translateX(4px)',
-                },
-              }}
-            >
-              <Box
-                sx={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: '10px',
-                  backgroundColor: `${colors.error}26`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                }}
-              >
-                <PersonAdd sx={{ fontSize: 20, color: colors.error }} />
-              </Box>
-              <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                  <Chip
-                    label="CRITICAL"
-                    size="small"
+                return (
+                  <Card
+                    key={alert.id || index}
                     sx={{
-                      backgroundColor: colors.error,
-                      color: colors.brandWhite,
-                      fontWeight: 700,
-                      fontSize: 10,
-                      height: 20,
-                      px: 0.5,
+                      backgroundColor: `${alertColor}0D`,
+                      border: `1.5px solid ${alertColor}26`,
+                      borderRadius: '12px',
+                      padding: 1.5,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1.5,
+                      cursor: 'pointer',
+                      transition: 'all 0.3s ease',
+                      '&:hover': {
+                        backgroundColor: `${alertColor}1A`,
+                        transform: 'translateX(4px)',
+                      },
                     }}
-                  />
-                </Box>
-                <Typography
-                  variant="body2"
-                  sx={{
-                    fontWeight: 700,
-                    color: colors.brandBlack,
-                    fontSize: 13,
-                    mb: 0.25,
-                  }}
-                >
-                  Admin Role Changed
-                </Typography>
-                <Typography
-                  variant="body2"
-                  sx={{
-                    color: colors.textSecondary,
-                    fontSize: 12,
-                    mb: 0.5,
-                  }}
-                >
-                  User "Jane Smith" promoted to Admin role by Super Admin
-                </Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <AccessTime sx={{ fontSize: 12, color: colors.textSecondary }} />
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      color: colors.textSecondary,
-                      fontSize: 11,
+                    onClick={() => {
+                      if (alert.logId) {
+                        navigate(`${constants.routes.logs || '/logs'}?logId=${alert.logId}`);
+                      }
                     }}
                   >
-                    15 minutes ago
-                  </Typography>
-                </Box>
-              </Box>
-              <IconButton
-                size="small"
-                sx={{
-                  width: 32,
-                  height: 32,
-                  backgroundColor: colors.error,
-                  color: colors.brandWhite,
-                  flexShrink: 0,
-                  '&:hover': {
-                    backgroundColor: colors.brandDarkRed,
-                  },
-                }}
-              >
-                <KeyboardArrowRight sx={{ fontSize: 18 }} />
-              </IconButton>
-            </Card>
-
-            {/* Warning Alert - Multiple Failed Login Attempts */}
-            <Card
-              sx={{
-                backgroundColor: `${colors.warning}0D`,
-                border: `1.5px solid ${colors.warning}26`,
-                borderRadius: '12px',
-                padding: 1.5,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1.5,
-                cursor: 'pointer',
-                transition: 'all 0.3s ease',
-                '&:hover': {
-                  backgroundColor: `${colors.warning}1A`,
-                  transform: 'translateX(4px)',
-                },
-              }}
-            >
-              <Box
-                sx={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: '10px',
-                  backgroundColor: `${colors.warning}26`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                }}
-              >
-                <Lock sx={{ fontSize: 20, color: colors.warning }} />
-              </Box>
-              <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                  <Chip
-                    label="WARNING"
-                    size="small"
-                    sx={{
-                      backgroundColor: colors.warning,
-                      color: colors.brandWhite,
-                      fontWeight: 700,
-                      fontSize: 10,
-                      height: 20,
-                      px: 0.5,
-                    }}
-                  />
-                </Box>
-                <Typography
-                  variant="body2"
-                  sx={{
-                    fontWeight: 700,
-                    color: colors.brandBlack,
-                    fontSize: 13,
-                    mb: 0.25,
-                  }}
-                >
-                  Multiple Failed Login Attempts
+                    <Box
+                      sx={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: '10px',
+                        backgroundColor: `${alertColor}26`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}
+                    >
+                      {React.createElement(alertIcon, { sx: { fontSize: 20, color: alertColor } })}
+                    </Box>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                        <Chip
+                          label={isCritical ? 'CRITICAL' : 'WARNING'}
+                          size="small"
+                          sx={{
+                            backgroundColor: alertColor,
+                            color: colors.brandWhite,
+                            fontWeight: 700,
+                            fontSize: 10,
+                            height: 20,
+                            px: 0.5,
+                          }}
+                        />
+                      </Box>
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontWeight: 700,
+                          color: colors.brandBlack,
+                          fontSize: 13,
+                          mb: 0.25,
+                        }}
+                      >
+                        {alert.title || alert.actionType || 'Admin Action'}
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          color: colors.textSecondary,
+                          fontSize: 12,
+                          mb: 0.5,
+                        }}
+                      >
+                        {alert.description || alert.message || 'No description available'}
+                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <AccessTime sx={{ fontSize: 12, color: colors.textSecondary }} />
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            color: colors.textSecondary,
+                            fontSize: 11,
+                          }}
+                        >
+                          {formatAlertTime(alert.timestamp || alert.createdAt)}
+                        </Typography>
+                      </Box>
+                    </Box>
+                    <IconButton
+                      size="small"
+                      sx={{
+                        width: 32,
+                        height: 32,
+                        backgroundColor: alertColor,
+                        color: colors.brandWhite,
+                        flexShrink: 0,
+                        '&:hover': {
+                          backgroundColor: isCritical ? colors.brandDarkRed : '#F57C00',
+                        },
+                      }}
+                    >
+                      <KeyboardArrowRight sx={{ fontSize: 18 }} />
+                    </IconButton>
+                  </Card>
+                );
+              })
+            ) : (
+              <Box sx={{ textAlign: 'center', py: 3 }}>
+                <Typography variant="body2" sx={{ color: colors.textSecondary }}>
+                  No high-risk alerts at this time
                 </Typography>
-                <Typography
-                  variant="body2"
-                  sx={{
-                    color: colors.textSecondary,
-                    fontSize: 12,
-                    mb: 0.5,
-                  }}
-                >
-                  3 failed login attempts detected for user "mike@example.com"
-                </Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <AccessTime sx={{ fontSize: 12, color: colors.textSecondary }} />
-                  <Typography
-                    variant="caption"
-                    sx={{
-                      color: colors.textSecondary,
-                      fontSize: 11,
-                    }}
-                  >
-                    1 hour ago
-                  </Typography>
-                </Box>
               </Box>
-              <IconButton
-                size="small"
-                sx={{
-                  width: 32,
-                  height: 32,
-                  backgroundColor: colors.warning,
-                  color: colors.brandWhite,
-                  flexShrink: 0,
-                  '&:hover': {
-                    backgroundColor: '#F57C00',
-                  },
-                }}
-              >
-                <KeyboardArrowRight sx={{ fontSize: 18 }} />
-              </IconButton>
-            </Card>
+            )}
           </Box>
         </Box>
       </Card>
@@ -824,13 +817,14 @@ const DashboardPage = () => {
         </Typography>
         <Grid container spacing={{ xs: 1.5, md: 2 }}>
           {[
-            { title: 'User Management', icon: People, color: colors.brandRed },
-            { title: 'Predictions', icon: TrendingUp, color: colors.info },
-            { title: 'Rewards', icon: Star, color: colors.success },
-            { title: 'System Logs', icon: Description, color: colors.warning },
+            { title: 'User Management', icon: People, color: colors.brandRed, route: constants.routes.users || '/users' },
+            { title: 'Predictions', icon: TrendingUp, color: colors.info, route: constants.routes.predictions || '/predictions' },
+            { title: 'Rewards', icon: Star, color: colors.success, route: constants.routes.rewards || '/rewards' },
+            { title: 'System Logs', icon: Description, color: colors.warning, route: constants.routes.logs || '/logs' },
           ].map((action, index) => (
             <Grid item xs={6} md={3} key={index}>
               <Card
+                onClick={() => navigate(action.route)}
                 sx={{
                   padding: { xs: 1.75, md: 2 },
                   borderRadius: '20px',

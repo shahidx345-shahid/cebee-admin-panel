@@ -3,7 +3,7 @@
  * Common functions for all API calls including error handling, token management, and request handling
  */
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://cebee-backend-api-alpha.vercel.app/api';
 
 /**
  * Get authentication token from localStorage
@@ -119,6 +119,18 @@ export const apiRequest = async (endpoint, options = {}) => {
       };
     }
 
+    // Handle rate limiting (429)
+    if (response.status === 429) {
+      const retryAfter = response.headers.get('Retry-After');
+      const waitTime = retryAfter ? ` Please try again in ${retryAfter} seconds.` : ' Please wait a moment before trying again.';
+      return {
+        success: false,
+        error: `Too many requests.${waitTime}`,
+        status: 429,
+        data: data,
+      };
+    }
+
     // Handle other errors
     if (!response.ok) {
       const errorMessage = data?.message || 
@@ -135,9 +147,14 @@ export const apiRequest = async (endpoint, options = {}) => {
     }
 
     // Success response
+    // Handle response structure
+    // Backend might return: { success: true, data: {...} }
+    // OR: { data: {...} } directly
+    const responseData = data && data.data ? data.data : data;
+    
     return {
       success: true,
-      data: data.data || data,
+      data: responseData,
       message: data.message,
       status: response.status,
       response: response,

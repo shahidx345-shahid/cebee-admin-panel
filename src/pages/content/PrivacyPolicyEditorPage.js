@@ -1,53 +1,107 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Button, Card, CircularProgress, Alert, Chip } from '@mui/material';
+import { Box, Typography, Button, Card, CircularProgress, Alert, Chip, Snackbar } from '@mui/material';
 import { CheckCircle, Info } from '@mui/icons-material';
 import { colors } from '../../config/theme';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
+import { format } from 'date-fns';
+import { getPublishedPrivacy, createPrivacy, updatePrivacy } from '../../services/privacyService';
 
 const PrivacyPolicyEditorPage = () => {
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [version, setVersion] = useState('1.0');
+  const [updatedAt, setUpdatedAt] = useState(null);
+  const [currentPrivacyId, setCurrentPrivacyId] = useState(null);
+  const [error, setError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
 
   useEffect(() => {
     loadContent();
   }, []);
 
-  const loadContent = () => {
+  const loadContent = async () => {
     try {
       setLoading(true);
-      // Load from localStorage if available
-      const savedContent = localStorage.getItem('privacyPolicyContent');
+      setError(null);
 
-      if (savedContent) {
-        setContent(savedContent);
+      // Try to get published privacy policy first (sorted by updatedAt desc, so first is latest)
+      const response = await getPublishedPrivacy();
+      
+      if (response.success && response.data?.privacy && response.data.privacy.length > 0) {
+        // Use the first published privacy policy (latest one)
+        const privacy = response.data.privacy[0];
+        setContent(privacy.content || '');
+        setVersion(privacy.version || '1.0');
+        setUpdatedAt(privacy.updatedAt ? new Date(privacy.updatedAt) : new Date());
+        setCurrentPrivacyId(privacy._id);
       } else {
-        // Start with empty content
+        // No published privacy policy found, start with empty content
         setContent('');
+        setVersion('1.0');
+        setUpdatedAt(null);
+        setCurrentPrivacyId(null);
       }
     } catch (error) {
       console.error('Error loading content:', error);
+      setError('Failed to load privacy policy. Please try again.');
+      setContent('');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    // Validation
+    if (!content.trim()) {
+      setError('Content is required');
+      return;
+    }
+
     try {
       setSaving(true);
-      // Save to localStorage
-      localStorage.setItem('privacyPolicyContent', content);
-      const newDate = new Date();
-      localStorage.setItem('privacyPolicyUpdatedAt', newDate.toISOString());
+      setError(null);
 
-      alert('Content saved successfully!');
+      const privacyData = {
+        content: content.trim(),
+        version: version.trim() || '1.0',
+        isActive: true, // Always publish when saving
+      };
+
+      let response;
+      if (currentPrivacyId) {
+        // Update existing privacy policy
+        response = await updatePrivacy(currentPrivacyId, privacyData);
+      } else {
+        // Create new privacy policy
+        response = await createPrivacy(privacyData);
+      }
+
+      if (response.success) {
+        const privacy = response.data;
+        setContent(privacy.content || content);
+        setVersion(privacy.version || version);
+        setUpdatedAt(privacy.updatedAt ? new Date(privacy.updatedAt) : new Date());
+        setCurrentPrivacyId(privacy._id || currentPrivacyId);
+        
+        setSuccessMessage(response.message || 'Privacy Policy saved successfully!');
+        
+        // Reload content to get latest version
+        await loadContent();
+      } else {
+        setError(response.error || 'Failed to save privacy policy');
+      }
     } catch (error) {
       console.error('Error saving content:', error);
-      alert('Failed to save content');
+      setError('An unexpected error occurred while saving privacy policy');
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleCloseSnackbar = () => {
+    setSuccessMessage(null);
   };
 
   if (loading) {
@@ -114,10 +168,20 @@ const PrivacyPolicyEditorPage = () => {
       >
         {/* Metadata */}
         <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: 3 }}>
-          <Chip label="Version: 1.0" size="small" sx={{ backgroundColor: '#2196F3', color: 'white', fontWeight: 600 }} />
-          <Chip label={`Updated: ${new Date().toLocaleDateString()}`} size="small" sx={{ backgroundColor: '#4CAF50', color: 'white', fontWeight: 600 }} />
+          <Chip label={`Version: ${version}`} size="small" sx={{ backgroundColor: '#2196F3', color: 'white', fontWeight: 600 }} />
+          <Chip 
+            label={updatedAt ? `Updated: ${format(updatedAt instanceof Date ? updatedAt : new Date(updatedAt), 'MMM dd, yyyy')}` : 'Not yet updated'} 
+            size="small" 
+            sx={{ backgroundColor: '#4CAF50', color: 'white', fontWeight: 600 }} 
+          />
           <Chip label="PUBLISHED" size="small" sx={{ backgroundColor: '#F44336', color: 'white', fontWeight: 600 }} />
         </Box>
+
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+            {error}
+          </Alert>
+        )}
 
         {/* Info Banner */}
         <Box sx={{ maxWidth: '1400px', margin: '0 auto' }}>
@@ -188,6 +252,17 @@ const PrivacyPolicyEditorPage = () => {
           </Box>
         </Box>
       </Card>
+
+      <Snackbar
+        open={!!successMessage}
+        autoHideDuration={3000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert onClose={handleCloseSnackbar} severity="success" sx={{ width: '100%' }}>
+          {successMessage}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

@@ -46,7 +46,7 @@ import {
 import { colors, constants } from '../config/theme';
 import DataTable from '../components/common/DataTable';
 import { format } from 'date-fns';
-import { MockDataService } from '../services/mockDataService';
+import { getRewards, getRewardStatistics } from '../services/rewardsService';
 
 // Static rewards data
 
@@ -58,6 +58,7 @@ const RewardsPage = () => {
   const [rewards, setRewards] = useState([]);
   const [filteredRewards, setFilteredRewards] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [totalCount, setTotalCount] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedMonth, setSelectedMonth] = useState('2025-09');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -73,19 +74,124 @@ const RewardsPage = () => {
   const [actionsAnchor, setActionsAnchor] = useState(null);
   const [selectedReward, setSelectedReward] = useState(null);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+  const [statistics, setStatistics] = useState({
+    currentMonthWinners: 0,
+    pendingPayouts: 0,
+    processingCount: 0,
+    totalPaid: 0,
+  });
+
+  // Reset page when filters change
+  useEffect(() => {
+    setPage(0);
+  }, [searchQuery, selectedMonth, statusFilter, rankFilter, consentFilter, selectedSort]);
 
   useEffect(() => {
     loadRewards();
-  }, []);
+    loadStatistics();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, rowsPerPage, searchQuery, selectedMonth, statusFilter, rankFilter, consentFilter, selectedSort]);
+
+  const loadStatistics = async () => {
+    try {
+      const statsResult = await getRewardStatistics({ month: selectedMonth !== 'all' ? selectedMonth : undefined });
+      if (statsResult.success && statsResult.data) {
+        setStatistics({
+          currentMonthWinners: statsResult.data.currentMonthWinners || 0,
+          pendingPayouts: statsResult.data.pendingPayouts || 0,
+          processingCount: statsResult.data.processingCount || 0,
+          totalPaid: statsResult.data.totalPaid || 0,
+        });
+      }
+    } catch (error) {
+      console.error('Error loading reward statistics:', error);
+    }
+  };
 
   const loadRewards = async () => {
     setLoading(true);
     try {
-      const data = await MockDataService.getRewards();
-      setRewards(data);
-      setFilteredRewards(data);
+      // Build query parameters from filters
+      const params = {
+        page: page,
+        limit: rowsPerPage,
+      };
+
+      if (searchQuery) {
+        params.search = searchQuery;
+      }
+
+      if (selectedMonth && selectedMonth !== 'all') {
+        params.month = selectedMonth;
+      }
+
+      if (statusFilter !== 'all') {
+        params.status = statusFilter;
+      }
+
+      if (rankFilter && rankFilter !== 'all') {
+        if (rankFilter === '1st-3rd') {
+          params.minRank = 1;
+          params.maxRank = 3;
+        } else if (rankFilter === '1st') {
+          params.rank = 1;
+        } else if (rankFilter === '2nd') {
+          params.rank = 2;
+        } else if (rankFilter === '3rd') {
+          params.rank = 3;
+        }
+      }
+
+      if (consentFilter !== 'all') {
+        params.consentOptIn = consentFilter === 'yes';
+      }
+
+      // Map sort to backend format
+      const sortMap = {
+        'rankLowest': 'rank_asc',
+        'rankHighest': 'rank_desc',
+        'spHighest': 'sp_desc',
+        'spLowest': 'sp_asc',
+      };
+      if (selectedSort && sortMap[selectedSort]) {
+        params.sort = sortMap[selectedSort];
+      }
+
+      const response = await getRewards(params);
+      console.log('Rewards API response:', response);
+      
+      if (response.success) {
+        // Backend may return rewards array or paginated response
+        let rewardsData = Array.isArray(response.data) 
+          ? response.data 
+          : (response.data.rewards || response.data.data || []);
+        
+        // Normalize the data to ensure each reward has an 'id' field
+        // The API might use _id, reward_id, or id
+        rewardsData = rewardsData.map((reward, index) => ({
+          ...reward,
+          id: reward.id || reward._id || reward.reward_id || reward.rewardId || `reward-${index}`,
+        }));
+        
+        console.log('Normalized rewards data:', rewardsData);
+        
+        // Get pagination info if available
+        const pagination = response.data.pagination || response.data;
+        const total = pagination.total || pagination.totalCount || rewardsData.length;
+        
+        setRewards(rewardsData);
+        setFilteredRewards(rewardsData);
+        setTotalCount(total);
+      } else {
+        console.error("Failed to load rewards", response.error);
+        setRewards([]);
+        setFilteredRewards([]);
+        setTotalCount(0);
+      }
     } catch (error) {
       console.error("Failed to load rewards", error);
+      setRewards([]);
+      setFilteredRewards([]);
     } finally {
       setLoading(false);
     }
@@ -94,98 +200,21 @@ const RewardsPage = () => {
   const currentMonth = new Date().toISOString().slice(0, 7);
   const currentMonthLabel = format(new Date(), 'MMMM yyyy');
 
-  const currentMonthWinners = rewards.filter((r) => {
-    const rewardMonth = r.rewardMonth || '';
-    return rewardMonth.startsWith(currentMonth) && (r.rank || 0) <= 3;
-  });
+  // Use statistics from API instead of calculating from rewards array
+  const currentMonthWinners = statistics.currentMonthWinners;
+  const pendingPayouts = statistics.pendingPayouts;
+  const processingCount = statistics.processingCount;
+  const totalPaid = statistics.totalPaid;
 
-  const pendingPayouts = rewards.filter((r) =>
-    (r.status || r.rewardStatus) === 'pending'
-  ).length;
-
-  const processingCount = rewards.filter((r) =>
-    (r.status || r.rewardStatus) === 'processing'
-  ).length;
-
-  const totalPaid = currentMonthWinners
-    .filter((r) => (r.status || r.rewardStatus) === 'paid')
-    .reduce((sum, r) => sum + (r.usdAmount || r.rewardAmount || 0), 0);
-
-  useEffect(() => {
-    filterAndSortRewards();
-  }, [rewards, searchQuery, selectedMonth, statusFilter, rankFilter, consentFilter, selectedSort]);
-
-  const filterAndSortRewards = () => {
-    let filtered = [...rewards];
-
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (reward) =>
-          reward.username?.toLowerCase().includes(query) ||
-          reward.userEmail?.toLowerCase().includes(query) ||
-          reward.id?.toLowerCase().includes(query)
-      );
-    }
-
-    if (selectedMonth && selectedMonth !== 'all') {
-      filtered = filtered.filter((reward) => {
-        const rewardMonth = reward.rewardMonth || '';
-        return rewardMonth.startsWith(selectedMonth);
-      });
-    }
-
-    if (rankFilter && rankFilter !== 'all') {
-      filtered = filtered.filter((reward) => {
-        const rank = reward.rank || 0;
-        if (rankFilter === '1st') return rank === 1;
-        if (rankFilter === '2nd') return rank === 2;
-        if (rankFilter === '3rd') return rank === 3;
-        if (rankFilter === '1st-3rd') return rank >= 1 && rank <= 3;
-        return true;
-      });
-    }
-
-    if (consentFilter !== 'all') {
-      filtered = filtered.filter((reward) => {
-        if (consentFilter === 'yes') return reward.consentOptIn === true;
-        if (consentFilter === 'no') return !reward.consentOptIn;
-        return true;
-      });
-    }
-
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter((reward) => {
-        const status = reward.status || reward.rewardStatus;
-        return status === statusFilter;
-      });
-    }
-
-    switch (selectedSort) {
-      case 'rankLowest':
-        filtered.sort((a, b) => (a.rank || 0) - (b.rank || 0));
-        break;
-      case 'rankHighest':
-        filtered.sort((a, b) => (b.rank || 0) - (a.rank || 0));
-        break;
-      case 'spHighest':
-        filtered.sort((a, b) => (b.spTotal || 0) - (a.spTotal || 0));
-        break;
-      case 'spLowest':
-        filtered.sort((a, b) => (a.spTotal || 0) - (b.spTotal || 0));
-        break;
-      default:
-        break;
-    }
-
-    setFilteredRewards(filtered);
-  };
+  // Filtering and sorting is now handled by the backend API
+  // filteredRewards is set directly from the API response
 
   const getStatusChip = (status) => {
     const statusMap = {
       pending: 'PENDING',
       processing: 'PROCESSING',
-      paid: 'PAID',
+      fulfilled: 'FULFILLED',
+      paid: 'FULFILLED', // Backward compatibility
       cancelled: 'CANCELLED',
       declined: 'DECLINED',
       unclaimed: 'UNCLAIMED',
@@ -194,7 +223,7 @@ const RewardsPage = () => {
     const label = statusMap[status] || 'PENDING';
     const isProcessing = status === 'processing';
     const isPending = status === 'pending';
-    const isPaid = status === 'paid';
+    const isFulfilled = status === 'fulfilled' || status === 'paid';
     const isCancelled = status === 'cancelled' || status === 'declined';
     const isUnclaimed = status === 'unclaimed';
 
@@ -203,7 +232,7 @@ const RewardsPage = () => {
     let border = '#FF9800';
 
     if (isProcessing) { color = '#42A5F5'; bg = '#EBF8FF'; border = '#42A5F5'; }
-    if (isPaid) { color = '#66BB6A'; bg = '#F0FDF4'; border = '#66BB6A'; }
+    if (isFulfilled) { color = '#66BB6A'; bg = '#F0FDF4'; border = '#66BB6A'; }
     if (isCancelled) { color = '#EF4444'; bg = '#FEF2F2'; border = '#EF4444'; }
     if (isUnclaimed) { color = '#9CA3AF'; bg = '#F3F4F6'; border = '#9CA3AF'; }
 
@@ -352,25 +381,26 @@ const RewardsPage = () => {
       },
     },
     {
-      id: 'payoutMethod',
-      label: 'Payout Method',
+      id: 'rewardType',
+      label: 'Reward Type',
       render: (value, row) => {
-        const method = value || row.payoutMethod || 'USDT';
-        const isGiftCard = method.toLowerCase().includes('gift');
+        const method = value || row.rewardType || row.payoutMethod || 'Gift Card';
+        const isGiftCard = method.toLowerCase().includes('gift') || method.toLowerCase() === 'gift card';
+        const isAlternative = method.toLowerCase().includes('alternative') || method.toLowerCase().includes('other');
         return (
           <Chip
             icon={
               isGiftCard ? (
                 <AccountBalanceWallet sx={{ fontSize: 16, color: '#42A5F5 !important' }} />
               ) : (
-                <AttachMoney sx={{ fontSize: 16, color: '#66BB6A !important' }} />
+                <EmojiEvents sx={{ fontSize: 16, color: '#FF9800 !important' }} />
               )
             }
-            label={method}
+            label={isGiftCard ? 'Gift Card' : isAlternative ? 'Alternative Reward' : 'Gift Card'}
             size="small"
             sx={{
-              backgroundColor: isGiftCard ? '#E3F2FD' : '#E8F5E9',
-              color: isGiftCard ? '#42A5F5' : '#66BB6A',
+              backgroundColor: isGiftCard ? '#E3F2FD' : '#FFF4E6',
+              color: isGiftCard ? '#42A5F5' : '#FF9800',
               fontWeight: 600,
               fontSize: 13,
               height: 32,
@@ -443,10 +473,8 @@ const RewardsPage = () => {
     },
   ];
 
-  const paginatedRewards = filteredRewards.slice(
-    page * rowsPerPage,
-    page * rowsPerPage + rowsPerPage
-  );
+  // Pagination is handled by the backend, so we use filteredRewards directly
+  const paginatedRewards = filteredRewards;
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%' }}>
@@ -495,7 +523,7 @@ const RewardsPage = () => {
                     fontSize: 14,
                   }}
                 >
-                  Manage payouts for Top 3 Monthly SP Leaderboard winners
+                  Manage reward claims for Top 3 Monthly SP Leaderboard winners
                 </Typography>
               </Box>
             </Box>
@@ -533,7 +561,7 @@ const RewardsPage = () => {
                   <Star sx={{ fontSize: 24, color: '#FFA726' }} />
                 </Box>
                 <Typography variant="h3" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 1, fontSize: 36 }}>
-                  {currentMonthWinners.length}
+                  {currentMonthWinners}
                 </Typography>
                 <Typography variant="body2" sx={{ fontWeight: 600, color: '#4A4A4A', fontSize: 14, mb: 0.5 }}>
                   Current Month Winners
@@ -576,7 +604,7 @@ const RewardsPage = () => {
                   {pendingPayouts}
                 </Typography>
                 <Typography variant="body2" sx={{ fontWeight: 600, color: '#4A4A4A', fontSize: 14, mb: 0.5 }}>
-                  Pending Payouts
+                  Pending Claims
                 </Typography>
                 <Typography variant="caption" sx={{ color: '#9E9E9E', fontSize: 12 }}>
                   Awaiting KYC or approval
@@ -656,10 +684,10 @@ const RewardsPage = () => {
                   ${totalPaid.toFixed(0)}
                 </Typography>
                 <Typography variant="body2" sx={{ fontWeight: 600, color: '#4A4A4A', fontSize: 14, mb: 0.5 }}>
-                  Total Paid (Current)
+                  Total Fulfilled (Current)
                 </Typography>
                 <Typography variant="caption" sx={{ color: '#9E9E9E', fontSize: 12 }}>
-                  Payouts completed
+                  Rewards fulfilled
                 </Typography>
               </Card>
             </Grid>
@@ -1130,7 +1158,8 @@ const RewardsPage = () => {
                 {statusFilter === 'all' ? 'All Statuses' :
                   statusFilter === 'pending' ? 'Pending' :
                     statusFilter === 'processing' ? 'Processing' :
-                      statusFilter === 'paid' ? 'Paid' :
+                      statusFilter === 'fulfilled' ? 'Fulfilled' :
+                      statusFilter === 'paid' ? 'Fulfilled' : // Backward compatibility
                         statusFilter === 'cancelled' ? 'Cancelled' :
                           statusFilter === 'unclaimed' ? 'Unclaimed' : 'All Statuses'}
               </Box>
@@ -1156,8 +1185,8 @@ const RewardsPage = () => {
               <MenuItem onClick={() => { setStatusFilter('processing'); setStatusAnchor(null); }}>
                 Processing
               </MenuItem>
-              <MenuItem onClick={() => { setStatusFilter('paid'); setStatusAnchor(null); }}>
-                Paid
+              <MenuItem onClick={() => { setStatusFilter('fulfilled'); setStatusAnchor(null); }}>
+                Fulfilled
               </MenuItem>
               <MenuItem onClick={() => { setStatusFilter('cancelled'); setStatusAnchor(null); }}>
                 Cancelled / Declined
@@ -1210,14 +1239,21 @@ const RewardsPage = () => {
             loading={loading}
             page={page}
             rowsPerPage={rowsPerPage}
-            totalCount={filteredRewards.length}
+            totalCount={totalCount}
             onPageChange={(e, newPage) => setPage(newPage)}
             onRowsPerPageChange={(e) => {
               setRowsPerPage(parseInt(e.target.value, 10));
               setPage(0);
             }}
             onRowClick={(row) => {
-              navigate(`/rewards/details/${row.id}`);
+              const rewardId = row.id || row._id || row.reward_id || row.rewardId;
+              console.log('Navigating to reward details with ID:', rewardId, 'Full row:', row);
+              if (rewardId) {
+                navigate(`/rewards/details/${rewardId}`);
+              } else {
+                console.error('Reward ID is missing from row:', row);
+                alert('Unable to open reward details: ID is missing');
+              }
             }}
             emptyMessage="No rewards found"
           />
@@ -1242,7 +1278,14 @@ const RewardsPage = () => {
           >
             <MenuItem
               onClick={() => {
-                navigate(`/rewards/details/${selectedReward.id}`);
+                const rewardId = selectedReward?.id || selectedReward?._id || selectedReward?.reward_id || selectedReward?.rewardId;
+                console.log('Navigating to reward details from menu with ID:', rewardId, 'Full reward:', selectedReward);
+                if (rewardId) {
+                  navigate(`/rewards/details/${rewardId}`);
+                } else {
+                  console.error('Reward ID is missing from selectedReward:', selectedReward);
+                  alert('Unable to open reward details: ID is missing');
+                }
                 setActionsAnchor(null);
               }}
               sx={{
@@ -1353,7 +1396,7 @@ const RewardsPage = () => {
                       ${selectedReward.usdAmount?.toFixed(0) || '0'} USD
                     </Typography>
                     <Chip
-                      label={selectedReward.payoutMethod || 'USDT'}
+                      label={selectedReward.rewardType || selectedReward.payoutMethod || 'Gift Card'}
                       size="small"
                       sx={{
                         bgcolor: 'rgba(255,255,255,0.2)',
@@ -1442,7 +1485,7 @@ const RewardsPage = () => {
                 <Grid container spacing={4}>
                   <Grid item xs={3}>
                     <Typography variant="caption" sx={{ color: colors.textSecondary, display: 'block', mb: 1 }}>Payout Method</Typography>
-                    <Chip label={selectedReward.payoutMethod || 'USDT'} size="small" sx={{ bgcolor: '#E0F2F1', color: '#00695C', fontWeight: 700, borderRadius: '4px', height: 24 }} />
+                    <Chip label={selectedReward.rewardType || selectedReward.payoutMethod || 'Gift Card'} size="small" sx={{ bgcolor: '#E0F2F1', color: '#00695C', fontWeight: 700, borderRadius: '4px', height: 24 }} />
                   </Grid>
                   <Grid item xs={3}>
                     <Typography variant="caption" sx={{ color: colors.textSecondary, display: 'block', mb: 1 }}>Payout Reference</Typography>
@@ -1520,7 +1563,7 @@ const RewardsPage = () => {
                     }}
                     startIcon={<CheckCircle />}
                   >
-                    Mark as Paid
+                    Mark as Fulfilled
                   </Button>
                   <Button variant="contained"
                     sx={{

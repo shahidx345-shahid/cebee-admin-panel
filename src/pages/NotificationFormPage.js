@@ -12,6 +12,8 @@ import {
   Chip,
   Checkbox,
   FormControlLabel,
+  Alert,
+  Snackbar,
 } from '@mui/material';
 import {
   ArrowBack,
@@ -53,6 +55,12 @@ import { format } from 'date-fns';
 import { colors, constants } from '../config/theme';
 import { DateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { 
+  createNotification, 
+  updateNotification, 
+  getNotificationById,
+  saveNotificationAsDraft 
+} from '../services/notificationsService';
 
 const NOTIFICATION_LIMITS = {
   titleMaxLength: 100,
@@ -105,6 +113,8 @@ const NotificationFormPage = () => {
   const isEditMode = !!id;
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
 
   const [formData, setFormData] = useState({
     title: '',
@@ -120,23 +130,29 @@ const NotificationFormPage = () => {
     const loadNotificationData = async () => {
       try {
         setLoading(true);
-        // Simulate network delay
-        await new Promise(resolve => setTimeout(resolve, 800));
+        setError(null);
 
-        // Mock data for edit mode
-        if (isEditMode) {
-          setFormData({
-            title: 'Mock Announcement',
-            body: 'This is a mock announcement body for testing purposes.',
-            type: 'important-announcement',
-            audience: 'all',
-            scheduleForLater: false,
-            scheduledAt: null,
-            deepLink: '/home',
-          });
+        if (isEditMode && id) {
+          const response = await getNotificationById(id);
+          
+          if (response.success && response.data) {
+            const notification = response.data;
+            setFormData({
+              title: notification.title || '',
+              body: notification.body || '',
+              type: notification.type || 'important-announcement',
+              audience: notification.audience || 'all',
+              scheduleForLater: notification.status === 'scheduled' && !!notification.scheduledAt,
+              scheduledAt: notification.scheduledAt ? new Date(notification.scheduledAt) : null,
+              deepLink: notification.deepLink || '',
+            });
+          } else {
+            setError(response.error || 'Failed to load notification');
+          }
         }
       } catch (error) {
         console.error('Error loading notification:', error);
+        setError(error.message || 'An error occurred while loading notification');
       } finally {
         setLoading(false);
       }
@@ -156,13 +172,25 @@ const NotificationFormPage = () => {
   const handleSaveAsDraft = async () => {
     try {
       setSaving(true);
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      console.log('Saved as draft:', formData);
-      alert('Notification saved as draft (Mock)');
-      navigate(constants.routes.notifications);
+      setError(null);
+
+      const response = await saveNotificationAsDraft(formData);
+
+      if (response.success) {
+        setSnackbar({
+          open: true,
+          message: response.message || 'Notification saved as draft successfully',
+          severity: 'success',
+        });
+        setTimeout(() => {
+          navigate(constants.routes.notifications);
+        }, 1500);
+      } else {
+        setError(response.error || 'Failed to save notification as draft');
+      }
     } catch (error) {
       console.error('Error saving notification:', error);
-      alert('Failed to save notification');
+      setError(error.message || 'An unexpected error occurred');
     } finally {
       setSaving(false);
     }
@@ -170,32 +198,58 @@ const NotificationFormPage = () => {
 
   const handleSendOrSchedule = async () => {
     if (!formData.title || !formData.body) {
-      alert('Title and message are required');
+      setError('Title and message are required');
       return;
     }
 
     if (formData.scheduleForLater && !formData.scheduledAt) {
-      alert('Please select a schedule date and time');
+      setError('Please select a schedule date and time');
       return;
     }
 
     try {
       setSaving(true);
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      console.log('Sent/Scheduled:', formData);
+      setError(null);
 
-      alert(
-        formData.scheduleForLater
-          ? 'Notification scheduled successfully (Mock)'
-          : 'Notification sent successfully (Mock)'
-      );
-      navigate(constants.routes.notifications);
+      let response;
+      if (isEditMode && id) {
+        // Update existing notification
+        response = await updateNotification(id, {
+          ...formData,
+          status: formData.scheduleForLater ? 'scheduled' : 'sent',
+        });
+      } else {
+        // Create new notification
+        response = await createNotification({
+          ...formData,
+          status: formData.scheduleForLater ? 'scheduled' : 'sent',
+        });
+      }
+
+      if (response.success) {
+        setSnackbar({
+          open: true,
+          message: response.message || (formData.scheduleForLater 
+            ? 'Notification scheduled successfully' 
+            : 'Notification sent successfully'),
+          severity: 'success',
+        });
+        setTimeout(() => {
+          navigate(constants.routes.notifications);
+        }, 1500);
+      } else {
+        setError(response.error || 'Failed to send/schedule notification');
+      }
     } catch (error) {
       console.error('Error saving notification:', error);
-      alert('Failed to save notification');
+      setError(error.message || 'An unexpected error occurred');
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleCloseSnackbar = () => {
+    setSnackbar({ ...snackbar, open: false });
   };
 
   if (loading) {
@@ -212,6 +266,28 @@ const NotificationFormPage = () => {
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns}>
       <Box sx={{ width: '100%', maxWidth: '100%' }}>
+        {/* Error Alert */}
+        {error && (
+          <Alert 
+            severity="error" 
+            onClose={() => setError(null)}
+            sx={{ mb: 3, borderRadius: '12px' }}
+          >
+            {error}
+          </Alert>
+        )}
+
+        {/* Snackbar for success messages */}
+        <Snackbar
+          open={snackbar.open}
+          autoHideDuration={6000}
+          onClose={handleCloseSnackbar}
+          anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+        >
+          <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
+            {snackbar.message}
+          </Alert>
+        </Snackbar>
         {/* Header */}
         <Box sx={{ mb: 3 }}>
           <Button
@@ -585,7 +661,7 @@ const NotificationFormPage = () => {
                         value={formData.scheduledAt || new Date()}
                         onChange={(date) => handleChange('scheduledAt', date)}
                         minDateTime={new Date()}
-                        fullWidth
+                        disabled={false}
                         slotProps={{
                           textField: {
                             sx: { borderRadius: '12px' },
@@ -604,7 +680,7 @@ const NotificationFormPage = () => {
                   variant="outlined"
                   startIcon={<Description />}
                   onClick={handleSaveAsDraft}
-                  disabled={saving}
+                  disabled={!!saving}
                   sx={{
                     flex: 1,
                     borderColor: colors.brandRed,
@@ -628,7 +704,7 @@ const NotificationFormPage = () => {
                   variant="contained"
                   startIcon={<Send />}
                   onClick={handleSendOrSchedule}
-                  disabled={saving || !formData.title || !formData.body}
+                  disabled={!!saving || !formData.title || !formData.body}
                   sx={{
                     flex: 1,
                     background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,

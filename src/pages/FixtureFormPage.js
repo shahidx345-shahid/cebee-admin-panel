@@ -39,6 +39,7 @@ import { format } from 'date-fns';
 import { getLeagues } from '../services/leaguesService';
 import { getCmds, getCurrentCmd, createCmd, updateCmdStatus } from '../services/cmdsService';
 import { getTeams } from '../services/teamsService';
+import { getFeaturedFixtures, createFixture, updateFixture } from '../services/fixturesService';
 
 const FixtureFormPage = () => {
   const navigate = useNavigate();
@@ -51,6 +52,10 @@ const FixtureFormPage = () => {
   const [currentCmd, setCurrentCmd] = useState(null);
   const [teams, setTeams] = useState([]);
   const [loadingTeams, setLoadingTeams] = useState(false);
+  const [featuredFixtures, setFeaturedFixtures] = useState([]);
+  const [availableTeams, setAvailableTeams] = useState([]); // Teams available based on selection
+  const [matchdays, setMatchdays] = useState([]);
+  const [loadingMatchdays, setLoadingMatchdays] = useState(false);
   const [showNewCmdForm, setShowNewCmdForm] = useState(false);
   const [newCmdForm, setNewCmdForm] = useState({
     name: '',
@@ -66,9 +71,12 @@ const FixtureFormPage = () => {
     leagueId: '',
     venue: '',
     kickoffTime: new Date(),
+    publishDateTime: new Date(Date.now() + 24 * 60 * 60 * 1000), // Default: 24 hours from now
     matchStatus: 'scheduled',
     cmdId: '', // Will be set to current CMd
+    matchday: '', // For Community Featured (uses CMd name)
   });
+  const [dateError, setDateError] = useState('');
 
   useEffect(() => {
     const initialize = async () => {
@@ -111,7 +119,12 @@ const FixtureFormPage = () => {
           if (current) {
             setCurrentCmd(current);
             currentCmdId = current.id;
-            setFormData(prev => ({ ...prev, cmdId: current.id }));
+            setFormData(prev => ({ 
+              ...prev, 
+              cmdId: current.id,
+              // Auto-set matchday to CMd name for Community Featured
+              matchday: featureType === 'community' ? current.name : prev.matchday
+            }));
           }
         } else {
           // Try to get current CMd if getCmds fails
@@ -128,7 +141,12 @@ const FixtureFormPage = () => {
             setCurrentCmd(current);
             currentCmdId = current.id;
             setCmds([current]);
-            setFormData(prev => ({ ...prev, cmdId: current.id }));
+            setFormData(prev => ({ 
+              ...prev, 
+              cmdId: current.id,
+              // Auto-set matchday to CMd name for Community Featured
+              matchday: featureType === 'community' ? current.name : prev.matchday
+            }));
           } else {
             console.error('Failed to load CMds:', cmdsResult.error || currentCmdResult.error);
             setCmds([]);
@@ -161,60 +179,183 @@ const FixtureFormPage = () => {
     const loadTeams = async () => {
       if (!formData.leagueId) {
         setTeams([]);
+        setAvailableTeams([]);
+        setFeaturedFixtures([]);
         return;
       }
 
       setLoadingTeams(true);
       try {
-        const teamsResult = await getTeams({ 
-          league_id: formData.leagueId, 
-          status: 'Active' 
-        });
-        
-        if (teamsResult.success && teamsResult.data?.teams) {
-          // Sort teams: featured teams first (by priority or featured flag), then alphabetically
-          const formattedTeams = teamsResult.data.teams
-            .map(team => ({
-              id: team._id || team.team_id,
-              team_id: team._id || team.team_id,
-              name: team.team_name || team.name,
-              team_name: team.team_name || team.name,
-              priority: team.priority || 0,
-              featured: team.featured || false,
-              isFeatured: team.featured || team.priority > 0,
-            }))
-            .sort((a, b) => {
-              // Featured teams first
-              if (a.isFeatured && !b.isFeatured) return -1;
-              if (!a.isFeatured && b.isFeatured) return 1;
-              // Then by priority (higher first)
-              if (a.priority !== b.priority) return (b.priority || 0) - (a.priority || 0);
-              // Then alphabetically
-              return a.name.localeCompare(b.name);
-            });
+        if (featureType === 'community') {
+          // For Community Featured: Fetch featured fixture and show both teams from it
+          const fixturesResult = await getFeaturedFixtures(formData.leagueId);
           
-          setTeams(formattedTeams);
+          if (fixturesResult.success && fixturesResult.data?.featuredFixture) {
+            const featuredFixture = fixturesResult.data.featuredFixture;
+            // Store the featured fixture data for later use
+            setFeaturedFixtures([featuredFixture]);
+            
+            // Extract teams from featured fixture (teamA and teamB)
+            const teams = [];
+            
+            if (featuredFixture.teamA && featuredFixture.teamA._id) {
+              teams.push({
+                id: featuredFixture.teamA._id,
+                team_id: featuredFixture.teamA._id,
+                name: featuredFixture.teamA.name,
+                team_name: featuredFixture.teamA.name,
+                logo: featuredFixture.teamA.logo,
+                isTeamA: true,
+                opponentId: featuredFixture.teamB?._id,
+                opponentName: featuredFixture.teamB?.name,
+              });
+            }
+            
+            if (featuredFixture.teamB && featuredFixture.teamB._id) {
+              teams.push({
+                id: featuredFixture.teamB._id,
+                team_id: featuredFixture.teamB._id,
+                name: featuredFixture.teamB.name,
+                team_name: featuredFixture.teamB.name,
+                logo: featuredFixture.teamB.logo,
+                isTeamA: false,
+                opponentId: featuredFixture.teamA?._id,
+                opponentName: featuredFixture.teamA?.name,
+              });
+            }
+            
+            setTeams(teams);
+            setAvailableTeams(teams);
+          } else {
+            setTeams([]);
+            setAvailableTeams([]);
+            setFeaturedFixtures([]);
+          }
         } else {
-          setTeams([]);
+          // For CeBee Featured: Show all teams from the league
+          const teamsResult = await getTeams({ 
+            league_id: formData.leagueId, 
+            status: 'Active' 
+          });
+          
+          if (teamsResult.success && teamsResult.data?.teams) {
+            // Sort teams: featured teams first (by priority or featured flag), then alphabetically
+            const formattedTeams = teamsResult.data.teams
+              .map(team => ({
+                id: team._id || team.team_id,
+                team_id: team._id || team.team_id,
+                name: team.team_name || team.name,
+                team_name: team.team_name || team.name,
+                priority: team.priority || 0,
+                featured: team.featured || false,
+                isFeatured: team.featured || team.priority > 0,
+              }))
+              .sort((a, b) => {
+                // Featured teams first
+                if (a.isFeatured && !b.isFeatured) return -1;
+                if (!a.isFeatured && b.isFeatured) return 1;
+                // Then by priority (higher first)
+                if (a.priority !== b.priority) return (b.priority || 0) - (a.priority || 0);
+                // Then alphabetically
+                return a.name.localeCompare(b.name);
+              });
+            
+            setTeams(formattedTeams);
+            setAvailableTeams(formattedTeams);
+            setFeaturedFixtures([]);
+          } else {
+            setTeams([]);
+            setAvailableTeams([]);
+          }
         }
       } catch (error) {
         console.error('Error loading teams:', error);
         setTeams([]);
+        setAvailableTeams([]);
+        setFeaturedFixtures([]);
       } finally {
         setLoadingTeams(false);
       }
     };
 
     loadTeams();
-  }, [formData.leagueId]);
+  }, [formData.leagueId, featureType]);
+
+  // Auto-update matchday when CMd is selected and feature type is community
+  useEffect(() => {
+    if (featureType === 'community' && formData.cmdId && currentCmd) {
+      // Automatically set matchday to current CMd name
+      if (formData.matchday !== currentCmd.name) {
+        setFormData(prev => ({ ...prev, matchday: currentCmd.name }));
+      }
+    } else if (featureType === 'community' && !formData.cmdId) {
+      // Clear matchday if no CMd is selected
+      setFormData(prev => ({ ...prev, matchday: '' }));
+    }
+  }, [formData.cmdId, currentCmd, featureType]);
+
+  // Update available teams when a team is selected (for Community Featured)
+  useEffect(() => {
+    if (featureType === 'community' && featuredFixtures.length > 0) {
+      if (formData.homeTeam && !formData.awayTeam) {
+        // Home team selected, show only the away team from the same fixture
+        const selectedTeam = teams.find(t => t.id === formData.homeTeam);
+        if (selectedTeam && selectedTeam.opponentId) {
+          const opponent = teams.find(t => t.id === selectedTeam.opponentId);
+          setAvailableTeams(opponent ? [opponent] : []);
+        } else {
+          setAvailableTeams([]);
+        }
+      } else if (formData.awayTeam && !formData.homeTeam) {
+        // Away team selected, show only the home team from the same fixture
+        const selectedTeam = teams.find(t => t.id === formData.awayTeam);
+        if (selectedTeam && selectedTeam.opponentId) {
+          const opponent = teams.find(t => t.id === selectedTeam.opponentId);
+          setAvailableTeams(opponent ? [opponent] : []);
+        } else {
+          setAvailableTeams([]);
+        }
+      } else if (!formData.homeTeam && !formData.awayTeam) {
+        // No team selected, show all teams from featured fixtures
+        setAvailableTeams(teams);
+      } else {
+        // Both teams selected, show all teams
+        setAvailableTeams(teams);
+      }
+    } else {
+      // For CeBee Featured, all teams are always available
+      setAvailableTeams(teams);
+    }
+  }, [formData.homeTeam, formData.awayTeam, featureType, teams, featuredFixtures]);
 
   const handleChange = (field, value) => {
     // Clear team selections if league changes
     if (field === 'leagueId') {
       setFormData(prev => ({ ...prev, [field]: value, homeTeam: '', awayTeam: '' }));
+    } else if (field === 'homeTeam' || field === 'awayTeam') {
+      // Allow both teams to be selected independently
+      // Only clear if selecting the same team in the other field (prevent duplicate selection)
+      if (field === 'homeTeam' && value === formData.awayTeam) {
+        // If selecting home team that's already selected as away team, clear away team
+        setFormData(prev => ({ ...prev, [field]: value, awayTeam: '' }));
+      } else if (field === 'awayTeam' && value === formData.homeTeam) {
+        // If selecting away team that's already selected as home team, clear home team
+        setFormData(prev => ({ ...prev, [field]: value, homeTeam: '' }));
+      } else {
+        // Normal selection - keep both teams
+        setFormData(prev => ({ ...prev, [field]: value }));
+      }
     } else {
       setFormData({ ...formData, [field]: value });
     }
+  };
+
+  const handleFeatureTypeChange = (type) => {
+    setFeatureType(type);
+    // Clear team selections when switching feature type
+    setFormData(prev => ({ ...prev, homeTeam: '', awayTeam: '' }));
+    setAvailableTeams([]);
+    setFeaturedFixtures([]);
   };
 
   const handleCreateCmd = async () => {
@@ -257,14 +398,24 @@ const FixtureFormPage = () => {
           // Set current CMd if status is current
           if (newCmdForm.status === 'current') {
             setCurrentCmd(newCmd);
-            setFormData(prev => ({ ...prev, cmdId: newCmd.id }));
+            setFormData(prev => ({ 
+              ...prev, 
+              cmdId: newCmd.id,
+              // Auto-set matchday to CMd name for Community Featured
+              matchday: featureType === 'community' ? newCmd.name : prev.matchday
+            }));
           }
         } else {
           // Fallback: just add the new CMd
           setCmds(prev => [...prev, newCmd]);
           if (newCmdForm.status === 'current') {
             setCurrentCmd(newCmd);
-            setFormData(prev => ({ ...prev, cmdId: newCmd.id }));
+            setFormData(prev => ({ 
+              ...prev, 
+              cmdId: newCmd.id,
+              // Auto-set matchday to CMd name for Community Featured
+              matchday: featureType === 'community' ? newCmd.name : prev.matchday
+            }));
           }
         }
 
@@ -310,7 +461,12 @@ const FixtureFormPage = () => {
           const selectedCmd = formattedCmds.find(cmd => cmd.id === cmdId);
           if (selectedCmd) {
             setCurrentCmd(selectedCmd);
-            setFormData(prev => ({ ...prev, cmdId: selectedCmd.id }));
+            setFormData(prev => ({ 
+              ...prev, 
+              cmdId: selectedCmd.id,
+              // Auto-set matchday to CMd name for Community Featured
+              matchday: featureType === 'community' ? selectedCmd.name : prev.matchday
+            }));
           }
         } else {
           // Fallback: update local state
@@ -320,7 +476,12 @@ const FixtureFormPage = () => {
           const selectedCmd = cmds.find(cmd => cmd.id === cmdId);
           if (selectedCmd) {
             setCurrentCmd(selectedCmd);
-            setFormData(prev => ({ ...prev, cmdId: selectedCmd.id }));
+            setFormData(prev => ({ 
+              ...prev, 
+              cmdId: selectedCmd.id,
+              // Auto-set matchday to CMd name for Community Featured
+              matchday: featureType === 'community' ? selectedCmd.name : prev.matchday
+            }));
           }
         }
       } else {
@@ -333,27 +494,134 @@ const FixtureFormPage = () => {
   };
 
   const handleSave = async () => {
-    // Ensure fixture is assigned to current CMd
-    if (!formData.cmdId && currentCmd) {
-      setFormData(prev => ({ ...prev, cmdId: currentCmd.id }));
+    // Validate required fields
+    if (!formData.leagueId) {
+      alert('Please select a league');
+      return;
     }
 
-    if (!formData.cmdId) {
+    if (!formData.kickoffTime) {
+      alert('Please select a kickoff time');
+      return;
+    }
+
+    if (!formData.publishDateTime) {
+      alert('Please select a publish date and time');
+      return;
+    }
+
+    if (!formData.venue) {
+      alert('Please select a venue');
+      return;
+    }
+
+    // Validate that publish date is before kickoff time
+    const publishDate = formData.publishDateTime instanceof Date 
+      ? formData.publishDateTime 
+      : new Date(formData.publishDateTime);
+    const kickoffDate = formData.kickoffTime instanceof Date 
+      ? formData.kickoffTime 
+      : new Date(formData.kickoffTime);
+
+    if (publishDate >= kickoffDate) {
+      setDateError('Publish date and time must be before kickoff date and time');
+      alert('Publish date and time must be before kickoff date and time. Please adjust the dates.');
+      return;
+    }
+    
+    // Clear any date errors if validation passes
+    setDateError('');
+
+    // Validate based on feature type
+    if (featureType === 'community') {
+      if (!formData.homeTeam && !formData.awayTeam) {
+        alert('Please select at least one team for Community Featured fixture');
+        return;
+      }
+      if (!formData.matchday) {
+        alert('Please enter a matchday for Community Featured fixture');
+        return;
+      }
+    } else {
+      // CeBe Featured or Regular
+      if (!formData.homeTeam || !formData.awayTeam) {
+        alert('Please select both home and away teams');
+        return;
+      }
+    }
+
+    // Ensure fixture is assigned to current CMd
+    const cmdId = formData.cmdId || currentCmd?.id;
+    if (!cmdId) {
       alert('No active CMd found. Please create or select a CMd first.');
       return;
     }
 
     try {
       setSaving(true);
-      await new Promise(resolve => setTimeout(resolve, 1000));
 
-      console.log('Fixture saved:', { ...formData, cmdId: formData.cmdId || currentCmd?.id });
-      alert('Fixture saved successfully (Mock)');
+      // Prepare fixture data according to backend requirements
+      const fixtureData = {
+        leagueId: formData.leagueId,
+        kickoffTime: formData.kickoffTime instanceof Date 
+          ? formData.kickoffTime.toISOString() 
+          : formData.kickoffTime,
+        publishDateTime: formData.publishDateTime instanceof Date 
+          ? formData.publishDateTime.toISOString() 
+          : formData.publishDateTime,
+        venue: formData.venue,
+        cmdId: cmdId,
+      };
 
-      navigate(constants.routes.fixtures);
+      // Add status if provided
+      if (formData.matchStatus) {
+        fixtureData.status = formData.matchStatus;
+      }
+
+      // Handle based on feature type
+      if (featureType === 'community') {
+        // Community Featured: requires selected_team_id and matchday
+        const selectedTeamId = formData.homeTeam || formData.awayTeam;
+        if (!selectedTeamId) {
+          alert('Please select a team');
+          setSaving(false);
+          return;
+        }
+        fixtureData.isCommunityFeatured = true;
+        fixtureData.selected_team_id = selectedTeamId;
+        fixtureData.matchday = formData.matchday;
+      } else {
+        // CeBe Featured or Regular: requires home_team_id and away_team_id
+        if (!formData.homeTeam || !formData.awayTeam) {
+          alert('Please select both home and away teams');
+          setSaving(false);
+          return;
+        }
+        fixtureData.home_team_id = formData.homeTeam;
+        fixtureData.away_team_id = formData.awayTeam;
+        if (featureType === 'cebee') {
+          fixtureData.isCeBeFeatured = true;
+        }
+      }
+
+      console.log('Saving fixture with data:', fixtureData);
+
+      let result;
+      if (isEditMode && id) {
+        result = await updateFixture(id, fixtureData);
+      } else {
+        result = await createFixture(fixtureData);
+      }
+
+      if (result.success) {
+        alert(result.message || (isEditMode ? 'Fixture updated successfully' : 'Fixture created successfully'));
+        navigate(constants.routes.fixtures, { state: { refresh: true } });
+      } else {
+        alert(result.error || 'Failed to save fixture');
+      }
     } catch (error) {
       console.error('Error saving fixture:', error);
-      alert('Failed to save fixture');
+      alert('An error occurred while saving the fixture');
     } finally {
       setSaving(false);
     }
@@ -711,7 +979,7 @@ const FixtureFormPage = () => {
           <Grid container spacing={2}>
             <Grid item xs={12} md={6}>
               <Card
-                onClick={() => setFeatureType('cebee')}
+                onClick={() => handleFeatureTypeChange('cebee')}
                 sx={{
                   padding: 2.5,
                   borderRadius: '16px',
@@ -760,7 +1028,7 @@ const FixtureFormPage = () => {
             </Grid>
             <Grid item xs={12} md={6}>
               <Card
-                onClick={() => setFeatureType('community')}
+                onClick={() => handleFeatureTypeChange('community')}
                 sx={{
                   padding: 2.5,
                   borderRadius: '16px',
@@ -844,10 +1112,21 @@ const FixtureFormPage = () => {
               <FormControl fullWidth required>
                 <InputLabel>Home Team *</InputLabel>
                 <Select
-                  value={formData.homeTeam}
+                  value={formData.homeTeam || ''}
                   onChange={(e) => handleChange('homeTeam', e.target.value)}
                   label="Home Team *"
-                  disabled={!formData.leagueId || loadingTeams}
+                  disabled={Boolean(!formData.leagueId || loadingTeams)}
+                  renderValue={(value) => {
+                    if (!value) return '';
+                    // Always look in teams array (not availableTeams) since availableTeams gets filtered
+                    const team = teams.find(t => {
+                      // Handle both string and object ID comparisons
+                      const teamId = String(t.id || t._id || t.team_id);
+                      const valueId = String(value);
+                      return teamId === valueId;
+                    });
+                    return team ? (team.name || team.team_name || '') : '';
+                  }}
                   sx={{
                     borderRadius: '12px',
                     '& .MuiOutlinedInput-notchedOutline': {
@@ -880,21 +1159,25 @@ const FixtureFormPage = () => {
                       <CircularProgress size={20} sx={{ mr: 1 }} />
                       Loading teams...
                     </MenuItem>
-                  ) : teams.length === 0 ? (
+                  ) : (featureType === 'community' ? availableTeams : teams).length === 0 ? (
                     <MenuItem disabled>
-                      {formData.leagueId ? 'No teams found for this league' : 'Please select a league first'}
+                      {formData.leagueId 
+                        ? (featureType === 'community' 
+                          ? 'No featured fixtures found for this league' 
+                          : 'No teams found for this league')
+                        : 'Please select a league first'}
                     </MenuItem>
                   ) : (
-                    teams.map((team) => (
-                      <MenuItem key={team.id} value={team.name}>
+                    (featureType === 'community' ? availableTeams : teams).map((team) => (
+                      <MenuItem key={team.id} value={team.id}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
-                          {team.isFeatured && (
+                          {(team.isFeatured || featureType === 'community') && (
                             <Star sx={{ fontSize: 16, color: colors.brandRed }} />
                           )}
                           <Typography sx={{ flex: 1 }}>{team.name}</Typography>
-                          {team.isFeatured && (
+                          {(team.isFeatured || featureType === 'community') && (
                             <Chip
-                              label="Featured"
+                              label={featureType === 'community' ? 'Featured Fixture' : 'Featured'}
                               size="small"
                               sx={{
                                 backgroundColor: `${colors.brandRed}15`,
@@ -916,10 +1199,21 @@ const FixtureFormPage = () => {
               <FormControl fullWidth required>
                 <InputLabel>Away Team *</InputLabel>
                 <Select
-                  value={formData.awayTeam}
+                  value={formData.awayTeam || ''}
                   onChange={(e) => handleChange('awayTeam', e.target.value)}
                   label="Away Team *"
-                  disabled={!formData.leagueId || loadingTeams}
+                  disabled={Boolean(!formData.leagueId || loadingTeams)}
+                  renderValue={(value) => {
+                    if (!value) return '';
+                    // Always look in teams array (not availableTeams) since availableTeams gets filtered
+                    const team = teams.find(t => {
+                      // Handle both string and object ID comparisons
+                      const teamId = String(t.id || t._id || t.team_id);
+                      const valueId = String(value);
+                      return teamId === valueId;
+                    });
+                    return team ? (team.name || team.team_name || '') : '';
+                  }}
                   sx={{
                     borderRadius: '12px',
                     '& .MuiOutlinedInput-notchedOutline': {
@@ -952,21 +1246,25 @@ const FixtureFormPage = () => {
                       <CircularProgress size={20} sx={{ mr: 1 }} />
                       Loading teams...
                     </MenuItem>
-                  ) : teams.length === 0 ? (
+                  ) : (featureType === 'community' ? availableTeams : teams).length === 0 ? (
                     <MenuItem disabled>
-                      {formData.leagueId ? 'No teams found for this league' : 'Please select a league first'}
+                      {formData.leagueId 
+                        ? (featureType === 'community' 
+                          ? (formData.homeTeam ? 'Select home team first' : 'No featured fixtures found for this league')
+                          : 'No teams found for this league')
+                        : 'Please select a league first'}
                     </MenuItem>
                   ) : (
-                    teams.map((team) => (
-                      <MenuItem key={team.id} value={team.name}>
+                    (featureType === 'community' ? availableTeams : teams).map((team) => (
+                      <MenuItem key={team.id} value={team.id}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
-                          {team.isFeatured && (
+                          {(team.isFeatured || featureType === 'community') && (
                             <Star sx={{ fontSize: 16, color: colors.brandRed }} />
                           )}
                           <Typography sx={{ flex: 1 }}>{team.name}</Typography>
-                          {team.isFeatured && (
+                          {(team.isFeatured || featureType === 'community') && (
                             <Chip
-                              label="Featured"
+                              label={featureType === 'community' ? 'Featured Fixture' : 'Featured'}
                               size="small"
                               sx={{
                                 backgroundColor: `${colors.brandRed}15`,
@@ -984,13 +1282,37 @@ const FixtureFormPage = () => {
                 </Select>
               </FormControl>
             </Grid>
-            <Grid item xs={12}>
-              <FormControl fullWidth>
-                <InputLabel>Match Ground / Stadium</InputLabel>
+            {featureType === 'community' && (
+              <Grid item xs={12} md={6}>
+                <TextField
+                  fullWidth
+                  required
+                  label="Matchday *"
+                  value={formData.matchday || ''}
+                  InputProps={{
+                    readOnly: true,
+                  }}
+                  helperText="Automatically set from selected CMd"
+                  sx={{
+                    borderRadius: '12px',
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '12px',
+                      backgroundColor: colors.brandWhite,
+                    },
+                    '& .MuiInputBase-input': {
+                      cursor: 'default',
+                    },
+                  }}
+                />
+              </Grid>
+            )}
+            <Grid item xs={12} md={featureType === 'community' ? 6 : 12}>
+              <FormControl fullWidth required>
+                <InputLabel>Match Ground / Stadium *</InputLabel>
                 <Select
                   value={formData.venue || 'other'}
                   onChange={(e) => handleChange('venue', e.target.value)}
-                  label="Match Ground / Stadium"
+                  label="Match Ground / Stadium *"
                   sx={{
                     borderRadius: '12px',
                     '& .MuiOutlinedInput-notchedOutline': {
@@ -1044,11 +1366,50 @@ const FixtureFormPage = () => {
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
             <CalendarToday sx={{ fontSize: 20, color: colors.brandRed }} />
             <Typography variant="h6" sx={{ fontWeight: 700 }}>
-              Kickoff Schedule
+              Schedule
             </Typography>
           </Box>
           <Grid container spacing={2} alignItems="center">
-            <Grid item xs={12} md={8}>
+            <Grid item xs={12} md={6}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                  Publish Date & Time *
+                </Typography>
+                <Chip
+                  label="Required"
+                  size="small"
+                  sx={{
+                    backgroundColor: colors.warning,
+                    color: colors.brandBlack,
+                    fontWeight: 600,
+                    height: 20,
+                    fontSize: 10,
+                  }}
+                />
+              </Box>
+              <DateTimePicker
+                value={formData.publishDateTime}
+                onChange={(date) => handleChange('publishDateTime', date)}
+                slotProps={{
+                  textField: {
+                    fullWidth: true,
+                    error: !!dateError,
+                    helperText: dateError || 'Fixture will be published at this time',
+                    sx: {
+                      borderRadius: '12px',
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '12px',
+                        border: dateError ? `2px solid ${colors.error || '#d32f2f'}` : `2px solid ${colors.brandRed}`,
+                        '& fieldset': {
+                          borderColor: dateError ? colors.error || '#d32f2f' : colors.brandRed,
+                        },
+                      },
+                    },
+                  },
+                }}
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                 <Typography variant="body1" sx={{ fontWeight: 600 }}>
                   Kickoff Date & Time *
@@ -1071,13 +1432,15 @@ const FixtureFormPage = () => {
                 slotProps={{
                   textField: {
                     fullWidth: true,
+                    error: !!dateError,
+                    helperText: dateError || 'Match will start at this time',
                     sx: {
                       borderRadius: '12px',
                       '& .MuiOutlinedInput-root': {
                         borderRadius: '12px',
-                        border: `2px solid ${colors.brandRed}`,
+                        border: dateError ? `2px solid ${colors.error || '#d32f2f'}` : `2px solid ${colors.brandRed}`,
                         '& fieldset': {
-                          borderColor: colors.brandRed,
+                          borderColor: dateError ? colors.error || '#d32f2f' : colors.brandRed,
                         },
                       },
                     },

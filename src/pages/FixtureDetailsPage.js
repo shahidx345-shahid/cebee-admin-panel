@@ -48,6 +48,7 @@ import { format } from 'date-fns';
 import { colors, constants } from '../config/theme';
 import SearchBar from '../components/common/SearchBar';
 import DataTable from '../components/common/DataTable';
+import { getFixture, getFixturePredictions } from '../services/fixturesService';
 
 const FixtureDetailsPage = () => {
   const navigate = useNavigate();
@@ -76,41 +77,148 @@ const FixtureDetailsPage = () => {
     const loadFixtureData = async () => {
       try {
         setLoading(true);
-        // Simulate loading time
-        await new Promise(resolve => setTimeout(resolve, 600));
-
-        let fixtureData = null;
-
-        // Use sample data directly
-        const sampleFixtures = getSampleFixtures();
-        fixtureData = sampleFixtures.find(f => f.id === id);
         
-        if (!fixtureData) {
-          console.error('Fixture not found with id:', id);
-          console.log('Available fixture IDs:', sampleFixtures.map(f => f.id));
+        if (!id) {
+          console.error('Fixture ID is missing');
+          setLoading(false);
+          return;
         }
 
-        if (fixtureData) {
-          setFixture(fixtureData);
-          // Initialize selected flow status based on fixture status
-          const status = fixtureData.status || fixtureData.matchStatus || 'scheduled';
-          // Map fixture status to flow status
-          const statusMap = {
-            'scheduled': 'predictionOpen',
-            'published': 'predictionOpen',
-            'predictionOpen': 'predictionOpen',
-            'predictionLock': 'predictionLock',
-            'live': 'live',
-            'resultsProcessing': 'resultPending',
-            'pending': 'resultPending',
-            'completed': 'completed',
-          };
-          setSelectedFlowStatus(statusMap[status] || 'predictionOpen');
+        // Fetch fixture from API
+        console.log('Loading fixture with ID:', id);
+        const fixtureResult = await getFixture(id);
+        console.log('Fixture API response:', fixtureResult);
+        
+        if (fixtureResult.success && fixtureResult.data) {
+          // Backend returns { success: true, data: { fixture: {...} } }
+          // The fixture object is nested in data.fixture
+          const fixtureData = fixtureResult.data.fixture || fixtureResult.data;
+          console.log('Fixture data extracted:', fixtureData);
+          
+          // Check if fixtureData is actually an object
+          if (!fixtureData || typeof fixtureData !== 'object' || Array.isArray(fixtureData)) {
+            console.error('Invalid fixture data structure:', fixtureData);
+            setLoading(false);
+            setFixture(null);
+            return;
+          }
+          
+          console.log('Processing fixture data, homeTeam:', fixtureData.homeTeam || fixtureData.home_team);
+          
+          // Format fixture data to match expected structure
+          let formattedFixture;
+          try {
+            formattedFixture = {
+              id: fixtureData._id || fixtureData.id,
+              matchId: fixtureData.matchId || fixtureData.match_id || fixtureData._id || fixtureData.id,
+              homeTeam: fixtureData.homeTeam || fixtureData.home_team || '',
+              awayTeam: fixtureData.awayTeam || fixtureData.away_team || '',
+              league: fixtureData.league || fixtureData.leagueName || fixtureData.league_name || (fixtureData.leagueId?.league_name) || '',
+              leagueId: fixtureData.leagueId?._id || fixtureData.leagueId || '',
+              kickoffTime: (() => {
+                const kickoff = fixtureData.kickoffTime || fixtureData.kickoff_time;
+                if (!kickoff) return null;
+                const date = new Date(kickoff);
+                return isNaN(date.getTime()) ? null : date;
+              })(),
+              status: fixtureData.status || fixtureData.matchStatus || 'scheduled',
+              matchStatus: fixtureData.matchStatus || fixtureData.status || 'scheduled',
+              predictions: fixtureData.totalPredictions || fixtureData.predictionCount || fixtureData.prediction_count || 0,
+              hot: fixtureData.isFeatured || fixtureData.isCeBeFeatured || false,
+              cmdId: fixtureData.cmdId?._id || fixtureData.cmdId || (typeof fixtureData.cmdId === 'string' ? fixtureData.cmdId : ''),
+              cmdName: fixtureData.cmdId?.name || fixtureData.cmdName || fixtureData.cmd_name || '',
+              venue: fixtureData.venue || '',
+              homeScore: fixtureData.homeScore || fixtureData.home_score || null,
+              awayScore: fixtureData.awayScore || fixtureData.away_score || null,
+              homeTeamLogo: fixtureData.homeTeamLogo || fixtureData.home_team_logo || null,
+              awayTeamLogo: fixtureData.awayTeamLogo || fixtureData.away_team_logo || null,
+              publishDateTime: (() => {
+                const publish = fixtureData.publishDateTime || fixtureData.publish_date_time;
+                if (!publish) return null;
+                const date = new Date(publish);
+                return isNaN(date.getTime()) ? null : date;
+              })(),
+              isCeBeFeatured: fixtureData.isCeBeFeatured || false,
+              isCommunityFeatured: fixtureData.isCommunityFeatured || false,
+              matchday: fixtureData.matchday || '',
+              // Include all other fields
+              ...fixtureData,
+            };
+            
+            console.log('Setting fixture state with formatted data:', formattedFixture);
+            setFixture(formattedFixture);
+            console.log('Fixture state set successfully');
+            
+            // Set loading to false IMMEDIATELY after fixture is set
+            // Don't wait for predictions to load
+            setLoading(false);
+            console.log('Loading set to false');
+            
+            // Initialize selected flow status based on fixture status
+            const status = formattedFixture.status || formattedFixture.matchStatus || 'scheduled';
+            // Map fixture status to flow status
+            const statusMap = {
+              'scheduled': 'predictionOpen',
+              'published': 'predictionOpen',
+              'predictionOpen': 'predictionOpen',
+              'predictionLock': 'predictionLock',
+              'predictionLocked': 'predictionLock',
+              'live': 'live',
+              'resultsProcessing': 'resultPending',
+              'pending': 'resultPending',
+              'resultPending': 'resultPending',
+              'completed': 'completed',
+            };
+            setSelectedFlowStatus(statusMap[status] || 'predictionOpen');
 
-          // Return sample predictions 
-          const samplePredictions = getSamplePredictions(id);
-          setPredictions(samplePredictions);
-          setFilteredPredictions(samplePredictions);
+            // Fetch predictions from API (async, don't block UI)
+            getFixturePredictions(id, { limit: 1000 })
+              .then(predictionsResult => {
+                if (predictionsResult.success && predictionsResult.data) {
+                  const predictionsArray = predictionsResult.data.predictions || predictionsResult.data || [];
+                  const formattedPredictions = predictionsArray.map(pred => ({
+                    id: pred._id || pred.id,
+                    userId: pred.userId || pred.user_id || '',
+                    username: pred.username || pred.userName || 'Unknown User',
+                    userEmail: pred.userEmail || pred.user_email || '',
+                    userCountry: pred.userCountry || pred.user_country || '',
+                    fixtureId: pred.fixtureId || pred.fixture_id || id,
+                    homeTeam: pred.homeTeam || pred.home_team || formattedFixture.homeTeam,
+                    awayTeam: pred.awayTeam || pred.away_team || formattedFixture.awayTeam,
+                    predictedHomeScore: pred.predictedHomeScore || pred.predicted_home_score || pred.homeScore || 0,
+                    predictedAwayScore: pred.predictedAwayScore || pred.predicted_away_score || pred.awayScore || 0,
+                    firstGoalScorer: pred.firstGoalScorer || pred.first_goal_scorer || '',
+                    firstGoalMinute: pred.firstGoalMinute || pred.first_goal_minute || null,
+                    createdAt: pred.createdAt ? new Date(pred.createdAt) : pred.created_at ? new Date(pred.created_at) : new Date(),
+                    points: pred.points || 0,
+                    isCorrect: pred.isCorrect || pred.is_correct || false,
+                  }));
+                  
+                  setPredictions(formattedPredictions);
+                  setFilteredPredictions(formattedPredictions);
+                } else {
+                  setPredictions([]);
+                  setFilteredPredictions([]);
+                }
+              })
+              .catch(predError => {
+                console.error('Error loading predictions:', predError);
+                setPredictions([]);
+                setFilteredPredictions([]);
+              });
+          } catch (formatError) {
+            console.error('Error formatting fixture data:', formatError);
+            setLoading(false);
+            setFixture(null);
+            return;
+          }
+        } else {
+          console.error('Failed to load fixture:', fixtureResult);
+          console.error('Error details:', fixtureResult.error);
+          // Set loading to false even on error so UI doesn't hang
+          setLoading(false);
+          // Set empty fixture to show error state
+          setFixture(null);
         }
       } catch (error) {
         console.error('Error loading fixture:', error);
@@ -585,6 +693,28 @@ const FixtureDetailsPage = () => {
 
   if (!fixture) {
     return (
+      <Box sx={{ p: 3 }}>
+        <Button
+          startIcon={<ArrowBack />}
+          onClick={() => navigate(constants.routes.fixtures)}
+          sx={{
+            mb: 3,
+            color: colors.brandRed,
+            textTransform: 'none',
+            fontWeight: 600,
+          }}
+        >
+          Back to Fixtures
+        </Button>
+        <Alert severity="error" sx={{ mb: 2 }}>
+          Fixture not found or failed to load. Please try again.
+        </Alert>
+      </Box>
+    );
+  }
+
+  if (!fixture) {
+    return (
       <Box sx={{ textAlign: 'center', padding: 6 }}>
         <Typography variant="h6" sx={{ color: colors.error, mb: 2 }}>
           Fixture not found
@@ -766,10 +896,12 @@ const FixtureDetailsPage = () => {
       id: 'predictionTime',
       label: 'Prediction Time',
       render: (_, row) => {
+        if (!row.predictionTime) return <Typography variant="body2" sx={{ color: colors.brandBlack }}>N/A</Typography>;
         const time = row.predictionTime?.toDate ? row.predictionTime.toDate() : new Date(row.predictionTime);
+        const isValidDate = time instanceof Date && !isNaN(time.getTime());
         return (
           <Typography variant="body2" sx={{ color: colors.brandBlack }}>
-            {row.predictionTime ? format(time, 'MMM dd, yyyy HH:mm') : 'N/A'}
+            {isValidDate ? format(time, 'MMM dd, yyyy HH:mm') : 'N/A'}
           </Typography>
         );
       },
@@ -913,7 +1045,7 @@ const FixtureDetailsPage = () => {
 
         <CardContent sx={{ p: 4, position: 'relative', zIndex: 1 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-            <Chip icon={<CalendarToday sx={{ fontSize: 14, color: '#fff !important' }} />} label={fixture.kickoffTime ? format(fixture.kickoffTime, 'EEE, MMM dd • HH:mm') : 'TBD'} sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: '#fff', border: '1px solid rgba(255,255,255,0.3)', fontWeight: 600 }} />
+            <Chip icon={<CalendarToday sx={{ fontSize: 14, color: '#fff !important' }} />} label={fixture.kickoffTime && !isNaN(new Date(fixture.kickoffTime).getTime()) ? format(new Date(fixture.kickoffTime), 'EEE, MMM dd • HH:mm') : 'TBD'} sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: '#fff', border: '1px solid rgba(255,255,255,0.3)', fontWeight: 600 }} />
             <Chip label={(fixture.status || 'scheduled').toUpperCase()} sx={{ fontWeight: 700, bgcolor: fixture.status === 'live' ? colors.brandBlack : 'rgba(255,255,255,0.2)', color: '#fff' }} />
           </Box>
 
@@ -1362,7 +1494,7 @@ const FixtureDetailsPage = () => {
                 { min: '12', event: 'Yellow Card', detail: 'Away Team', color: colors.warning },
                 { min: '0', event: 'Kickoff', detail: '', color: colors.brandRed },
               ] : [
-                { min: '', event: 'Match Scheduled', detail: fixture?.kickoffTime ? format(fixture.kickoffTime, 'MMM dd, yyyy HH:mm') : '', color: colors.info },
+                { min: '', event: 'Match Scheduled', detail: fixture?.kickoffTime && !isNaN(new Date(fixture.kickoffTime).getTime()) ? format(new Date(fixture.kickoffTime), 'MMM dd, yyyy HH:mm') : '', color: colors.info },
                 { min: '', event: 'Predictions Open', detail: `${predictions.length} predictions made`, color: colors.success },
               ].map((ev, i) => (
                 <Box key={i} sx={{ mb: 3, position: 'relative' }}>

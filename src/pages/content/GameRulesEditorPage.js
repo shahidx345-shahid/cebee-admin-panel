@@ -11,12 +11,15 @@ import {
   DialogTitle,
   TextField,
   IconButton,
+  Alert,
+  Snackbar,
 } from '@mui/material';
 import { Book, Edit as EditIcon, CheckCircle, Close, Description, Tag, Info } from '@mui/icons-material';
 import { colors } from '../../config/theme';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import { format } from 'date-fns';
+import { getPublishedGameRules, getGameRuleById, createGameRules, updateGameRules } from '../../services/gameRulesService';
 
 // Static default content
 const defaultContent = `<h1>CeBee Predict Rules & Fair Play</h1>
@@ -81,65 +84,114 @@ const GameRulesEditorPage = () => {
   const [saving, setSaving] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [version, setVersion] = useState('1.0');
-  const [updatedAt, setUpdatedAt] = useState(new Date('2026-01-12'));
+  const [updatedAt, setUpdatedAt] = useState(null);
   const [status, setStatus] = useState('published');
+  const [currentGameRuleId, setCurrentGameRuleId] = useState(null);
+  const [error, setError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
 
   useEffect(() => {
     loadContent();
   }, []);
 
-  const loadContent = () => {
+  const loadContent = async () => {
     try {
       setLoading(true);
-      // Load from localStorage if available
-      const savedContent = localStorage.getItem('gameRulesContent');
-      const savedTitle = localStorage.getItem('gameRulesTitle');
-      const savedVersion = localStorage.getItem('gameRulesVersion');
-      const savedStatus = localStorage.getItem('gameRulesStatus');
-      const savedDate = localStorage.getItem('gameRulesUpdatedAt');
+      setError(null);
 
-      if (savedContent) {
-        setContent(savedContent);
-        setTitle(savedTitle || 'Rules & Fair Play');
-        setVersion(savedVersion || '1.0');
-        setUpdatedAt(savedDate ? new Date(savedDate) : new Date('2026-01-12'));
-        setStatus(savedStatus || 'published');
+      // Try to get published game rules first (sorted by updatedAt desc, so first is latest)
+      const response = await getPublishedGameRules();
+      
+      if (response.success && response.data?.gameRules && response.data.gameRules.length > 0) {
+        // Use the first published game rule (latest one)
+        const gameRule = response.data.gameRules[0];
+        setContent(gameRule.content || defaultContent);
+        setTitle(gameRule.title || 'Rules & Fair Play');
+        setVersion(gameRule.version || '1.0');
+        setUpdatedAt(gameRule.updatedAt ? new Date(gameRule.updatedAt) : new Date());
+        setStatus(gameRule.status ? gameRule.status.toLowerCase() : 'published');
+        setCurrentGameRuleId(gameRule._id);
       } else {
-        // Use default content
+        // No published rules found, use default content
         setContent(defaultContent);
         setTitle('Rules & Fair Play');
         setVersion('1.0');
-        setUpdatedAt(new Date('2026-01-12'));
-        setStatus('published');
+        setUpdatedAt(new Date());
+        setStatus('draft');
+        setCurrentGameRuleId(null);
       }
     } catch (error) {
       console.error('Error loading content:', error);
+      setError('Failed to load game rules. Using default content.');
+      // Use default content as fallback
+      setContent(defaultContent);
+      setTitle('Rules & Fair Play');
+      setVersion('1.0');
+      setUpdatedAt(new Date());
+      setStatus('draft');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    // Validation
+    if (!title.trim()) {
+      setError('Title is required');
+      return;
+    }
+    if (!content.trim()) {
+      setError('Content is required');
+      return;
+    }
+
     try {
       setSaving(true);
-      // Save to localStorage
-      localStorage.setItem('gameRulesContent', content);
-      localStorage.setItem('gameRulesTitle', title);
-      localStorage.setItem('gameRulesVersion', version);
-      const newDate = new Date();
-      localStorage.setItem('gameRulesUpdatedAt', newDate.toISOString());
+      setError(null);
 
-      setUpdatedAt(newDate);
-      // setStatus('published'); // Status is now managed by state
-      localStorage.setItem('gameRulesStatus', status); // Persist status
-      setIsModalOpen(false);
-      alert('Content saved successfully!');
+      const gameRuleData = {
+        title: title.trim(),
+        content: content.trim(),
+        version: version.trim() || '1.0',
+        status: status,
+      };
+
+      let response;
+      if (currentGameRuleId) {
+        // Update existing game rules
+        response = await updateGameRules(currentGameRuleId, gameRuleData);
+      } else {
+        // Create new game rules
+        response = await createGameRules(gameRuleData);
+      }
+
+      if (response.success) {
+        const gameRule = response.data;
+        setContent(gameRule.content || content);
+        setTitle(gameRule.title || title);
+        setVersion(gameRule.version || version);
+        setUpdatedAt(gameRule.updatedAt ? new Date(gameRule.updatedAt) : new Date());
+        setStatus(gameRule.status ? gameRule.status.toLowerCase() : status);
+        setCurrentGameRuleId(gameRule._id || currentGameRuleId);
+        
+        setSuccessMessage(response.message || 'Game rules saved successfully!');
+        setIsModalOpen(false);
+        
+        // Reload content to get latest version
+        await loadContent();
+      } else {
+        setError(response.error || 'Failed to save game rules');
+      }
     } catch (error) {
       console.error('Error saving content:', error);
-      alert('Failed to save content');
+      setError('An unexpected error occurred while saving game rules');
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleCloseSnackbar = () => {
+    setSuccessMessage(null);
   };
 
   const handleEditClick = () => {
@@ -211,7 +263,7 @@ const GameRulesEditorPage = () => {
             }}
           />
           <Chip
-            label={updatedAt ? `Updated: ${format(updatedAt, 'MMM dd, yyyy')}` : 'Updated: Not yet'}
+            label={updatedAt ? `Updated: ${format(updatedAt instanceof Date ? updatedAt : new Date(updatedAt), 'MMM dd, yyyy')}` : 'Updated: Not yet'}
             size="small"
             sx={{
               backgroundColor: '#4CAF50',
@@ -315,7 +367,7 @@ const GameRulesEditorPage = () => {
             </Typography>
             {updatedAt && (
               <Typography variant="body2" sx={{ color: '#9CA3AF', fontSize: 14 }}>
-                Version {version} • Updated {format(updatedAt, 'MMM dd, yyyy')}
+                Version {version} • Updated {format(updatedAt instanceof Date ? updatedAt : new Date(updatedAt), 'MMM dd, yyyy')}
               </Typography>
             )}
           </Box>
@@ -415,6 +467,11 @@ const GameRulesEditorPage = () => {
           </Box>
         </DialogTitle>
         <DialogContent sx={{ pt: 0 }}>
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+              {error}
+            </Alert>
+          )}
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
             {/* Title Field */}
             <Box>
@@ -577,6 +634,17 @@ const GameRulesEditorPage = () => {
           </Box>
         </DialogContent>
       </Dialog>
+
+      <Snackbar
+        open={!!successMessage}
+        autoHideDuration={3000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert onClose={handleCloseSnackbar} severity="success" sx={{ width: '100%' }}>
+          {successMessage}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

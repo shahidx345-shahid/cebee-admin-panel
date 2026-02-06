@@ -20,6 +20,7 @@ import {
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { colors, constants } from '../config/theme';
+import { getLeaderboardEntry } from '../services/leaderboardService';
 
 const LeaderboardDetailsPage = () => {
     const navigate = useNavigate();
@@ -30,6 +31,7 @@ const LeaderboardDetailsPage = () => {
 
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
     useEffect(() => {
         loadUserData();
@@ -87,12 +89,52 @@ const LeaderboardDetailsPage = () => {
     const loadUserData = async () => {
         try {
             setLoading(true);
-            await new Promise(resolve => setTimeout(resolve, 600)); // Simulate delay
+            setError(null);
 
-            const userData = generateDummyUserData(id, period);
-            setUser(userData);
-        } catch (error) {
-            console.error('Error loading user:', error);
+            const response = await getLeaderboardEntry(id, { period });
+            
+            if (response.success && response.data) {
+                // Map API response to component format
+                const userData = response.data;
+                setUser({
+                    id: userData.id || userData.userId || id,
+                    rank: userData.rank || 0,
+                    username: userData.username || userData.userName || 'N/A',
+                    email: userData.email || userData.userEmail || 'N/A',
+                    fullName: userData.fullName || userData.name || userData.username || 'N/A',
+                    country: userData.country || 'N/A',
+                    isActive: userData.isActive !== false,
+                    isVerified: userData.isVerified || false,
+                    isBlocked: userData.isBlocked || false,
+                    isDeleted: userData.isDeleted || false,
+                    isDeactivated: userData.isDeactivated || false,
+                    fraudFlags: userData.fraudFlags || [],
+                    spTotal: userData.spTotal || userData.points || 0,
+                    spCurrent: userData.spCurrent || 0,
+                    cpTotal: userData.cpTotal || 0,
+                    cpCurrent: userData.cpCurrent || 0,
+                    totalPredictions: userData.totalPredictions || 0,
+                    correctPredictions: userData.correctPredictions || 0,
+                    predictionAccuracy: userData.predictionAccuracy || userData.accuracyRate || 0,
+                    totalPolls: userData.totalPolls || 0,
+                    createdAt: userData.createdAt ? new Date(userData.createdAt) : new Date(),
+                    lastLogin: userData.lastLogin ? new Date(userData.lastLogin) : new Date(),
+                    lastUpdated: userData.lastUpdated ? new Date(userData.lastUpdated) : new Date(),
+                    spFromPredictions: userData.spFromPredictions || 0,
+                    spFromDailyLogin: userData.spFromDailyLogin || 0,
+                    cpFromReferrals: userData.cpFromReferrals || 0,
+                    cpFromEngagement: userData.cpFromEngagement || 0,
+                });
+            } else {
+                // Fallback to dummy data on error
+                console.warn('Failed to fetch leaderboard entry:', response.error);
+                const dummyData = generateDummyUserData(id, period);
+                setUser(dummyData);
+            }
+        } catch (err) {
+            console.error('Error loading user:', err);
+            setError(err.message || 'Failed to load leaderboard entry');
+            // Fallback to dummy data
             const dummyData = generateDummyUserData(id, period);
             setUser(dummyData);
         } finally {
@@ -104,6 +146,28 @@ const LeaderboardDetailsPage = () => {
         return (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
                 <CircularProgress sx={{ color: colors.brandRed }} />
+            </Box>
+        );
+    }
+
+    if (error && !user) {
+        return (
+            <Box sx={{ textAlign: 'center', padding: 6 }}>
+                <Typography variant="h6" sx={{ color: colors.error, mb: 2 }}>
+                    {error}
+                </Typography>
+                <Button
+                    variant="contained"
+                    onClick={() => navigate(constants.routes.leaderboard)}
+                    sx={{
+                        background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
+                        borderRadius: '12px',
+                        textTransform: 'none',
+                        fontWeight: 600,
+                    }}
+                >
+                    Back to Leaderboard
+                </Button>
             </Box>
         );
     }
@@ -253,7 +317,7 @@ const LeaderboardDetailsPage = () => {
                             Last Updated
                         </Typography>
                         <Typography variant="body1" sx={{ fontWeight: 600, color: colors.brandWhite }}>
-                            {format(new Date(), 'MMM dd, HH:mm')}
+                            {user.lastUpdated ? format(new Date(user.lastUpdated), 'MMM dd, HH:mm') : format(new Date(), 'MMM dd, HH:mm')}
                         </Typography>
                     </Box>
                 </Box>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -55,9 +55,12 @@ import DataTable from '../components/common/DataTable';
 // Firebase imports removed
 import { db } from '../config/firebase';
 import { format } from 'date-fns';
+import { getCmds, getCurrentCmd } from '../services/cmdsService';
+import { getFixtures } from '../services/fixturesService';
 
 const FixturesPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [fixtures, setFixtures] = useState([]);
   const [filteredFixtures, setFilteredFixtures] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -140,41 +143,139 @@ const FixturesPage = () => {
 
   const loadFixtures = async () => {
     setLoading(true);
-    // Use sample data immediately
-    const fixturesData = getSampleFixtures();
-    
-    // Load CMds
-    const mockCmds = [
-      {
-        id: 'cmd_001',
-        name: 'CMd-05',
-        status: 'current',
-      },
-      {
-        id: 'cmd_002',
-        name: 'CMd-04',
-        status: 'completed',
-      },
-      {
-        id: 'cmd_003',
-        name: 'CMd-03',
-        status: 'completed',
-      },
-    ];
-    setCmds(mockCmds);
-    const current = mockCmds.find(cmd => cmd.status === 'current');
-    if (current) {
-      setCurrentCmd(current);
+    try {
+      // Load CMds from API first (needed for filtering and displaying cmd names)
+      let formattedCmds = [];
+      let currentCmdData = null;
+      
+      const cmdsResult = await getCmds();
+      if (cmdsResult.success && cmdsResult.data) {
+        formattedCmds = cmdsResult.data.map(cmd => ({
+          id: cmd.id || cmd._id,
+          name: cmd.name,
+          status: cmd.status,
+          fixtureCount: cmd.fixtureCount || 0,
+        }));
+        setCmds(formattedCmds);
+        
+        // Set current CMd
+        const current = formattedCmds.find(cmd => cmd.status === 'current');
+        if (current) {
+          currentCmdData = current;
+          setCurrentCmd(current);
+        } else {
+          // Try to get current CMd if not found in list
+          const currentCmdResult = await getCurrentCmd();
+          if (currentCmdResult.success && currentCmdResult.data) {
+            currentCmdData = {
+              id: currentCmdResult.data.id || currentCmdResult.data._id,
+              name: currentCmdResult.data.name,
+              status: currentCmdResult.data.status,
+              fixtureCount: currentCmdResult.data.fixtureCount || 0,
+            };
+            setCurrentCmd(currentCmdData);
+          }
+        }
+      }
+      
+      // Fetch fixtures from API
+      const queryParams = {
+        limit: 1000, // Get enough fixtures
+      };
+      
+      // Add CMd filter - use currentCmdData from this function scope
+      const currentCmdForFilter = currentCmdData || (formattedCmds.find(cmd => cmd.status === 'current'));
+      if (selectedCmd === 'current' && currentCmdForFilter) {
+        queryParams.cmdId = currentCmdForFilter.id;
+      } else if (selectedCmd && selectedCmd !== 'all' && selectedCmd !== 'current') {
+        queryParams.cmdId = selectedCmd;
+      }
+      
+      // Add status filter
+      if (selectedStatus && selectedStatus !== 'all') {
+        queryParams.status = selectedStatus;
+      }
+      
+      const fixturesResult = await getFixtures(queryParams);
+      
+      if (fixturesResult.success && fixturesResult.data) {
+        // Format fixtures to match expected structure
+        // Backend returns { fixtures: [...], pagination: {...} } or just array
+        const fixturesArray = fixturesResult.data.fixtures || fixturesResult.data || [];
+        const formattedFixtures = fixturesArray.map(fixture => {
+          // Handle populated cmdId (could be object with _id and name)
+          let cmdId = '';
+          let cmdName = '';
+          if (fixture.cmdId) {
+            if (typeof fixture.cmdId === 'object' && fixture.cmdId._id) {
+              cmdId = fixture.cmdId._id.toString();
+              cmdName = fixture.cmdId.name || '';
+            } else {
+              cmdId = fixture.cmdId.toString();
+              // Find CMd name from formattedCmds array
+              const cmd = formattedCmds.find(c => (c.id || c._id)?.toString() === cmdId);
+              cmdName = cmd ? cmd.name : '';
+            }
+          }
+          
+          // Handle populated leagueId (could be object)
+          let league = '';
+          if (fixture.leagueId) {
+            if (typeof fixture.leagueId === 'object' && fixture.leagueId.league_name) {
+              league = fixture.leagueId.league_name;
+            } else {
+              league = fixture.league || fixture.leagueName || fixture.league_name || '';
+            }
+          } else {
+            league = fixture.league || fixture.leagueName || fixture.league_name || '';
+          }
+          
+          return {
+            id: fixture._id || fixture.id,
+            matchId: fixture.matchId || fixture.match_id || fixture._id || fixture.id,
+            homeTeam: fixture.homeTeam || fixture.home_team || '',
+            awayTeam: fixture.awayTeam || fixture.away_team || '',
+            league: league,
+            kickoffTime: fixture.kickoffTime ? new Date(fixture.kickoffTime) : fixture.kickoff_time ? new Date(fixture.kickoff_time) : new Date(),
+            status: fixture.status || fixture.matchStatus || 'scheduled',
+            matchStatus: fixture.matchStatus || fixture.status || 'scheduled',
+            predictions: fixture.predictionCount || fixture.prediction_count || 0,
+            hot: fixture.isFeatured || fixture.isCeBeFeatured || fixture.isCeBeFeatured || false,
+            cmdId: cmdId,
+            cmdName: cmdName,
+            venue: fixture.venue || '',
+            homeScore: fixture.homeScore || fixture.home_score || null,
+            awayScore: fixture.awayScore || fixture.away_score || null,
+          };
+        });
+        
+        setFixtures(formattedFixtures);
+        setFilteredFixtures(formattedFixtures);
+      } else {
+        // Fallback to empty array if API fails
+        console.error('Failed to load fixtures:', fixturesResult.error);
+        setFixtures([]);
+        setFilteredFixtures([]);
+      }
+    } catch (error) {
+      console.error('Error loading fixtures:', error);
+    } finally {
+      setLoading(false);
     }
-    
-    setFixtures(fixturesData);
-    setFilteredFixtures(fixturesData);
-    setLoading(false);
   };
 
   useEffect(() => {
     loadFixtures();
-  }, []);
+  }, [selectedCmd, selectedStatus]); // Reload when filters change
+
+  // Reload fixtures when navigating back from form page
+  useEffect(() => {
+    if (location.state?.refresh) {
+      loadFixtures();
+      // Clear the refresh flag
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, navigate]);
 
   useEffect(() => {
     const filterAndSortFixtures = () => {

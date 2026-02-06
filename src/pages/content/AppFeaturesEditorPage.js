@@ -11,12 +11,15 @@ import {
   DialogTitle,
   TextField,
   IconButton,
+  Alert,
+  Snackbar,
 } from '@mui/material';
 import { Star, Edit as EditIcon, CheckCircle, Close, Description, Tag } from '@mui/icons-material';
 import { colors } from '../../config/theme';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import { format } from 'date-fns';
+import { getPublishedAppFeatures, getAppFeatureById, createAppFeatures, updateAppFeatures } from '../../services/appFeaturesService';
 
 // Static default content
 const defaultContent = `<h1>How CeBee Predict Works</h1>
@@ -86,65 +89,114 @@ const AppFeaturesEditorPage = () => {
   const [saving, setSaving] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [version, setVersion] = useState('1.0');
-  const [updatedAt, setUpdatedAt] = useState(new Date('2026-01-14'));
+  const [updatedAt, setUpdatedAt] = useState(null);
   const [status, setStatus] = useState('published');
+  const [currentAppFeatureId, setCurrentAppFeatureId] = useState(null);
+  const [error, setError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
 
   useEffect(() => {
     loadContent();
   }, []);
 
-  const loadContent = () => {
+  const loadContent = async () => {
     try {
       setLoading(true);
-      // Load from localStorage if available
-      const savedContent = localStorage.getItem('appFeaturesContent');
-      const savedTitle = localStorage.getItem('appFeaturesTitle');
-      const savedVersion = localStorage.getItem('appFeaturesVersion');
-      const savedDate = localStorage.getItem('appFeaturesUpdatedAt');
-      const savedStatus = localStorage.getItem('appFeaturesStatus');
+      setError(null);
 
-      if (savedContent) {
-        setContent(savedContent);
-        setTitle(savedTitle || 'How CeBee Predict Works');
-        setVersion(savedVersion || '1.0');
-        setUpdatedAt(savedDate ? new Date(savedDate) : new Date('2026-01-14'));
-        setStatus(savedStatus || 'published');
+      // Try to get published app features first (sorted by updatedAt desc, so first is latest)
+      const response = await getPublishedAppFeatures();
+      
+      if (response.success && response.data?.appFeatures && response.data.appFeatures.length > 0) {
+        // Use the first published app feature (latest one)
+        const appFeature = response.data.appFeatures[0];
+        setContent(appFeature.content || defaultContent);
+        setTitle(appFeature.title || 'How CeBee Predict Works');
+        setVersion(appFeature.version || '1.0');
+        setUpdatedAt(appFeature.updatedAt ? new Date(appFeature.updatedAt) : new Date());
+        setStatus(appFeature.status ? appFeature.status.toLowerCase() : 'published');
+        setCurrentAppFeatureId(appFeature._id);
       } else {
-        // Use default content
+        // No published features found, use default content
         setContent(defaultContent);
         setTitle('How CeBee Predict Works');
         setVersion('1.0');
-        setUpdatedAt(new Date('2026-01-14'));
-        setStatus('published');
+        setUpdatedAt(new Date());
+        setStatus('draft');
+        setCurrentAppFeatureId(null);
       }
     } catch (error) {
       console.error('Error loading content:', error);
+      setError('Failed to load app features. Using default content.');
+      // Use default content as fallback
+      setContent(defaultContent);
+      setTitle('How CeBee Predict Works');
+      setVersion('1.0');
+      setUpdatedAt(new Date());
+      setStatus('draft');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    // Validation
+    if (!title.trim()) {
+      setError('Title is required');
+      return;
+    }
+    if (!content.trim()) {
+      setError('Content is required');
+      return;
+    }
+
     try {
       setSaving(true);
-      // Save to localStorage
-      localStorage.setItem('appFeaturesContent', content);
-      localStorage.setItem('appFeaturesTitle', title);
-      localStorage.setItem('appFeaturesVersion', version);
-      const newDate = new Date();
-      localStorage.setItem('appFeaturesUpdatedAt', newDate.toISOString());
+      setError(null);
 
-      setUpdatedAt(newDate);
-      // setStatus('published'); // Status is now managed by state
-      localStorage.setItem('appFeaturesStatus', status); // Persist status
-      setIsModalOpen(false);
-      alert('Content saved successfully!');
+      const appFeatureData = {
+        title: title.trim(),
+        content: content.trim(),
+        version: version.trim() || '1.0',
+        status: status,
+      };
+
+      let response;
+      if (currentAppFeatureId) {
+        // Update existing app features
+        response = await updateAppFeatures(currentAppFeatureId, appFeatureData);
+      } else {
+        // Create new app features
+        response = await createAppFeatures(appFeatureData);
+      }
+
+      if (response.success) {
+        const appFeature = response.data;
+        setContent(appFeature.content || content);
+        setTitle(appFeature.title || title);
+        setVersion(appFeature.version || version);
+        setUpdatedAt(appFeature.updatedAt ? new Date(appFeature.updatedAt) : new Date());
+        setStatus(appFeature.status ? appFeature.status.toLowerCase() : status);
+        setCurrentAppFeatureId(appFeature._id || currentAppFeatureId);
+        
+        setSuccessMessage(response.message || 'App features saved successfully!');
+        setIsModalOpen(false);
+        
+        // Reload content to get latest version
+        await loadContent();
+      } else {
+        setError(response.error || 'Failed to save app features');
+      }
     } catch (error) {
       console.error('Error saving content:', error);
-      alert('Failed to save content');
+      setError('An unexpected error occurred while saving app features');
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleCloseSnackbar = () => {
+    setSuccessMessage(null);
   };
 
   const handleEditClick = () => {
@@ -216,7 +268,7 @@ const AppFeaturesEditorPage = () => {
             }}
           />
           <Chip
-            label={updatedAt ? `Updated: ${format(updatedAt, 'MMM dd, yyyy')}` : 'Updated: Not yet'}
+            label={updatedAt ? `Updated: ${format(updatedAt instanceof Date ? updatedAt : new Date(updatedAt), 'MMM dd, yyyy')}` : 'Updated: Not yet'}
             size="small"
             sx={{
               backgroundColor: '#2196F3',
@@ -320,7 +372,7 @@ const AppFeaturesEditorPage = () => {
             </Typography>
             {updatedAt && (
               <Typography variant="body2" sx={{ color: '#9CA3AF', fontSize: 14 }}>
-                Version {version} • Updated {format(updatedAt, 'MMM dd, yyyy')}
+                Version {version} • Updated {format(updatedAt instanceof Date ? updatedAt : new Date(updatedAt), 'MMM dd, yyyy')}
               </Typography>
             )}
           </Box>
@@ -420,6 +472,11 @@ const AppFeaturesEditorPage = () => {
           </Box>
         </DialogTitle>
         <DialogContent sx={{ pt: 0 }}>
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+              {error}
+            </Alert>
+          )}
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
             {/* Title Field */}
             <Box>
@@ -582,6 +639,17 @@ const AppFeaturesEditorPage = () => {
           </Box>
         </DialogContent>
       </Dialog>
+
+      <Snackbar
+        open={!!successMessage}
+        autoHideDuration={3000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert onClose={handleCloseSnackbar} severity="success" sx={{ width: '100%' }}>
+          {successMessage}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

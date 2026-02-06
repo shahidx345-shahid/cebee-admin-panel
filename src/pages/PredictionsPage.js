@@ -39,6 +39,8 @@ import { colors, constants } from '../config/theme';
 import SearchBar from '../components/common/SearchBar';
 import DataTable from '../components/common/DataTable';
 import { format } from 'date-fns';
+import { getCmds, getCurrentCmd } from '../services/cmdsService';
+import { getPredictions, getGroupedPredictions, formatPredictions, getPredictionStatistics } from '../services/predictionsService';
 
 const PredictionsPage = () => {
   const navigate = useNavigate();
@@ -52,137 +54,155 @@ const PredictionsPage = () => {
   const [cmds, setCmds] = useState([]);
   const [currentCmd, setCurrentCmd] = useState(null);
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(20);
   const [sortAnchor, setSortAnchor] = useState(null);
   const [paginationAnchor, setPaginationAnchor] = useState(null);
+  const [pagination, setPagination] = useState({
+    page: 0,
+    limit: 20,
+    total: 0,
+    pages: 0,
+  });
+  const [statistics, setStatistics] = useState({
+    totalPredictions: 0,
+    accuracyRate: 0,
+    ongoingPredictions: 0,
+    completedPredictions: 0,
+  });
 
-  const totalPredictions = predictions.length;
-  const ongoingCount = predictions.filter((p) => (p.status || p.predictionStatus) === 'ongoing').length;
-  const completedCount = predictions.filter((p) =>
-    (p.status || p.predictionStatus) === 'correct' || (p.status || p.predictionStatus) === 'incorrect'
-  ).length;
-  const correctCount = predictions.filter((p) => (p.status || p.predictionStatus) === 'correct').length;
-  const accuracyRate = totalPredictions > 0 ? ((correctCount / totalPredictions) * 100).toFixed(1) : '0.0';
+  // Use statistics from API, fallback to calculated if API fails
+  const totalPredictions = statistics.totalPredictions || predictions.length;
+  const ongoingCount = statistics.ongoingPredictions || predictions.filter((p) => {
+    const status = p.status || p.predictionStatus;
+    return status === 'ongoing' || status === 'pending';
+  }).length;
+  const completedCount = statistics.completedPredictions || predictions.filter((p) => {
+    const status = p.status || p.predictionStatus;
+    return status === 'correct' || status === 'incorrect' || status === 'partial';
+  }).length;
+  const accuracyRate = statistics.accuracyRate || (completedCount > 0 ? ((predictions.filter((p) => {
+    const status = p.status || p.predictionStatus;
+    return status === 'correct';
+  }).length / completedCount) * 100).toFixed(1) : '0.0');
 
   useEffect(() => {
     loadPredictions();
-  }, []);
-
-
-  const generateDummyPredictions = () => {
-    const users = ['john_doe', 'jane_smith', 'mike_wilson', 'sarah_jones', 'david_brown'];
-    const usernames = ['John Doe', 'Jane Smith', 'Mike Wilson', 'Sarah Jones', 'David Brown'];
-    const emails = ['john@example.com', 'jane@example.com', 'mike@example.com', 'sarah@example.com', 'david@example.com'];
-    const matches = [
-      { homeTeam: 'Arsenal', awayTeam: 'Chelsea', fixtureId: 'MATCH_001' },
-      { homeTeam: 'Liverpool', awayTeam: 'Manchester United', fixtureId: 'MATCH_002' },
-      { homeTeam: 'Manchester City', awayTeam: 'Tottenham', fixtureId: 'MATCH_003' },
-      { homeTeam: 'Newcastle', awayTeam: 'Brighton', fixtureId: 'MATCH_004' },
-    ];
-    const predictionTypes = ['correct_score', 'match_result', 'both_teams_score', 'goal_range'];
-    const predictions = [];
-
-    // Generate Ongoing predictions
-    users.forEach((userId, userIdx) => {
-      matches.forEach((match, matchIdx) => {
-        const numPredictions = Math.floor(Math.random() * 3) + 1; // 1-3 predictions per user-match
-        for (let i = 0; i < numPredictions; i++) {
-          predictions.push({
-            id: `PRED_${userId}_${match.fixtureId}_${i}`,
-            userId: userId,
-            username: usernames[userIdx],
-            userEmail: emails[userIdx],
-            fixtureId: match.fixtureId,
-            matchId: match.fixtureId,
-            matchName: `${match.homeTeam} vs ${match.awayTeam}`,
-            homeTeam: match.homeTeam,
-            awayTeam: match.awayTeam,
-            predictionType: predictionTypes[Math.floor(Math.random() * predictionTypes.length)],
-            prediction: match.homeTeam, // Simplified
-            predictionTime: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000), // Last 7 days
-            status: 'ongoing',
-            predictionStatus: 'ongoing',
-            cmdId: 'cmd_001',
-            cmdName: 'CMd-05',
-          });
-        }
-      });
-    });
-
-    // Generate Completed predictions
-    users.slice(0, 3).forEach((userId, userIdx) => {
-      matches.slice(0, 2).forEach((match, matchIdx) => {
-        const numPredictions = Math.floor(Math.random() * 2) + 1; // 1-2 predictions per user-match
-        for (let i = 0; i < numPredictions; i++) {
-          const isCorrect = Math.random() > 0.5;
-          predictions.push({
-            id: `PRED_COMP_${userId}_${match.fixtureId}_${i}`,
-            userId: userId,
-            username: usernames[userIdx],
-            userEmail: emails[userIdx],
-            fixtureId: match.fixtureId,
-            matchId: match.fixtureId,
-            matchName: `${match.homeTeam} vs ${match.awayTeam}`,
-            homeTeam: match.homeTeam,
-            awayTeam: match.awayTeam,
-            predictionType: predictionTypes[Math.floor(Math.random() * predictionTypes.length)],
-            prediction: match.homeTeam,
-            predictionTime: new Date(Date.now() - (14 + Math.random() * 7) * 24 * 60 * 60 * 1000), // 14-21 days ago
-            status: isCorrect ? 'correct' : 'incorrect',
-            predictionStatus: isCorrect ? 'correct' : 'incorrect',
-            actualResult: `${Math.floor(Math.random() * 3)} - ${Math.floor(Math.random() * 3)}`,
-            spAwarded: isCorrect ? Math.floor(Math.random() * 100) + 10 : 0,
-            cmdId: matchIdx < 2 ? 'cmd_001' : 'cmd_002',
-            cmdName: matchIdx < 2 ? 'CMd-05' : 'CMd-04',
-          });
-        }
-      });
-    });
-
-    return predictions;
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, rowsPerPage, selectedStatus, selectedSort, selectedCmd, searchQuery]);
 
   const loadPredictions = async () => {
     try {
       setLoading(true);
-      // Data loading simulation
-      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      // Build query parameters
+      const params = {
+        page: page + 1, // Backend uses 1-based pagination
+        limit: rowsPerPage,
+        sort: selectedSort === 'dateNewest' ? 'newest' : selectedSort === 'dateOldest' ? 'oldest' : 'newest',
+      };
 
-      // Load CMds
-      const mockCmds = [
-        {
-          id: 'cmd_001',
-          name: 'CMd-05',
-          status: 'current',
-        },
-        {
-          id: 'cmd_002',
-          name: 'CMd-04',
-          status: 'completed',
-        },
-        {
-          id: 'cmd_003',
-          name: 'CMd-03',
-          status: 'completed',
-        },
-      ];
-      setCmds(mockCmds);
-      const current = mockCmds.find(cmd => cmd.status === 'current');
-      if (current) {
-        setCurrentCmd(current);
+      // Add filters
+      if (searchQuery) params.search = searchQuery;
+      if (selectedStatus !== 'all') params.status = selectedStatus;
+      if (selectedCmd && selectedCmd !== 'all' && selectedCmd !== 'current') {
+        params.cmd = selectedCmd;
+      } else if (selectedCmd === 'current' && currentCmd) {
+        params.cmd = currentCmd.name;
       }
 
-      const dummyData = generateDummyPredictions();
-      setPredictions(dummyData);
+      // Remove undefined params
+      Object.keys(params).forEach(key => params[key] === undefined && delete params[key]);
 
-      // Group predictions by user + match combination
-      const grouped = groupPredictionsByUserMatch(dummyData);
-      setFilteredPredictions(grouped);
+      // Load statistics from API (only once, not on every filter change)
+      if (page === 0 && !searchQuery && selectedStatus === 'ongoing' && selectedCmd === 'current') {
+        const statsResult = await getPredictionStatistics();
+        if (statsResult.success && statsResult.data) {
+          setStatistics({
+            totalPredictions: statsResult.data.totalPredictions || 0,
+            accuracyRate: statsResult.data.accuracyRate || 0,
+            ongoingPredictions: statsResult.data.ongoingPredictions || 0,
+            completedPredictions: statsResult.data.completedPredictions || 0,
+          });
+        }
+      }
+      
+      // Load CMds from API (only once)
+      if (cmds.length === 0) {
+        const cmdsResult = await getCmds();
+        
+        if (cmdsResult.success && cmdsResult.data) {
+          const formattedCmds = cmdsResult.data.map(cmd => ({
+            id: cmd.id || cmd._id,
+            name: cmd.name,
+            status: cmd.status,
+            fixtureCount: cmd.fixtureCount || 0,
+          }));
+          setCmds(formattedCmds);
+          
+          // Set current CMd
+          const current = formattedCmds.find(cmd => cmd.status === 'current');
+          if (current) {
+            setCurrentCmd(current);
+          } else {
+            const currentCmdResult = await getCurrentCmd();
+            if (currentCmdResult.success && currentCmdResult.data) {
+              const currentCmd = {
+                id: currentCmdResult.data.id || currentCmdResult.data._id,
+                name: currentCmdResult.data.name,
+                status: currentCmdResult.data.status,
+                fixtureCount: currentCmdResult.data.fixtureCount || 0,
+              };
+              setCurrentCmd(currentCmd);
+            }
+          }
+        }
+      }
+      
+      // Load predictions from API with proper pagination
+      const predictionsResult = await getPredictions(params);
+      
+      if (predictionsResult.success && predictionsResult.data) {
+        const predictionsArray = predictionsResult.data.predictions || [];
+        
+        if (predictionsArray.length > 0) {
+          const formattedPredictions = formatPredictions(predictionsArray);
+          
+          if (formattedPredictions.length > 0) {
+            setPredictions(formattedPredictions);
+            
+            // Group predictions by user + match combination
+            const grouped = groupPredictionsByUserMatch(formattedPredictions);
+            setFilteredPredictions(grouped);
+            
+            // Update pagination from API response
+            if (predictionsResult.data.pagination) {
+              setPagination({
+                page: (predictionsResult.data.pagination.page || 1) - 1, // Convert to 0-based
+                limit: predictionsResult.data.pagination.limit || rowsPerPage,
+                total: predictionsResult.data.pagination.total || 0,
+                pages: predictionsResult.data.pagination.pages || 0,
+              });
+            }
+          } else {
+            setPredictions([]);
+            setFilteredPredictions([]);
+            setPagination(prev => ({ ...prev, total: 0, pages: 0 }));
+          }
+        } else {
+          setPredictions([]);
+          setFilteredPredictions([]);
+          setPagination(prev => ({ ...prev, total: 0, pages: 0 }));
+        }
+      } else {
+        setPredictions([]);
+        setFilteredPredictions([]);
+        setPagination(prev => ({ ...prev, total: 0, pages: 0 }));
+      }
     } catch (error) {
       console.error('Error loading predictions:', error);
-      // Fallback
       setPredictions([]);
       setFilteredPredictions([]);
+      setPagination(prev => ({ ...prev, total: 0, pages: 0 }));
     } finally {
       setLoading(false);
     }
@@ -193,9 +213,10 @@ const PredictionsPage = () => {
     const groupedMap = new Map();
 
     predictions.forEach((pred) => {
+      const hasUserInfo = pred.userId || pred.userEmail;
       const userId = pred.userId || pred.userEmail || 'unknown';
-      const matchId = pred.fixtureId || pred.matchId || 'unknown';
-      const key = `${userId}_${matchId}`;
+      const matchId = pred.fixtureId || pred.matchId || pred.id || 'unknown';
+      const key = hasUserInfo ? `${userId}_${matchId}` : matchId;
 
       if (!groupedMap.has(key)) {
         groupedMap.set(key, {
@@ -207,10 +228,10 @@ const PredictionsPage = () => {
           matchName: pred.matchName || `${pred.homeTeam || 'TBD'} vs ${pred.awayTeam || 'TBD'}`,
           homeTeam: pred.homeTeam || 'TBD',
           awayTeam: pred.awayTeam || 'TBD',
-          fixtureId: pred.fixtureId || pred.matchId,
+          fixtureId: pred.fixtureId || pred.matchId || pred.id,
           predictions: [],
-          totalPredictions: 0,
-          status: 'mixed', // Will be calculated based on individual predictions
+          totalPredictions: pred.totalPredictions || 0,
+          status: pred.status || pred.predictionStatus || 'ongoing',
           cmdId: pred.cmdId,
           cmdName: pred.cmdName,
         });
@@ -218,13 +239,17 @@ const PredictionsPage = () => {
 
       const group = groupedMap.get(key);
       group.predictions.push(pred);
-      group.totalPredictions = group.predictions.length;
+      
+      if (!hasUserInfo && pred.totalPredictions) {
+        group.totalPredictions = pred.totalPredictions;
+      } else {
+        group.totalPredictions = group.predictions.length;
+      }
 
-      // Determine overall status
       const statuses = group.predictions.map(p => p.status || p.predictionStatus || 'ongoing');
-      if (statuses.every(s => s === 'ongoing')) {
+      if (statuses.every(s => s === 'ongoing' || s === 'predictionOpen')) {
         group.status = 'ongoing';
-      } else if (statuses.every(s => s === 'correct')) {
+      } else if (statuses.every(s => s === 'correct' || s === 'completed')) {
         group.status = 'all_correct';
       } else if (statuses.every(s => s === 'incorrect')) {
         group.status = 'all_incorrect';
@@ -259,13 +284,19 @@ const PredictionsPage = () => {
       if (selectedCmd === 'current') {
         // Filter by current CMd
         if (currentCmd) {
-          filtered = filtered.filter((group) => group.cmdId === currentCmd.id);
+          filtered = filtered.filter((group) => {
+            const groupCmdId = group.cmdId || group.predictions?.[0]?.cmdId;
+            return groupCmdId === currentCmd.id;
+          });
         } else {
           filtered = [];
         }
       } else {
         // Filter by specific CMd ID
-        filtered = filtered.filter((group) => group.cmdId === selectedCmd);
+        filtered = filtered.filter((group) => {
+          const groupCmdId = group.cmdId || group.predictions?.[0]?.cmdId;
+          return groupCmdId === selectedCmd;
+        });
       }
     }
 
@@ -528,31 +559,35 @@ const PredictionsPage = () => {
     {
       id: 'actions',
       label: 'Actions',
-      render: (_, row) => (
-        <Button
-          variant="contained"
-          size="small"
-          onClick={() => navigate(`/predictions/details/${encodeURIComponent(row.id)}`)}
-          sx={{
-            minWidth: 'auto',
-            padding: '6px 12px',
-            borderRadius: '8px',
-            background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
-            textTransform: 'none',
-            fontWeight: 600,
-          }}
-        >
-          <Visibility sx={{ fontSize: 16, mr: 0.5 }} />
-          View Details
-        </Button>
-      ),
+      render: (_, row) => {
+        // Get the first prediction ID from the group
+        const firstPredictionId = row.predictions && row.predictions.length > 0 
+          ? row.predictions[0].id 
+          : row.id;
+        return (
+          <Button
+            variant="contained"
+            size="small"
+            onClick={() => navigate(`/predictions/details/${encodeURIComponent(firstPredictionId)}`)}
+            sx={{
+              minWidth: 'auto',
+              padding: '6px 12px',
+              borderRadius: '8px',
+              background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
+              textTransform: 'none',
+              fontWeight: 600,
+            }}
+          >
+            <Visibility sx={{ fontSize: 16, mr: 0.5 }} />
+            View Details
+          </Button>
+        );
+      },
     },
   ];
 
-  const paginatedPredictions = filteredPredictions.slice(
-    page * rowsPerPage,
-    page * rowsPerPage + rowsPerPage
-  );
+  // Use filteredPredictions directly (pagination is handled by backend)
+  const paginatedPredictions = filteredPredictions;
 
 
   return (
@@ -1110,13 +1145,18 @@ const PredictionsPage = () => {
         loading={loading}
         page={page}
         rowsPerPage={rowsPerPage}
-        totalCount={filteredPredictions.length}
+        totalCount={pagination.total || 0}
         onPageChange={(e, newPage) => setPage(newPage)}
         onRowsPerPageChange={(e) => {
           setRowsPerPage(parseInt(e.target.value, 10));
           setPage(0);
         }}
-        onRowClick={(row) => navigate(`/predictions/details/${row.id}`)}
+        onRowClick={(row) => {
+          const firstPredictionId = row.predictions && row.predictions.length > 0 
+            ? row.predictions[0].id 
+            : row.id;
+          navigate(`/predictions/details/${encodeURIComponent(firstPredictionId)}`);
+        }}
         emptyMessage="No predictions found"
       />
     </Box>

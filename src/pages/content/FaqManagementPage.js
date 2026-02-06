@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
@@ -10,11 +10,14 @@ import {
   MenuItem,
   Dialog,
   DialogContent,
+  CircularProgress,
+  Alert,
 } from '@mui/material';
 import { Add, Help, MoreVert, List as ListIcon, ArrowDropDown, Search as SearchIcon } from '@mui/icons-material';
 import { colors } from '../../config/theme';
 import DataTable from '../../components/common/DataTable';
 import { useNavigate } from 'react-router-dom';
+import { getFaqs, deleteFaq } from '../../services/faqService';
 
 // Static FAQ data
 const staticFaqsData = [
@@ -69,8 +72,8 @@ const staticFaqsData = [
   {
     id: '5',
     faqId: 'FAQ_005',
-    question: 'How do I withdraw my rewards?',
-    answer: 'Navigate to the rewards section, select your payment method, and request withdrawal. Complete KYC verification if required. Withdrawals are processed after verification.',
+    question: 'How do I claim my rewards?',
+    answer: 'Navigate to the rewards section and claim your reward. Rewards are fulfilled as gift cards by default. Alternative non-cash rewards may be available with support approval.',
     category: 'Rewards',
     status: 'published',
     order: 5,
@@ -81,8 +84,8 @@ const staticFaqsData = [
   {
     id: '6',
     faqId: 'FAQ_006',
-    question: 'What payment methods are accepted?',
-    answer: 'We accept USDT, Gift Cards, and other digital payment methods. More payment options will be added based on your region and preferences.',
+    question: 'What types of rewards are available?',
+    answer: 'CeBee rewards are non-cash only. Gift cards are the primary and default reward type. Alternative non-cash rewards of equal value may be available with support approval for users with genuine reasons.',
     category: 'Payments',
     status: 'published',
     order: 6,
@@ -93,8 +96,8 @@ const staticFaqsData = [
   {
     id: '7',
     faqId: 'FAQ_007',
-    question: 'How long does withdrawal take?',
-    answer: 'Withdrawals are processed within 3-5 business days after verification. Processing time may vary depending on the payment method selected.',
+    question: 'How long does reward fulfillment take?',
+    answer: 'Rewards are fulfilled within 3-5 business days after verification. Gift cards are delivered via email once your reward claim is approved.',
     category: 'Payments',
     status: 'published',
     order: 7,
@@ -310,11 +313,12 @@ const staticFaqsData = [
 
 const FaqManagementPage = () => {
   const navigate = useNavigate();
-  const [faqs] = useState(staticFaqsData);
-  const [filteredFaqs, setFilteredFaqs] = useState(staticFaqsData);
-  const [loading] = useState(false);
+  const [faqs, setFaqs] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [pagination, setPagination] = useState({ total: 0, pages: 0 });
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedFaq, setSelectedFaq] = useState(null);
 
@@ -328,27 +332,89 @@ const FaqManagementPage = () => {
   const [openDialog, setOpenDialog] = useState(false);
   const [rowsPerPageMenuAnchor, setRowsPerPageMenuAnchor] = useState(null);
 
-  React.useEffect(() => {
-    let result = faqs;
+  // Load FAQs from API with filters
+  const loadFaqs = async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
-    if (searchQuery) {
-      result = result.filter(faq =>
-        faq.question.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        faq.answer.toLowerCase().includes(searchQuery.toLowerCase())
-      );
+      // Build query parameters
+      const params = {
+        page: page + 1, // Backend uses 1-based pagination
+        limit: rowsPerPage,
+      };
+
+      // Add search filter
+      if (searchQuery.trim()) {
+        params.search = searchQuery.trim();
+      }
+
+      // Add category filter
+      if (categoryFilter !== 'all') {
+        params.category = categoryFilter;
+      }
+
+      // Add status filter - backend expects 'published', 'draft', 'archived' or 'All'
+      if (statusFilter !== 'all') {
+        params.status = statusFilter;
+      }
+
+      const response = await getFaqs(params);
+
+      if (response.success && response.data) {
+        // Backend returns { faqs: [...], pagination: {...} }
+        const faqsData = response.data.faqs || [];
+        
+        // Map backend data to frontend format
+        const mappedFaqs = faqsData.map((faq, index) => ({
+          id: faq._id || faq.id,
+          faqId: faq.faqId || `FAQ_${String((page * rowsPerPage) + index + 1).padStart(3, '0')}`,
+          question: faq.question || '',
+          answer: faq.answer || '',
+          category: faq.category || 'Getting Started',
+          status: faq.status ? faq.status.toLowerCase() : 'published',
+          order: faq.order || 0,
+          createdAt: faq.createdAt ? new Date(faq.createdAt).toLocaleDateString() : '',
+          views: faq.views || 0,
+          helpful: faq.helpful || 0,
+        }));
+
+        setFaqs(mappedFaqs);
+        
+        // Update pagination
+        if (response.data.pagination) {
+          setPagination({
+            total: response.data.pagination.total || 0,
+            pages: response.data.pagination.pages || 0,
+          });
+        }
+      } else {
+        setError(response.error || 'Failed to load FAQs');
+        setFaqs([]);
+      }
+    } catch (error) {
+      console.error('Error loading FAQs:', error);
+      setError('An unexpected error occurred while loading FAQs');
+      setFaqs([]);
+    } finally {
+      setLoading(false);
     }
+  };
 
-    if (categoryFilter !== 'all') {
-      result = result.filter(faq => faq.category === categoryFilter);
-    }
+  // Debounce search query to avoid too many API calls
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setPage(0); // Reset to first page when search changes
+    }, 500); // 500ms debounce
 
-    if (statusFilter !== 'all') {
-      result = result.filter(faq => (faq.status || 'published') === statusFilter);
-    }
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
-    setFilteredFaqs(result);
-    setPage(0);
-  }, [faqs, searchQuery, categoryFilter, statusFilter]);
+  // Load FAQs when filters or pagination change
+  useEffect(() => {
+    loadFaqs();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, rowsPerPage, searchQuery, categoryFilter, statusFilter]);
 
   const handleRowsPerPageMenuOpen = (event) => {
     setRowsPerPageMenuAnchor(event.currentTarget);
@@ -381,9 +447,22 @@ const FaqManagementPage = () => {
     handleMenuClose();
   };
 
-  const handleDeleteFromMenu = () => {
+  const handleDeleteFromMenu = async () => {
     if (selectedFaq) {
-      console.log('Delete FAQ:', selectedFaq.id);
+      if (window.confirm(`Are you sure you want to delete "${selectedFaq.question}"?`)) {
+        try {
+          const response = await deleteFaq(selectedFaq.id);
+          if (response.success) {
+            // Reload FAQs after deletion
+            loadFaqs();
+          } else {
+            alert(response.error || 'Failed to delete FAQ');
+          }
+        } catch (error) {
+          console.error('Error deleting FAQ:', error);
+          alert('An unexpected error occurred while deleting FAQ');
+        }
+      }
     }
     handleMenuClose();
   };
@@ -503,10 +582,8 @@ const FaqManagementPage = () => {
     },
   ];
 
-  const paginatedFaqs = faqs.slice(
-    page * rowsPerPage,
-    page * rowsPerPage + rowsPerPage
-  );
+  // Use faqs directly since pagination is handled by backend
+  const paginatedFaqs = faqs;
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%' }}>
@@ -563,7 +640,16 @@ const FaqManagementPage = () => {
             type="text"
             placeholder="Search FAQs..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setPage(0); // Reset to first page on search
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                setPage(0);
+                loadFaqs();
+              }
+            }}
             style={{
               border: 'none',
               outline: 'none',
@@ -599,16 +685,16 @@ const FaqManagementPage = () => {
             onClose={() => setCategoryAnchorEl(null)}
             PaperProps={{ sx: { borderRadius: '12px', mt: 1, minWidth: 180 } }}
           >
-            <MenuItem onClick={() => { setCategoryFilter('all'); setCategoryAnchorEl(null); }}>All Categories</MenuItem>
-            <MenuItem onClick={() => { setCategoryFilter('Getting Started'); setCategoryAnchorEl(null); }}>Getting Started</MenuItem>
-            <MenuItem onClick={() => { setCategoryFilter('Rewards'); setCategoryAnchorEl(null); }}>Rewards</MenuItem>
-            <MenuItem onClick={() => { setCategoryFilter('Payments'); setCategoryAnchorEl(null); }}>Payments</MenuItem>
-            <MenuItem onClick={() => { setCategoryFilter('Security'); setCategoryAnchorEl(null); }}>Security</MenuItem>
-            <MenuItem onClick={() => { setCategoryFilter('Predictions'); setCategoryAnchorEl(null); }}>Predictions</MenuItem>
-            <MenuItem onClick={() => { setCategoryFilter('Leaderboard'); setCategoryAnchorEl(null); }}>Leaderboard</MenuItem>
-            <MenuItem onClick={() => { setCategoryFilter('Account'); setCategoryAnchorEl(null); }}>Account</MenuItem>
-            <MenuItem onClick={() => { setCategoryFilter('Support'); setCategoryAnchorEl(null); }}>Support</MenuItem>
-            <MenuItem onClick={() => { setCategoryFilter('Matches'); setCategoryAnchorEl(null); }}>Matches</MenuItem>
+            <MenuItem onClick={() => { setCategoryFilter('all'); setCategoryAnchorEl(null); setPage(0); }}>All Categories</MenuItem>
+            <MenuItem onClick={() => { setCategoryFilter('Getting Started'); setCategoryAnchorEl(null); setPage(0); }}>Getting Started</MenuItem>
+            <MenuItem onClick={() => { setCategoryFilter('Predictions'); setCategoryAnchorEl(null); setPage(0); }}>Predictions</MenuItem>
+            <MenuItem onClick={() => { setCategoryFilter('Rewards'); setCategoryAnchorEl(null); setPage(0); }}>Rewards</MenuItem>
+            <MenuItem onClick={() => { setCategoryFilter('Account'); setCategoryAnchorEl(null); setPage(0); }}>Account</MenuItem>
+            <MenuItem onClick={() => { setCategoryFilter('Payments'); setCategoryAnchorEl(null); setPage(0); }}>Payments</MenuItem>
+            <MenuItem onClick={() => { setCategoryFilter('Security'); setCategoryAnchorEl(null); setPage(0); }}>Security</MenuItem>
+            <MenuItem onClick={() => { setCategoryFilter('Leaderboard'); setCategoryAnchorEl(null); setPage(0); }}>Leaderboard</MenuItem>
+            <MenuItem onClick={() => { setCategoryFilter('Support'); setCategoryAnchorEl(null); setPage(0); }}>Support</MenuItem>
+            <MenuItem onClick={() => { setCategoryFilter('Matches'); setCategoryAnchorEl(null); setPage(0); }}>Matches</MenuItem>
           </Menu>
         </Box>
 
@@ -637,10 +723,10 @@ const FaqManagementPage = () => {
             onClose={() => setStatusAnchorEl(null)}
             PaperProps={{ sx: { borderRadius: '12px', mt: 1, minWidth: 180 } }}
           >
-            <MenuItem onClick={() => { setStatusFilter('all'); setStatusAnchorEl(null); }}>All Statuses</MenuItem>
-            <MenuItem onClick={() => { setStatusFilter('published'); setStatusAnchorEl(null); }}>Published</MenuItem>
-            <MenuItem onClick={() => { setStatusFilter('draft'); setStatusAnchorEl(null); }}>Draft</MenuItem>
-            <MenuItem onClick={() => { setStatusFilter('archived'); setStatusAnchorEl(null); }}>Archived</MenuItem>
+            <MenuItem onClick={() => { setStatusFilter('all'); setStatusAnchorEl(null); setPage(0); }}>All Statuses</MenuItem>
+            <MenuItem onClick={() => { setStatusFilter('published'); setStatusAnchorEl(null); setPage(0); }}>Published</MenuItem>
+            <MenuItem onClick={() => { setStatusFilter('draft'); setStatusAnchorEl(null); setPage(0); }}>Draft</MenuItem>
+            <MenuItem onClick={() => { setStatusFilter('archived'); setStatusAnchorEl(null); setPage(0); }}>Archived</MenuItem>
           </Menu>
         </Box>
       </Box>
@@ -676,7 +762,7 @@ const FaqManagementPage = () => {
                 FAQs List
               </Typography>
               <Typography variant="body2" sx={{ color: '#9CA3AF', fontSize: 14 }}>
-                {filteredFaqs.length} FAQs found
+                {pagination.total || faqs.length} FAQs found
               </Typography>
             </Box>
           </Box>
@@ -731,13 +817,19 @@ const FaqManagementPage = () => {
         </Box>
       </Card>
 
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
+
       <DataTable
         columns={columns}
         data={paginatedFaqs}
         loading={loading}
         page={page}
         rowsPerPage={rowsPerPage}
-        totalCount={filteredFaqs.length}
+        totalCount={pagination.total || faqs.length}
         onPageChange={(e, newPage) => setPage(newPage)}
         onRowsPerPageChange={(e) => {
           setRowsPerPage(parseInt(e.target.value, 10));

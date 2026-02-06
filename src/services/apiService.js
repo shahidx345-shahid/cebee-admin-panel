@@ -1,134 +1,15 @@
 /**
  * Centralized API Service for CeBee Admin Panel
  * Handles all backend API calls with proper error handling and state management
+ * Uses apiBase.js for core API utilities
  */
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
-
-/**
- * Get authentication token from localStorage
- */
-const getAuthToken = () => {
-  try {
-    const session = localStorage.getItem('admin_session');
-    if (session) {
-      const parsed = JSON.parse(session);
-      return parsed.token || null;
-    }
-  } catch (error) {
-    console.error('Error getting auth token:', error);
-  }
-  return null;
-};
-
-/**
- * Save authentication token to localStorage
- */
-const saveAuthToken = (token, user) => {
-  try {
-    const session = {
-      token,
-      user,
-      timestamp: new Date().toISOString()
-    };
-    localStorage.setItem('admin_session', JSON.stringify(session));
-  } catch (error) {
-    console.error('Error saving auth token:', error);
-  }
-};
-
-/**
- * Remove authentication token from localStorage
- */
-const removeAuthToken = () => {
-  try {
-    localStorage.removeItem('admin_session');
-  } catch (error) {
-    console.error('Error removing auth token:', error);
-  }
-};
-
-/**
- * Get stored user session
- */
-const getStoredSession = () => {
-  try {
-    const session = localStorage.getItem('admin_session');
-    if (session) {
-      return JSON.parse(session);
-    }
-  } catch (error) {
-    console.error('Error getting stored session:', error);
-  }
-  return null;
-};
-
-/**
- * Main API request function with error handling
- */
-const apiRequest = async (endpoint, options = {}) => {
-  const token = getAuthToken();
-  
-  const defaultHeaders = {
-    'Content-Type': 'application/json',
-  };
-
-  // Add authorization header if token exists
-  if (token) {
-    defaultHeaders['Authorization'] = `Bearer ${token}`;
-  }
-
-  const config = {
-    ...options,
-    headers: {
-      ...defaultHeaders,
-      ...options.headers,
-    },
-  };
-
-  try {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
-    
-    // Handle non-JSON responses
-    const contentType = response.headers.get('content-type');
-    const isJson = contentType && contentType.includes('application/json');
-    
-    let data;
-    if (isJson) {
-      data = await response.json();
-    } else {
-      data = await response.text();
-    }
-
-    // Handle unauthorized - clear session and redirect to login
-    if (response.status === 401) {
-      removeAuthToken();
-      // Don't redirect here - let the component handle it
-      throw new Error('Unauthorized. Please login again.');
-    }
-
-    // Handle other errors
-    if (!response.ok) {
-      const errorMessage = data?.message || data?.error?.message || `Request failed with status ${response.status}`;
-      throw new Error(errorMessage);
-    }
-
-    return {
-      success: true,
-      data: data.data || data,
-      message: data.message,
-      response,
-    };
-  } catch (error) {
-    // Network errors
-    if (error.name === 'TypeError' && error.message.includes('fetch')) {
-      throw new Error('Network error. Please check your connection and ensure the backend server is running.');
-    }
-
-    // Re-throw other errors
-    throw error;
-  }
-};
+import { 
+  apiRequest, 
+  saveAuthToken, 
+  removeAuthToken, 
+  getStoredSession 
+} from './apiBase';
 
 /**
  * API Service Object with all endpoints
@@ -146,14 +27,17 @@ const apiService = {
    */
   login: async (email, password) => {
     try {
-      const response = await apiRequest('/auth/login', {
+      const response = await apiRequest('/admin/login', {
         method: 'POST',
-        body: JSON.stringify({ email, password }),
+        body: { email, password },
       });
 
       // Check if user is admin
       if (response.data?.user?.role !== 'admin') {
-        throw new Error('Access denied. Admin privileges required.');
+        return {
+          success: false,
+          error: 'Access denied. Admin privileges required.',
+        };
       }
 
       // Save token and user data
@@ -179,18 +63,8 @@ const apiService = {
    * @returns {Promise<{success: boolean, data: object}>}
    */
   getCurrentUser: async () => {
-    try {
-      const response = await apiRequest('/auth/me');
-      return {
-        success: true,
-        data: response.data,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error.message,
-      };
-    }
+    const response = await apiRequest('/auth/me');
+    return response;
   },
 
   /**
@@ -215,10 +89,7 @@ const apiService = {
       const queryString = new URLSearchParams(params).toString();
       const endpoint = `/players${queryString ? `?${queryString}` : ''}`;
       const response = await apiRequest(endpoint);
-      return {
-        success: true,
-        data: response.data,
-      };
+      return response;
     } catch (error) {
       return {
         success: false,
@@ -239,10 +110,7 @@ const apiService = {
       const queryString = new URLSearchParams(params).toString();
       const endpoint = `/players/team/${teamId}${queryString ? `?${queryString}` : ''}`;
       const response = await apiRequest(endpoint);
-      return {
-        success: true,
-        data: response.data,
-      };
+      return response;
     } catch (error) {
       return {
         success: false,
@@ -258,18 +126,7 @@ const apiService = {
    * @returns {Promise<{success: boolean, data: object}>}
    */
   getPlayer: async (playerId) => {
-    try {
-      const response = await apiRequest(`/players/${playerId}`);
-      return {
-        success: true,
-        data: response.data,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error.message,
-      };
-    }
+    return await apiRequest(`/players/${playerId}`);
   },
 
   /**
@@ -278,22 +135,14 @@ const apiService = {
    * @returns {Promise<{success: boolean, data: object}>}
    */
   createPlayer: async (playerData) => {
-    try {
-      const response = await apiRequest('/players', {
-        method: 'POST',
-        body: JSON.stringify(playerData),
-      });
-      return {
-        success: true,
-        data: response.data,
-        message: response.message || 'Player created successfully',
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error.message,
-      };
-    }
+    const response = await apiRequest('/players', {
+      method: 'POST',
+      body: playerData,
+    });
+    return {
+      ...response,
+      message: response.message || 'Player created successfully',
+    };
   },
 
   /**
@@ -303,22 +152,14 @@ const apiService = {
    * @returns {Promise<{success: boolean, data: object}>}
    */
   updatePlayer: async (playerId, playerData) => {
-    try {
-      const response = await apiRequest(`/players/${playerId}`, {
-        method: 'PUT',
-        body: JSON.stringify(playerData),
-      });
-      return {
-        success: true,
-        data: response.data,
-        message: response.message || 'Player updated successfully',
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error.message,
-      };
-    }
+    const response = await apiRequest(`/players/${playerId}`, {
+      method: 'PUT',
+      body: playerData,
+    });
+    return {
+      ...response,
+      message: response.message || 'Player updated successfully',
+    };
   },
 
   /**
@@ -328,22 +169,14 @@ const apiService = {
    * @returns {Promise<{success: boolean, data: object}>}
    */
   deactivatePlayerTemporary: async (playerId, deactivationData) => {
-    try {
-      const response = await apiRequest(`/players/${playerId}/deactivate-temporary`, {
-        method: 'PATCH',
-        body: JSON.stringify(deactivationData),
-      });
-      return {
-        success: true,
-        data: response.data,
-        message: response.message || 'Player temporarily deactivated',
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error.message,
-      };
-    }
+    const response = await apiRequest(`/players/${playerId}/deactivate-temporary`, {
+      method: 'PATCH',
+      body: deactivationData,
+    });
+    return {
+      ...response,
+      message: response.message || 'Player temporarily deactivated',
+    };
   },
 
   /**
@@ -353,22 +186,14 @@ const apiService = {
    * @returns {Promise<{success: boolean, data: object}>}
    */
   deactivatePlayerPermanent: async (playerId, deactivationData) => {
-    try {
-      const response = await apiRequest(`/players/${playerId}/deactivate-permanent`, {
-        method: 'PATCH',
-        body: JSON.stringify(deactivationData),
-      });
-      return {
-        success: true,
-        data: response.data,
-        message: response.message || 'Player permanently deactivated',
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error.message,
-      };
-    }
+    const response = await apiRequest(`/players/${playerId}/deactivate-permanent`, {
+      method: 'PATCH',
+      body: deactivationData,
+    });
+    return {
+      ...response,
+      message: response.message || 'Player permanently deactivated',
+    };
   },
 
   /**
@@ -377,21 +202,13 @@ const apiService = {
    * @returns {Promise<{success: boolean, data: object}>}
    */
   reactivatePlayer: async (playerId) => {
-    try {
-      const response = await apiRequest(`/players/${playerId}/reactivate`, {
-        method: 'PATCH',
-      });
-      return {
-        success: true,
-        data: response.data,
-        message: response.message || 'Player reactivated successfully',
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error.message,
-      };
-    }
+    const response = await apiRequest(`/players/${playerId}/reactivate`, {
+      method: 'PATCH',
+    });
+    return {
+      ...response,
+      message: response.message || 'Player reactivated successfully',
+    };
   },
 
   // ============================================
@@ -404,18 +221,128 @@ const apiService = {
    * @returns {Promise<{success: boolean, data: object}>}
    */
   getTeam: async (teamId) => {
-    try {
-      const response = await apiRequest(`/teams/${teamId}`);
+    return await apiRequest(`/teams/${teamId}`);
+  },
+
+  // ============================================
+  // Settings Management Endpoints
+  // ============================================
+
+  /**
+   * Get all platform settings
+   * @returns {Promise<{success: boolean, data: object}>}
+   */
+  getSettings: async () => {
+    const response = await apiRequest('/admin/settings');
+    if (response.success) {
       return {
-        success: true,
-        data: response.data,
-      };
-    } catch (error) {
-      return {
-        success: false,
-        error: error.message,
+        ...response,
+        data: response.data?.settings || response.data,
       };
     }
+    return response;
+  },
+
+  /**
+   * Update platform status
+   * @param {string} platformStatus - 'online' or 'maintenance'
+   * @returns {Promise<{success: boolean, data: object, message: string}>}
+   */
+  updatePlatformStatus: async (platformStatus) => {
+    const response = await apiRequest('/admin/settings/platform-status', {
+      method: 'PUT',
+      body: { platformStatus },
+    });
+    return {
+      ...response,
+      data: response.data?.settings || response.data,
+      message: response.message || 'Platform status updated successfully',
+    };
+  },
+
+  /**
+   * Update maintenance message
+   * @param {object} maintenanceMessage - { title: string, body: string }
+   * @returns {Promise<{success: boolean, data: object, message: string}>}
+   */
+  updateMaintenanceMessage: async (maintenanceMessage) => {
+    const response = await apiRequest('/admin/settings/maintenance-message', {
+      method: 'PUT',
+      body: maintenanceMessage,
+    });
+    return {
+      ...response,
+      data: response.data?.settings || response.data,
+      message: response.message || 'Maintenance message updated successfully',
+    };
+  },
+
+  /**
+   * Update general settings
+   * @param {object} generalSettings - { appName?: string, dateFormat?: string, timeFormat?: string }
+   * @returns {Promise<{success: boolean, data: object, message: string}>}
+   */
+  updateGeneralSettings: async (generalSettings) => {
+    const response = await apiRequest('/admin/settings/general', {
+      method: 'PUT',
+      body: generalSettings,
+    });
+    return {
+      ...response,
+      data: response.data?.settings || response.data,
+      message: response.message || 'General settings updated successfully',
+    };
+  },
+
+  /**
+   * Update timezone setting
+   * @param {string} timezone - Timezone string (e.g., 'Asia/Karachi', 'UTC')
+   * @returns {Promise<{success: boolean, data: object, message: string}>}
+   */
+  updateTimezone: async (timezone) => {
+    const response = await apiRequest('/admin/settings/timezone', {
+      method: 'PUT',
+      body: { timezone },
+    });
+    return {
+      ...response,
+      data: response.data?.settings || response.data,
+      message: response.message || 'Timezone updated successfully',
+    };
+  },
+
+  /**
+   * Update app versions
+   * @param {object} appVersions - { ios?: string, android?: string }
+   * @returns {Promise<{success: boolean, data: object, message: string}>}
+   */
+  updateAppVersions: async (appVersions) => {
+    const response = await apiRequest('/admin/settings/app-versions', {
+      method: 'PUT',
+      body: appVersions,
+    });
+    return {
+      ...response,
+      data: response.data?.settings || response.data,
+      message: response.message || 'App versions updated successfully',
+    };
+  },
+
+  /**
+   * Update release notes
+   * @param {string} releaseNotes - Release notes content (markdown supported)
+   * @returns {Promise<{success: boolean, data: object, message: string}>}
+   */
+  updateReleaseNotes: async (releaseNotes) => {
+    const response = await apiRequest('/admin/settings/release-notes', {
+      method: 'PUT',
+      body: { releaseNotes },
+    });
+    return {
+      ...response,
+      data: response.data?.settings || response.data,
+      message: response.message || 'Release notes updated successfully',
+    };
   },
 
   // ============================================
@@ -445,7 +372,8 @@ const apiService = {
    * @returns {string|null}
    */
   getToken: () => {
-    return getAuthToken();
+    const session = getStoredSession();
+    return session?.token || null;
   },
 };
 

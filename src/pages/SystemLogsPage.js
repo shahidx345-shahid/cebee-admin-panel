@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -13,6 +13,8 @@ import {
   IconButton,
   Tooltip,
   Menu,
+  Alert,
+  CircularProgress,
 } from '@mui/material';
 
 
@@ -41,11 +43,18 @@ import DataTable from '../components/common/DataTable';
 
 import { format } from 'date-fns';
 import ResolveLogModal from '../components/logs/ResolveLogModal';
+import {
+  getSystemLogs,
+  getSystemLogAdmins,
+  getSystemLogStats,
+  resolveSystemLog,
+} from '../services/systemLogsService';
 
 const SystemLogsPage = () => {
   const [logs, setLogs] = useState([]);
   const [filteredLogs, setFilteredLogs] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [adminFilter, setAdminFilter] = useState('all');
@@ -53,204 +62,142 @@ const SystemLogsPage = () => {
   const [selectedSort, setSelectedSort] = useState('dateNewest');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(50);
+  const [pagination, setPagination] = useState({ page: 1, limit: 50, total: 0, pages: 0 });
+  const [stats, setStats] = useState({ total: 0, critical: 0, security: 0, unresolved: 0 });
+  const [admins, setAdmins] = useState([]);
   const [dateMenuAnchor, setDateMenuAnchor] = useState(null);
   const [adminMenuAnchor, setAdminMenuAnchor] = useState(null);
   const [sortMenuAnchor, setSortMenuAnchor] = useState(null);
+  const [selectedLogForResolution, setSelectedLogForResolution] = useState(null);
 
+  // Load admins list on mount
   useEffect(() => {
-    loadLogs();
+    loadAdmins();
   }, []);
 
+  // Load stats on mount
   useEffect(() => {
-    filterAndSortLogs();
-  }, [logs, searchQuery, typeFilter, adminFilter, dateRangeFilter, selectedSort]);
+    loadStats();
+  }, []);
+
+  // Load logs when filters change
+  useEffect(() => {
+    loadLogs();
+  }, [page, rowsPerPage, searchQuery, typeFilter, adminFilter, dateRangeFilter, selectedSort]);
+
+  // Map backend log format to frontend format
+  const mapBackendToFrontend = useCallback((backendLog) => {
+    return {
+      id: backendLog._id || backendLog.id,
+      event: backendLog.action || backendLog.event,
+      relatedUsername: backendLog.userId?.username || backendLog.userId?.email || null,
+      adminName: backendLog.adminId 
+        ? (backendLog.adminId.fullName || backendLog.adminId.username || backendLog.adminId.email || 'Admin')
+        : 'Auto-Detection System',
+      adminId: backendLog.adminId?._id?.toString() || backendLog.adminId?.toString() || 'auto-detection',
+      createdAt: new Date(backendLog.createdAt),
+      severity: backendLog.severity?.toLowerCase() || 'medium',
+      type: backendLog.category || backendLog.type || 'system',
+      status: backendLog.resolved ? 'resolved' : 'unresolved',
+      resolved: backendLog.resolved || false,
+      resolvedAt: backendLog.resolvedAt ? new Date(backendLog.resolvedAt) : null,
+      resolvedBy: backendLog.resolvedBy?.fullName || backendLog.resolvedBy?.username || null,
+      description: backendLog.description || '',
+      metadata: backendLog.metadata || {},
+    };
+  }, []);
+
+  const loadAdmins = async () => {
+    try {
+      const response = await getSystemLogAdmins();
+      if (response.success && response.data?.admins) {
+        setAdmins(response.data.admins);
+      }
+    } catch (error) {
+      console.error('Error loading admins:', error);
+    }
+  };
+
+  const loadStats = async () => {
+    try {
+      const response = await getSystemLogStats();
+      if (response.success && response.data?.stats) {
+        setStats(response.data.stats);
+      }
+    } catch (error) {
+      console.error('Error loading stats:', error);
+    }
+  };
 
   const loadLogs = async () => {
     try {
       setLoading(true);
-      // Mock Data matching screenshot
-      const mockLogs = [
-        {
-          id: '1',
-          event: 'Content Updated',
-          relatedUsername: null,
-          adminName: 'Support Admin',
-          adminId: 'admin_3',
-          createdAt: new Date('2026-01-23T11:10:00'),
-          severity: 'low',
-          type: 'system',
-          status: 'acknowledged'
-        },
-        {
-          id: '2',
-          event: 'Login Anomaly Detected',
-          relatedUsername: 'traveling_user',
-          adminName: 'Auto-Detection System',
-          adminId: 'system',
-          createdAt: new Date('2026-01-23T10:40:00'),
-          severity: 'medium',
-          type: 'security',
-          status: 'unresolved'
-        },
-        {
-          id: '3',
-          event: 'Match Result Updated',
-          relatedUsername: null,
-          adminName: 'Super Admin',
-          adminId: 'admin_1',
-          createdAt: new Date('2026-01-23T10:40:00'),
-          severity: 'normal',
-          type: 'system',
-          status: 'acknowledged'
-        },
-        {
-          id: '4',
-          event: 'Reward Payout Processed',
-          relatedUsername: 'john_predictor',
-          adminName: 'Super Admin',
-          adminId: 'admin_1',
-          createdAt: new Date('2026-01-23T09:40:00'),
-          severity: 'high',
-          type: 'critical',
-          status: 'unresolved'
-        },
-        {
-          id: '5',
-          event: 'Settings Changed',
-          relatedUsername: null,
-          adminName: 'Super Admin',
-          adminId: 'admin_1',
-          createdAt: new Date('2026-01-23T09:40:00'),
-          severity: 'low',
-          type: 'system',
-          status: 'acknowledged'
-        },
-        {
-          id: '6',
-          event: 'Duplicate Identity Detected',
-          relatedUsername: 'duplicate_user',
-          adminName: 'Auto-Detection System',
-          adminId: 'system',
-          createdAt: new Date('2026-01-23T08:40:00'),
-          severity: 'medium',
-          type: 'security',
-          status: 'unresolved'
-        },
-        {
-          id: '7',
-          event: 'Leaderboard Calculated',
-          relatedUsername: null,
-          adminName: 'Backend Service',
-          adminId: 'system',
-          createdAt: new Date('2026-01-23T07:40:00'),
-          severity: 'normal',
-          type: 'system',
-          status: 'acknowledged'
-        },
-      ];
+      setError(null);
 
-      setLogs(mockLogs);
-      setFilteredLogs(mockLogs);
+      // Build query parameters
+      const params = {
+        page: page + 1, // Backend uses 1-based pagination
+        limit: rowsPerPage,
+      };
+
+      // Map frontend sort to backend sort
+      if (selectedSort === 'dateNewest') {
+        params.sort = 'newest';
+      } else if (selectedSort === 'dateOldest') {
+        params.sort = 'oldest';
+      } else if (selectedSort === 'severityHigh' || selectedSort === 'severityLow') {
+        params.sort = 'severity';
+      } else {
+        params.sort = selectedSort || 'newest';
+      }
+
+      // Add filters
+      if (searchQuery) params.search = searchQuery;
+      if (typeFilter !== 'all') params.category = typeFilter;
+      if (adminFilter !== 'all') params.adminUser = adminFilter;
+      if (dateRangeFilter !== 'all') {
+        params.dateRange = dateRangeFilter === 'last7Days' ? 'last7days' : 
+                          dateRangeFilter === 'last30Days' ? 'last30days' : 
+                          dateRangeFilter;
+      }
+
+      const response = await getSystemLogs(params);
+
+      if (response.success && response.data) {
+        // Map backend logs to frontend format
+        const mappedLogs = (response.data.logs || []).map(mapBackendToFrontend);
+        setLogs(mappedLogs);
+        setFilteredLogs(mappedLogs);
+        
+        // Update pagination
+        if (response.data.pagination) {
+          setPagination(response.data.pagination);
+        }
+
+        // Update stats if provided
+        if (response.data.stats) {
+          setStats(response.data.stats);
+        }
+      } else {
+        setError(response.error || 'Failed to load system logs');
+        setLogs([]);
+        setFilteredLogs([]);
+      }
     } catch (error) {
       console.error('Error loading logs:', error);
+      setError(error.message || 'Failed to load system logs');
+      setLogs([]);
+      setFilteredLogs([]);
     } finally {
       setLoading(false);
     }
   };
 
-  const filterAndSortLogs = () => {
-    let filtered = [...logs];
-
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (log) =>
-          log.event?.toLowerCase().includes(query) ||
-          log.adminName?.toLowerCase().includes(query) ||
-          log.relatedUsername?.toLowerCase().includes(query) ||
-          log.logId?.toLowerCase().includes(query)
-      );
-    }
-
-    if (typeFilter !== 'all') {
-      filtered = filtered.filter((log) => {
-        const type = log.type || log.logType;
-        const severity = log.severity || log.severityLevel;
-        if (typeFilter === 'critical') {
-          return type === 'critical' || severity === 'high' || severity === 'critical';
-        } else if (typeFilter === 'security') {
-          return type === 'security' || log.event?.toLowerCase().includes('security') || log.event?.toLowerCase().includes('fraud');
-        } else if (typeFilter === 'system') {
-          return type === 'system' || type === 'info';
-        } else if (typeFilter === 'admin') {
-          return type === 'admin' || log.event?.toLowerCase().includes('admin');
-        }
-        return type === typeFilter;
-      });
-    }
-
-    if (adminFilter !== 'all') {
-      filtered = filtered.filter((log) => log.adminId === adminFilter);
-    }
-
-    const now = new Date();
-    if (dateRangeFilter === 'today') {
-      const startOfToday = new Date(now.setHours(0, 0, 0, 0));
-      filtered = filtered.filter((log) => {
-        const date = log.createdAt?.toDate ? log.createdAt.toDate() : new Date(log.createdAt);
-        return date >= startOfToday;
-      });
-    } else if (dateRangeFilter === 'last7Days') {
-      const last7Days = new Date(now.setDate(now.getDate() - 7));
-      filtered = filtered.filter((log) => {
-        const date = log.createdAt?.toDate ? log.createdAt.toDate() : new Date(log.createdAt);
-        return date >= last7Days;
-      });
-    } else if (dateRangeFilter === 'last30Days') {
-      const last30Days = new Date(now.setDate(now.getDate() - 30));
-      filtered = filtered.filter((log) => {
-        const date = log.createdAt?.toDate ? log.createdAt.toDate() : new Date(log.createdAt);
-        return date >= last30Days;
-      });
-    }
-
-    switch (selectedSort) {
-      case 'dateNewest':
-        filtered.sort((a, b) => {
-          const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
-          const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
-          return dateB - dateA;
-        });
-        break;
-      case 'dateOldest':
-        filtered.sort((a, b) => {
-          const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
-          const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
-          return dateA - dateB;
-        });
-        break;
-      case 'severityHigh':
-        const severityOrder = { critical: 0, warning: 1, info: 2 };
-        filtered.sort((a, b) => {
-          const typeA = a.type || a.logType || 'info';
-          const typeB = b.type || b.logType || 'info';
-          return (severityOrder[typeA] || 2) - (severityOrder[typeB] || 2);
-        });
-        break;
-      case 'severityLow':
-        const severityOrderLow = { critical: 0, warning: 1, info: 2 };
-        filtered.sort((a, b) => {
-          const typeA = a.type || a.logType || 'info';
-          const typeB = b.type || b.logType || 'info';
-          return (severityOrderLow[typeB] || 2) - (severityOrderLow[typeA] || 2);
-        });
-        break;
-      default:
-        break;
-    }
-
-    setFilteredLogs(filtered);
-  };
+  // Filtering and sorting is now handled by backend, but we keep this for client-side display adjustments
+  // The logs are already filtered and sorted from the backend
+  useEffect(() => {
+    setFilteredLogs(logs);
+  }, [logs]);
 
   const getSeverityChip = (severity, type) => {
     const severityLevel = severity || type || 'normal';
@@ -341,12 +288,10 @@ const SystemLogsPage = () => {
     );
   };
 
-  const criticalLogs = logs.filter((l) => (l.type || l.logType) === 'critical' || (l.severity || l.severityLevel) === 'high');
-  const securityLogs = logs.filter((l) => (l.type || l.logType) === 'security' || l.event?.toLowerCase().includes('security') || l.event?.toLowerCase().includes('fraud'));
-  const unresolvedLogs = logs.filter((l) => {
-    const status = l.status || l.logStatus;
-    return status !== 'acknowledged' && status !== 'resolved';
-  });
+  // Use stats from backend instead of calculating from logs
+  const criticalLogs = stats.critical || 0;
+  const securityLogs = stats.security || 0;
+  const unresolvedLogs = stats.unresolved || 0;
 
   const getDateSortLabel = () => {
     switch (selectedSort) {
@@ -360,21 +305,33 @@ const SystemLogsPage = () => {
   };
 
   const handleDateMenuClose = (value) => {
-    if (value) setDateRangeFilter(value);
+    if (value) {
+      setDateRangeFilter(value);
+      setPage(0); // Reset to first page when filter changes
+    }
     setDateMenuAnchor(null);
   };
 
   const handleAdminMenuClose = (value) => {
-    if (value) setAdminFilter(value);
+    if (value) {
+      setAdminFilter(value);
+      setPage(0); // Reset to first page when filter changes
+    }
     setAdminMenuAnchor(null);
   };
 
   const handleSortMenuClose = (value) => {
-    if (value) setSelectedSort(value);
+    if (value) {
+      setSelectedSort(value);
+      setPage(0); // Reset to first page when sort changes
+    }
     setSortMenuAnchor(null);
   };
 
-  const [selectedLogForResolution, setSelectedLogForResolution] = useState(null);
+  const handleSearchChange = (query) => {
+    setSearchQuery(query);
+    setPage(0); // Reset to first page when search changes
+  };
 
   const handleOpenResolveModal = (log) => {
     setSelectedLogForResolution(log);
@@ -384,28 +341,35 @@ const SystemLogsPage = () => {
     setSelectedLogForResolution(null);
   };
 
-  const handleConfirmResolve = (log, notes) => {
-    // Update local state to reflect resolution
-    const updatedLogs = logs.map(l => {
-      if (l.id === log.id) {
-        return {
-          ...l,
-          status: 'resolved',
-          resolutionNotes: notes,
-          resolvedAt: new Date(),
-          resolvedBy: 'Super Admin' // Mock
-        };
+  const handleConfirmResolve = async (log, notes) => {
+    try {
+      setLoading(true);
+      const response = await resolveSystemLog(log.id);
+
+      if (response.success) {
+        // Reload logs to get updated data
+        await loadLogs();
+        await loadStats(); // Refresh stats
+        handleCloseResolveModal();
+        alert('Log resolved successfully');
+      } else {
+        alert(`Failed to resolve log: ${response.error || 'Unknown error'}`);
       }
-      return l;
-    });
+    } catch (error) {
+      console.error('Error resolving log:', error);
+      alert(`Failed to resolve log: ${error.message || 'Unknown error'}`);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    setLogs(updatedLogs);
-    // Also update filtered logs if needed, but the effect will handle it if logs changes
-    // setFilteredLogs ... (useEffect handles this)
+  const handlePageChange = (event, newPage) => {
+    setPage(newPage);
+  };
 
-    console.log('Log resolved:', log.id, 'Notes:', notes);
-    handleCloseResolveModal();
-    alert('Log marked as resolved (Phase 1 Mock)');
+  const handleRowsPerPageChange = (event) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
   };
 
   const handleExport = () => {
@@ -546,10 +510,8 @@ const SystemLogsPage = () => {
     },
   ];
 
-  const paginatedLogs = filteredLogs.slice(
-    page * rowsPerPage,
-    page * rowsPerPage + rowsPerPage
-  );
+  // Pagination is handled by backend, so use filteredLogs directly
+  const paginatedLogs = filteredLogs;
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%' }}>
@@ -592,20 +554,32 @@ const SystemLogsPage = () => {
         </Typography>
       </Box>
 
-      {/* Security Alerts Section */}
-      {unresolvedLogs.length > 0 && (
+      {/* Error Alert */}
+      {error && (
+        <Alert
+          severity="error"
+          onClose={() => setError(null)}
+          sx={{ mb: 3, borderRadius: '12px' }}
+        >
+          <Typography sx={{ fontWeight: 600, fontSize: 14 }}>
+            {error}
+          </Typography>
+        </Alert>
+      )}
+
+      {/* Security Alerts Section - Show count only */}
+      {unresolvedLogs > 0 && (
         <Card
           sx={{
             p: 3,
             mb: 4,
             borderRadius: '16px',
-            backgroundColor: '#FDF2F2', // Light red background matching screenshot
-            border: '1px solid #FECACA', // Light red border
+            backgroundColor: '#FDF2F2',
+            border: '1px solid #FECACA',
             boxShadow: 'none',
           }}
         >
-          {/* Alert Header */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <Box
               sx={{
                 width: 40,
@@ -640,84 +614,9 @@ const SystemLogsPage = () => {
                   fontSize: 14,
                 }}
               >
-                {unresolvedLogs.length} unresolved critical/security logs require Super Admin attention
+                {unresolvedLogs} unresolved critical/security logs require Super Admin attention
               </Typography>
             </Box>
-          </Box>
-
-          {/* Alert List */}
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {unresolvedLogs.map((log) => {
-              const date = log.createdAt instanceof Date ? log.createdAt : new Date(log.createdAt);
-              const isHigh = (log.severity || log.severityLevel) === 'high';
-              const badgeColors = isHigh
-                ? { bg: '#FFEBEB', text: colors.brandRed } // High: Pinkish red
-                : { bg: '#FFFBEB', text: '#D97706' }; // Medium: Yellowish orange
-
-              return (
-                <Card
-                  key={log.id}
-                  sx={{
-                    p: 2,
-                    borderRadius: '12px',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    border: 'none',
-                  }}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                    {/* Severity Badge */}
-                    <Box
-                      sx={{
-                        px: 1.5,
-                        py: 0.5,
-                        borderRadius: '6px',
-                        backgroundColor: badgeColors.bg,
-                        color: badgeColors.text,
-                        fontWeight: 700,
-                        fontSize: 12,
-                        textTransform: 'uppercase',
-                        minWidth: 60,
-                        textAlign: 'center',
-                      }}
-                    >
-                      {(log.severity || log.severityLevel).toUpperCase()}
-                    </Box>
-
-                    {/* Content */}
-                    <Box>
-                      <Typography variant="body1" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.5 }}>
-                        {log.event}
-                      </Typography>
-                      <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13 }}>
-                        User: <span style={{ color: colors.textPrimary }}>{log.relatedUsername || 'N/A'}</span> • Admin: <span style={{ color: colors.textPrimary }}>{log.adminName || 'System'}</span> • {format(date, 'MMM dd, HH:mm')}
-                      </Typography>
-                    </Box>
-                  </Box>
-
-                  {/* Action Button */}
-                  <Button
-                    variant="contained"
-                    onClick={() => handleOpenResolveModal(log)}
-                    sx={{
-                      backgroundColor: colors.brandRed,
-                      color: 'white',
-                      textTransform: 'none',
-                      fontWeight: 600,
-                      borderRadius: '8px',
-                      px: 3,
-                      '&:hover': {
-                        backgroundColor: colors.brandDarkRed,
-                      },
-                    }}
-                  >
-                    Resolve
-                  </Button>
-                </Card>
-              );
-            })}
           </Box>
         </Card>
       )}
@@ -727,29 +626,29 @@ const SystemLogsPage = () => {
         {[
           {
             title: 'Total Logs',
-            count: logs.length,
+            count: stats.total || 0,
             icon: Description,
             color: '#3B82F6', // Blue
             bgColor: '#EFF6FF', // Light Blue
           },
           {
             title: 'Critical',
-            count: criticalLogs.length,
+            count: criticalLogs,
             icon: Error,
             color: '#EF4444', // Red
             bgColor: '#FEF2F2', // Light Red
           },
           {
             title: 'Security',
-            count: securityLogs.length,
+            count: securityLogs,
             icon: Shield,
             color: '#F59E0B', // Amber
             bgColor: '#FFFBEB', // Light Amber
           },
           {
             title: 'Unresolved',
-            count: unresolvedLogs.length,
-            icon: AccessTime, // Changed to clock icon
+            count: unresolvedLogs,
+            icon: AccessTime,
             color: '#EF4444', // Red
             bgColor: '#FEF2F2', // Light Red
           },
@@ -952,7 +851,7 @@ const SystemLogsPage = () => {
         <Box sx={{ flexGrow: 1, minWidth: 300 }}>
           <SearchBar
             value={searchQuery}
-            onChange={setSearchQuery}
+            onChange={handleSearchChange}
             placeholder="Search logs by event, admin, or user..."
             sx={{
               '& .MuiOutlinedInput-root': {
@@ -1082,8 +981,9 @@ const SystemLogsPage = () => {
           loading={loading}
           page={page}
           rowsPerPage={rowsPerPage}
-          totalCount={filteredLogs.length}
-          onPageChange={(e, newPage) => setPage(newPage)}
+          totalCount={pagination.total || filteredLogs.length}
+          onPageChange={handlePageChange}
+          onRowsPerPageChange={handleRowsPerPageChange}
           onRowsPerPageChange={(e) => {
             setRowsPerPage(parseInt(e.target.value, 10));
             setPage(0);
@@ -1124,15 +1024,14 @@ const SystemLogsPage = () => {
           },
         }}
       >
-        <MenuItem onClick={() => handleAdminMenuClose('all')}>All Admins</MenuItem>
-        {[...new Set(logs.map((l) => l.adminId).filter(Boolean))].map((adminId) => {
-          const log = logs.find((l) => l.adminId === adminId);
-          return (
-            <MenuItem key={adminId} onClick={() => handleAdminMenuClose(adminId)}>
-              {log?.adminName || adminId}
+        {admins.map((admin) => (
+          <MenuItem 
+            key={admin.id} 
+            onClick={() => handleAdminMenuClose(admin.id === 'all' ? 'all' : admin.id)}
+          >
+            {admin.label}
             </MenuItem>
-          );
-        })}
+        ))}
       </Menu>
 
       {/* Sort Menu */}

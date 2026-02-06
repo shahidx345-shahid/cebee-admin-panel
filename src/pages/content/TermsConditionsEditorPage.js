@@ -1,53 +1,107 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Button, Card, CircularProgress, Alert, Chip } from '@mui/material';
+import { Box, Typography, Button, Card, CircularProgress, Alert, Chip, Snackbar } from '@mui/material';
 import { CheckCircle, Info } from '@mui/icons-material';
 import { colors } from '../../config/theme';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
+import { format } from 'date-fns';
+import { getPublishedTerms, createTerms, updateTerms } from '../../services/termsService';
 
 const TermsConditionsEditorPage = () => {
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [version, setVersion] = useState('1.0');
+  const [updatedAt, setUpdatedAt] = useState(null);
+  const [currentTermsId, setCurrentTermsId] = useState(null);
+  const [error, setError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
 
   useEffect(() => {
     loadContent();
   }, []);
 
-  const loadContent = () => {
+  const loadContent = async () => {
     try {
       setLoading(true);
-      // Load from localStorage if available
-      const savedContent = localStorage.getItem('termsConditionsContent');
+      setError(null);
 
-      if (savedContent) {
-        setContent(savedContent);
+      // Try to get published terms first (sorted by updatedAt desc, so first is latest)
+      const response = await getPublishedTerms();
+      
+      if (response.success && response.data?.terms && response.data.terms.length > 0) {
+        // Use the first published terms (latest one)
+        const terms = response.data.terms[0];
+        setContent(terms.content || '');
+        setVersion(terms.version || '1.0');
+        setUpdatedAt(terms.updatedAt ? new Date(terms.updatedAt) : new Date());
+        setCurrentTermsId(terms._id);
       } else {
-        // Start with empty content
+        // No published terms found, start with empty content
         setContent('');
+        setVersion('1.0');
+        setUpdatedAt(null);
+        setCurrentTermsId(null);
       }
     } catch (error) {
       console.error('Error loading content:', error);
+      setError('Failed to load terms & conditions. Please try again.');
+      setContent('');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    // Validation
+    if (!content.trim()) {
+      setError('Content is required');
+      return;
+    }
+
     try {
       setSaving(true);
-      // Save to localStorage
-      localStorage.setItem('termsConditionsContent', content);
-      const newDate = new Date();
-      localStorage.setItem('termsConditionsUpdatedAt', newDate.toISOString());
+      setError(null);
 
-      alert('Content saved successfully!');
+      const termsData = {
+        content: content.trim(),
+        version: version.trim() || '1.0',
+        isActive: true, // Always publish when saving
+      };
+
+      let response;
+      if (currentTermsId) {
+        // Update existing terms
+        response = await updateTerms(currentTermsId, termsData);
+      } else {
+        // Create new terms
+        response = await createTerms(termsData);
+      }
+
+      if (response.success) {
+        const terms = response.data;
+        setContent(terms.content || content);
+        setVersion(terms.version || version);
+        setUpdatedAt(terms.updatedAt ? new Date(terms.updatedAt) : new Date());
+        setCurrentTermsId(terms._id || currentTermsId);
+        
+        setSuccessMessage(response.message || 'Terms & Conditions saved successfully!');
+        
+        // Reload content to get latest version
+        await loadContent();
+      } else {
+        setError(response.error || 'Failed to save terms & conditions');
+      }
     } catch (error) {
       console.error('Error saving content:', error);
-      alert('Failed to save content');
+      setError('An unexpected error occurred while saving terms & conditions');
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleCloseSnackbar = () => {
+    setSuccessMessage(null);
   };
 
   if (loading) {
@@ -114,10 +168,20 @@ const TermsConditionsEditorPage = () => {
       >
         {/* Metadata */}
         <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap', mb: 3 }}>
-          <Chip label="Version: 1.0" size="small" sx={{ backgroundColor: '#2196F3', color: 'white', fontWeight: 600 }} />
-          <Chip label={`Updated: ${new Date().toLocaleDateString()}`} size="small" sx={{ backgroundColor: '#4CAF50', color: 'white', fontWeight: 600 }} />
+          <Chip label={`Version: ${version}`} size="small" sx={{ backgroundColor: '#2196F3', color: 'white', fontWeight: 600 }} />
+          <Chip 
+            label={updatedAt ? `Updated: ${format(updatedAt instanceof Date ? updatedAt : new Date(updatedAt), 'MMM dd, yyyy')}` : 'Not yet updated'} 
+            size="small" 
+            sx={{ backgroundColor: '#4CAF50', color: 'white', fontWeight: 600 }} 
+          />
           <Chip label="PUBLISHED" size="small" sx={{ backgroundColor: '#F44336', color: 'white', fontWeight: 600 }} />
         </Box>
+
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+            {error}
+          </Alert>
+        )}
 
         {/* Info Banner */}
         <Box sx={{ maxWidth: '1400px', margin: '0 auto' }}>
@@ -188,6 +252,17 @@ const TermsConditionsEditorPage = () => {
           </Box>
         </Box>
       </Card>
+
+      <Snackbar
+        open={!!successMessage}
+        autoHideDuration={3000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert onClose={handleCloseSnackbar} severity="success" sx={{ width: '100%' }}>
+          {successMessage}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

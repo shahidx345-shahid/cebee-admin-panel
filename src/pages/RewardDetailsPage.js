@@ -41,8 +41,7 @@ import {
 } from '@mui/icons-material';
 import { colors, constants } from '../config/theme';
 import { format } from 'date-fns';
-
-import { MockDataService } from '../services/mockDataService';
+import { getRewardById, updateRewardStatus, updateRewardNotes, markRewardAsFulfilled, cancelReward } from '../services/rewardsService';
 
 const RewardDetailsPage = () => {
     const navigate = useNavigate();
@@ -61,99 +60,231 @@ const RewardDetailsPage = () => {
         loadReward();
     }, [id]);
 
+    // Helper function to safely parse dates
+    const parseDate = (dateString) => {
+        if (!dateString) return null;
+        try {
+            const parsed = new Date(dateString);
+            return isNaN(parsed.getTime()) ? null : parsed;
+        } catch (e) {
+            return null;
+        }
+    };
+
     const loadReward = async () => {
         setLoading(true);
         try {
-            const data = await MockDataService.getRewardById(id);
-            if (data) {
+            // Get ID from params, handle different formats
+            const rewardId = id || (typeof id === 'string' ? id.trim() : null);
+            
+            if (!rewardId || rewardId === 'undefined' || rewardId === 'null') {
+                console.error('Reward ID is missing or invalid:', id);
                 setReward({
-                    ...data,
-                    // Parse dates that might be strings from MockDataService
-                    claimDeadline: new Date(data.claimDeadline),
-                    claimSubmittedAt: data.claimSubmittedAt ? new Date(data.claimSubmittedAt) : null,
-                    kycSubmittedAt: data.kycSubmittedAt ? new Date(data.kycSubmittedAt) : null,
-                    kycVerifiedAt: data.kycVerifiedAt ? new Date(data.kycVerifiedAt) : null,
-                    consentTimestamp: data.consentTimestamp ? new Date(data.consentTimestamp) : null,
-                    events: (data.events || []).map(e => ({ ...e, timestamp: new Date(e.timestamp) })),
-                    // Add mock user data (in production, fetch from user service)
-                    userCountry: data.userCountry || 'Nigeria',
-                    accountStatus: data.accountStatus || 'Active',
-                    registrationDate: data.registrationDate ? new Date(data.registrationDate) : new Date(Date.now() - 180 * 24 * 60 * 60 * 1000),
-                    lastLoginDate: data.lastLoginDate ? new Date(data.lastLoginDate) : new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-                    // Fulfillment fields
-                    fulfillmentMethod: data.fulfillmentMethod || null,
-                    fulfillmentStatus: data.fulfillmentStatus || 'Pending',
-                    fulfilledAt: data.fulfilledAt ? new Date(data.fulfilledAt) : null,
-                    fulfilledBy: data.fulfilledBy || null,
-                    // Gift card specific fields
-                    giftCardPlatform: data.giftCardPlatform || (data.payoutMethod === 'Gift Card' ? 'Amazon' : null),
-                    giftCardRegion: data.giftCardRegion || (data.payoutMethod === 'Gift Card' ? 'US' : null),
-                    // Risk badges
+                    id: null,
+                    username: 'N/A',
+                    userEmail: 'N/A',
+                    status: 'error',
+                    errorMessage: 'Reward ID is missing or invalid',
+                });
+                setLoading(false);
+                return;
+            }
+
+            const response = await getRewardById(rewardId);
+            
+            // Strictly use API data - no mock fallback
+            if (!response.success || !response.data) {
+                console.error('API call failed:', response.error);
+                setReward({
+                    id: id,
+                    username: 'N/A',
+                    userEmail: 'N/A',
+                    status: 'error',
+                    errorMessage: response.error || 'Failed to load reward from API'
+                });
+                setLoading(false);
+                return;
+            }
+            
+            if (response.success && response.data) {
+                // Backend returns { success: true, data: { reward } }
+                // The service already extracts the reward, so response.data is the reward object
+                const data = response.data;
+                
+                // Map backend API response to frontend format
+                // Backend returns reward object with populated userId (user object with username, email, fullName)
+                const rewardData = {
+                    // Core fields
+                    id: data._id || data.id || id,
+                    userId: data.userId?._id || data.userId || data.user_id || null,
+                    rank: data.rank || 0,
+                    // User data from populated userId object
+                    username: data.userId?.username || data.username || 'N/A',
+                    userEmail: data.userId?.email || data.userEmail || data.email || 'N/A',
+                    userFullName: data.userId?.fullName || data.userFullName || null,
+                    spTotal: data.spTotal || 0,
+                    usdAmount: data.usdAmount || 0,
+                    rewardType: data.rewardType || data.payoutMethod || 'Gift Card',
+                    payoutMethod: data.payoutMethod || data.rewardType || 'Gift Card', // Backward compatibility
+                    status: data.status || 'unclaimed',
+                    rewardMonth: data.rewardMonth || '',
+                    
+                    // KYC fields
+                    kycStatus: data.kycStatus || 'not_submitted',
+                    kycVerified: data.kycVerified || false,
+                    kycVerifiedAt: parseDate(data.kycVerifiedAt),
+                    kycVerifiedBy: data.kycVerifiedBy || null,
+                    kycSubmittedAt: parseDate(data.kycSubmittedAt),
+                    
+                    // Risk fields
+                    risk: data.risk || false,
+                    riskLevel: data.riskLevel || 'none',
                     riskBadges: data.riskBadges || [],
                     riskReason: data.riskReason || null,
-                    // Reward type
-                    rewardType: data.rewardType || 'Monthly SP Rewards',
+                    
+                    // Claim fields
+                    claimDeadline: parseDate(data.claimDeadline),
+                    claimSubmittedAt: parseDate(data.claimSubmittedAt),
+                    
+                    // Consent fields
+                    consentOptIn: data.consentOptIn || false,
+                    consentTimestamp: parseDate(data.consentTimestamp),
+                    consentSource: data.consentSource || null,
+                    
+                    // Gift Card fields
+                    giftCardPlatform: data.giftCardPlatform || null,
+                    giftCardRegion: data.giftCardRegion || null,
+                    giftCardCode: data.giftCardCode || null,
+                    
+                    // Alternative Reward fields
+                    alternativeRewardType: data.alternativeRewardType || null,
+                    alternativeApproved: data.alternativeApproved || false,
+                    alternativeReason: data.alternativeReason || null,
+                    
+                    // Proof & Consent fields
+                    screenshot: data.screenshot || null,
+                    videoConsentStatus: data.videoConsentStatus || null,
+                    
+                    // Processing fields
+                    processedAt: parseDate(data.processedAt),
+                    
+                    // Fulfillment fields (for display)
+                    fulfilledAt: parseDate(data.processedAt), // Use processedAt for fulfilled rewards
+                    fulfilledBy: data.kycVerifiedBy || null, // Use KYC verified by as fulfilled by
+                    
+                    // User profile data (from populated userId)
+                    userCountry: data.userId?.country || null,
+                    accountStatus: data.userId?.status || 'Active',
+                    registrationDate: parseDate(data.userId?.createdAt),
+                    lastLoginDate: parseDate(data.userId?.lastLogin),
+                    
+                    // Events
+                    events: (data.events || []).map(e => ({
+                        id: e.id || Date.now(),
+                        action: e.action || 'Unknown',
+                        timestamp: parseDate(e.timestamp) || new Date(),
+                        triggeredBy: e.triggeredBy || 'System'
+                    })),
+                    
+                    // Admin fields
+                    adminNotes: data.adminNotes || '',
+                    declineReason: data.declineReason || null,
+                    
+                    // Lock status
+                    isLocked: data.isLocked || false,
+                };
+                setReward(rewardData);
+                setNotes(rewardData.adminNotes || '');
+            } else {
+                const errorMsg = response.error || 'Unknown error';
+                console.error("Failed to load reward:", errorMsg);
+                
+                setReward({
+                    id: id,
+                    username: 'N/A',
+                    userEmail: 'N/A',
+                    status: 'error',
+                    errorMessage: errorMsg,
                 });
-                setNotes(data.adminNotes || '');
             }
         } catch (error) {
-            console.error("Failed to load reward", error);
+            console.error("Failed to load reward:", error);
+            // Set a minimal reward object so the page can still display
+            setReward({
+                id: id,
+                username: 'N/A',
+                userEmail: 'N/A',
+                status: 'error',
+                errorMessage: error.message || 'Failed to load reward details',
+            });
         } finally {
             setLoading(false);
         }
     };
 
     const handleDecline = async () => {
-        const newEvent = { id: Date.now(), action: 'Reward Declined', timestamp: new Date(), triggeredBy: 'Admin' };
+        if (!declineReason || declineReason.trim() === '') {
+            alert('Please provide a reason for declining the reward');
+            return;
+        }
 
-        // Optimistic update
-        const updatedReward = {
-            ...reward,
-            status: 'cancelled',
-            declineReason: declineReason,
-            events: [newEvent, ...reward.events]
-        };
-        setReward(updatedReward);
-
-        // Persist
-        await MockDataService.updateReward(id, {
-            status: 'cancelled',
-            declineReason: declineReason
-        });
-        await MockDataService.addRewardEvent(id, {
-            ...newEvent,
-            timestamp: newEvent.timestamp.toISOString()
-        });
-
+        try {
+            const response = await cancelReward(id, declineReason);
+            
+            if (response.success) {
+                // Reload reward to get updated data from backend
+                await loadReward();
         setDeclineDialogOpen(false);
+                setDeclineReason('');
+            } else {
+                alert(`Failed to decline reward: ${response.error}`);
+            }
+        } catch (error) {
+            console.error("Failed to decline reward", error);
+            alert(`Failed to decline reward: ${error.message}`);
+        }
     };
 
-    const handleMarkPaid = async () => {
-        const newEvent = { id: Date.now(), action: 'Reward Paid', timestamp: new Date(), triggeredBy: 'Admin' };
+    const handleMarkFulfilled = async () => {
+        try {
+            const response = await markRewardAsFulfilled(id);
+            
+            if (response.success) {
+                // Reload reward to get updated data from backend
+                await loadReward();
+                setConfirmPaidDialogOpen(false);
+            } else {
+                alert(`Failed to mark reward as fulfilled: ${response.error}`);
+            }
+        } catch (error) {
+            console.error("Failed to mark reward as fulfilled", error);
+            alert(`Failed to mark reward as fulfilled: ${error.message}`);
+        }
+    };
 
-        // Optimistic update
-        const updatedReward = {
-            ...reward,
-            status: 'paid',
-            events: [newEvent, ...reward.events]
-        };
-        setReward(updatedReward);
-
-        // Persist
-        await MockDataService.updateReward(id, { status: 'paid' });
-        await MockDataService.addRewardEvent(id, {
-            ...newEvent,
-            timestamp: newEvent.timestamp.toISOString()
-        });
-
-        setConfirmPaidDialogOpen(false);
+    const handleSaveNotes = async () => {
+        try {
+            const response = await updateRewardNotes(id, notes);
+            
+            if (response.success) {
+                // Reload reward to get updated data from backend
+                await loadReward();
+                alert('Notes saved successfully');
+            } else {
+                alert(`Failed to save notes: ${response.error}`);
+            }
+        } catch (error) {
+            console.error("Failed to save notes", error);
+            alert(`Failed to save notes: ${error.message}`);
+        }
     };
 
     const getStatusColor = (status) => {
         switch (status) {
             case 'pending': return colors.warning;
             case 'processing': return colors.info;
-            case 'paid': return colors.success;
+            case 'fulfilled': return colors.success;
+            case 'paid': return colors.success; // Backward compatibility
             case 'cancelled':
             case 'declined': return colors.error;
             case 'unclaimed': return colors.textSecondary;
@@ -165,18 +296,12 @@ const RewardDetailsPage = () => {
         switch (status) {
             case 'pending': return '#FFF7ED';
             case 'processing': return '#EBF8FF';
-            case 'paid': return '#F0FDF4';
+            case 'fulfilled': return '#F0FDF4';
+            case 'paid': return '#F0FDF4'; // Backward compatibility
             case 'cancelled':
             case 'declined': return '#FEF2F2';
             case 'unclaimed': return '#F3F4F6';
             default: return '#EBF8FF';
-        }
-    };
-
-    const handleCopyWalletAddress = () => {
-        if (reward?.walletAddress) {
-            navigator.clipboard.writeText(reward.walletAddress);
-            // You could add a toast notification here
         }
     };
 
@@ -204,11 +329,35 @@ const RewardDetailsPage = () => {
         return <Box sx={{ p: 4, display: 'flex', justifyContent: 'center' }}><CircularProgress /></Box>;
     }
 
-    if (!reward) {
+    if (!reward || reward.status === 'error') {
         return (
             <Box sx={{ p: 4, textAlign: 'center' }}>
-                <Typography variant="h6">Reward not found</Typography>
-                <Button startIcon={<ArrowBack />} onClick={() => navigate(constants.routes.rewards)} sx={{ mt: 2 }}>
+                <Typography variant="h6" sx={{ mb: 2, color: colors.error }}>
+                    {reward?.status === 'error' ? 'Failed to load reward details' : 'Reward not found'}
+                </Typography>
+                <Typography variant="body2" sx={{ mb: 2, color: colors.textSecondary }}>
+                    {reward?.status === 'error' 
+                        ? 'There was an error loading the reward details. Please try again or contact support.'
+                        : `Reward with ID "${id}" was not found.`}
+                </Typography>
+                {reward?.errorMessage && (
+                    <Typography variant="caption" sx={{ mb: 3, color: colors.textSecondary, display: 'block', fontFamily: 'monospace', fontSize: '12px' }}>
+                        Error: {reward.errorMessage}
+                    </Typography>
+                )}
+                <Typography variant="caption" sx={{ mb: 3, color: colors.textSecondary, display: 'block' }}>
+                    Please check the browser console for more details.
+                </Typography>
+                <Button 
+                    startIcon={<ArrowBack />} 
+                    onClick={() => navigate(constants.routes.rewards)} 
+                    variant="contained"
+                    sx={{ 
+                        mt: 2,
+                        bgcolor: colors.brandRed,
+                        '&:hover': { bgcolor: colors.brandDarkRed }
+                    }}
+                >
                     Back to Rewards
                 </Button>
             </Box>
@@ -355,11 +504,11 @@ const RewardDetailsPage = () => {
                                 </Grid>
                                 <Grid item xs={12} sm={6} md={4}>
                                     <Typography variant="caption" sx={{ color: colors.textSecondary, textTransform: 'uppercase', fontWeight: 600 }}>Total Monthly SP</Typography>
-                                    <Typography variant="h6" sx={{ fontWeight: 700, color: colors.brandRed, mt: 0.5 }}>{reward.spTotal.toLocaleString()}</Typography>
+                                    <Typography variant="h6" sx={{ fontWeight: 700, color: colors.brandRed, mt: 0.5 }}>{(reward.spTotal || 0).toLocaleString()}</Typography>
                                 </Grid>
                                 <Grid item xs={12} sm={6} md={4}>
                                     <Typography variant="caption" sx={{ color: colors.textSecondary, textTransform: 'uppercase', fontWeight: 600 }}>Reward Amount (USD)</Typography>
-                                    <Typography variant="h5" sx={{ fontWeight: 700, color: colors.success, mt: 0.5 }}>${reward.usdAmount}</Typography>
+                                    <Typography variant="h5" sx={{ fontWeight: 700, color: colors.success, mt: 0.5 }}>${reward.usdAmount || 0}</Typography>
                                 </Grid>
                                 <Grid item xs={12}>
                                     <Divider sx={{ my: 1 }} />
@@ -368,11 +517,11 @@ const RewardDetailsPage = () => {
                                     <Typography variant="caption" sx={{ color: colors.textSecondary, textTransform: 'uppercase', fontWeight: 600 }}>Reward Status</Typography>
                                     <Box sx={{ mt: 0.5 }}>
                                         <Chip
-                                            label={reward.status.toUpperCase()}
+                                            label={(reward.status || 'pending').toUpperCase()}
                                             sx={{
                                                 fontWeight: 700,
-                                                backgroundColor: getStatusBg(reward.status),
-                                                color: getStatusColor(reward.status),
+                                                backgroundColor: getStatusBg(reward.status || 'pending'),
+                                                color: getStatusColor(reward.status || 'pending'),
                                                 fontSize: '13px',
                                                 height: 32,
                                             }}
@@ -493,9 +642,9 @@ const RewardDetailsPage = () => {
                                     <Typography variant="caption" sx={{ color: colors.textSecondary, textTransform: 'uppercase', fontWeight: 600 }}>Claim Status</Typography>
                                     <Box sx={{ mt: 0.5 }}>
                                         <Chip
-                                            label={reward.claimSubmittedAt ? 'Claimed' : (new Date() > reward.claimDeadline ? 'Expired' : 'Not Claimed')}
+                                            label={reward.claimSubmittedAt ? 'Claimed' : (reward.claimDeadline && new Date() > reward.claimDeadline ? 'Expired' : 'Not Claimed')}
                                             size="small"
-                                            color={reward.claimSubmittedAt ? 'success' : (new Date() > reward.claimDeadline ? 'error' : 'warning')}
+                                            color={reward.claimSubmittedAt ? 'success' : (reward.claimDeadline && new Date() > reward.claimDeadline ? 'error' : 'warning')}
                                             sx={{ fontWeight: 700 }}
                                         />
                                     </Box>
@@ -508,8 +657,8 @@ const RewardDetailsPage = () => {
                                 </Grid>
                                 <Grid item xs={12} sm={6} md={3}>
                                     <Typography variant="caption" sx={{ color: colors.textSecondary, textTransform: 'uppercase', fontWeight: 600 }}>Claim Deadline</Typography>
-                                    <Typography variant="body1" sx={{ fontWeight: 600, mt: 0.5, color: new Date() > reward.claimDeadline ? colors.error : colors.brandBlack }}>
-                                        {format(reward.claimDeadline, 'MMM dd, yyyy HH:mm')}
+                                    <Typography variant="body1" sx={{ fontWeight: 600, mt: 0.5, color: reward.claimDeadline && new Date() > reward.claimDeadline ? colors.error : colors.brandBlack }}>
+                                        {reward.claimDeadline ? format(reward.claimDeadline, 'MMM dd, yyyy HH:mm') : '-'}
                                     </Typography>
                                 </Grid>
                                 <Grid item xs={12} sm={6} md={3}>
@@ -520,7 +669,7 @@ const RewardDetailsPage = () => {
                                     <Typography variant="caption" sx={{ color: colors.textSecondary, textTransform: 'uppercase', fontWeight: 600 }}>Claim Source</Typography>
                                     <Typography variant="body1" sx={{ fontWeight: 500, mt: 0.5 }}>Reward Claim Flow</Typography>
                                 </Grid>
-                                {new Date() > reward.claimDeadline && !reward.claimSubmittedAt && (
+                                {reward.claimDeadline && new Date() > reward.claimDeadline && !reward.claimSubmittedAt && (
                                     <Grid item xs={12}>
                                         <Box sx={{ 
                                             p: 2, 
@@ -652,7 +801,7 @@ const RewardDetailsPage = () => {
                         </CardContent>
                     </Card>
 
-                    {/* 5. Payout Method & Fulfillment */}
+                    {/* 5. Reward Type & Fulfillment */}
                     <Card sx={{ mb: 3, borderRadius: '16px' }}>
                         <Box sx={{ 
                             bgcolor: '#F9FAFB',
@@ -660,8 +809,8 @@ const RewardDetailsPage = () => {
                             borderBottom: `1px solid ${colors.divider}`,
                         }}>
                             <Typography variant="h6" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <AccountBalanceWallet />
-                                Payout Method & Fulfillment
+                                <EmojiEvents />
+                                Reward Type & Fulfillment
                             </Typography>
                         </Box>
                         <CardContent sx={{ p: 3 }}>
@@ -669,7 +818,7 @@ const RewardDetailsPage = () => {
                             <Box sx={{ mb: 3 }}>
                                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
                                     <Typography variant="subtitle2" sx={{ fontWeight: 700, color: colors.brandBlack }}>
-                                        A. User-Selected Payout Method (Request)
+                                        A. User-Selected Reward Type (Request)
                                     </Typography>
                                     <Chip 
                                         label="READ-ONLY" 
@@ -688,11 +837,11 @@ const RewardDetailsPage = () => {
                                         <Typography variant="caption" sx={{ color: colors.textSecondary, textTransform: 'uppercase', fontWeight: 600 }}>Selected Method</Typography>
                                         <Box sx={{ mt: 0.5 }}>
                                             <Chip
-                                                icon={reward.payoutMethod === 'USDT' ? <AccountBalanceWallet sx={{ fontSize: 16 }} /> : <CardGiftcard sx={{ fontSize: 16 }} />}
-                                                label={reward.payoutMethod === 'USDT' ? 'USDT (TRC20)' : 'Gift Card'}
+                                                icon={<CardGiftcard sx={{ fontSize: 16 }} />}
+                                                label={reward.rewardType || reward.payoutMethod || 'Gift Card'}
                                                 sx={{
-                                                    bgcolor: reward.payoutMethod === 'USDT' ? '#DBEAFE' : '#FCE7F3',
-                                                    color: reward.payoutMethod === 'USDT' ? '#1E40AF' : '#9F1239',
+                                                    bgcolor: '#FCE7F3',
+                                                    color: '#9F1239',
                                                     fontWeight: 700,
                                                     fontSize: '13px',
                                                     height: 32,
@@ -734,7 +883,7 @@ const RewardDetailsPage = () => {
                                         <Typography variant="caption" sx={{ color: colors.textSecondary, textTransform: 'uppercase', fontWeight: 600 }}>Fulfillment Method</Typography>
                                         <Box sx={{ mt: 0.5 }}>
                                             <Chip
-                                                label={reward.fulfillmentMethod || (reward.payoutMethod === 'USDT' ? 'Manual USDT (TRC20) Transfer' : 'Manual Gift Card Fulfillment')}
+                                                label={reward.fulfillmentMethod || (reward.rewardType === 'Alternative Reward' ? 'Manual Alternative Reward Fulfillment' : 'Manual Gift Card Fulfillment')}
                                                 sx={{
                                                     bgcolor: '#FEF3C7',
                                                     color: '#78350F',
@@ -762,7 +911,7 @@ const RewardDetailsPage = () => {
                                             Critical Rule (Phase 1)
                                         </Typography>
                                         <Typography variant="body2" sx={{ color: '#92400E', fontWeight: 500 }}>
-                                            Admin fulfillment method must match the user-selected payout method. No substitutions or alternatives are allowed.
+                                            Admin fulfillment method must match the user-selected reward type. Alternative rewards require support approval.
                                         </Typography>
                                     </Box>
                                 </Box>
@@ -770,7 +919,7 @@ const RewardDetailsPage = () => {
                         </CardContent>
                     </Card>
 
-                    {/* 6. Payout Details */}
+                    {/* 6. Reward Details */}
                     <Card sx={{ mb: 3, borderRadius: '16px' }}>
                         <Box sx={{ 
                             bgcolor: '#F9FAFB',
@@ -779,73 +928,45 @@ const RewardDetailsPage = () => {
                         }}>
                             <Typography variant="h6" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
                                 <CreditCard />
-                                Payout Details
+                                Reward Details
                             </Typography>
                         </Box>
                         <CardContent sx={{ p: 3 }}>
-                            {reward.payoutMethod === 'USDT' ? (
+                            {reward.rewardType === 'Alternative Reward' || (reward.payoutMethod && reward.payoutMethod !== 'Gift Card' && !reward.payoutMethod.toLowerCase().includes('gift')) ? (
                                 <Grid container spacing={3}>
-                                    <Grid item xs={12} sm={4}>
-                                        <Typography variant="caption" sx={{ color: colors.textSecondary, textTransform: 'uppercase', fontWeight: 600 }}>Network</Typography>
-                                        <Box sx={{ mt: 0.5 }}>
-                                            <Chip 
-                                                label="TRC20" 
-                                                size="small"
-                                                sx={{ 
-                                                    bgcolor: '#DBEAFE',
-                                                    color: '#1E40AF',
-                                                    fontWeight: 700 
-                                                }} 
-                                            />
-                                        </Box>
-                                    </Grid>
-                                    <Grid item xs={12} sm={4}>
-                                        <Typography variant="caption" sx={{ color: colors.textSecondary, textTransform: 'uppercase', fontWeight: 600 }}>Amount</Typography>
-                                        <Typography variant="h6" sx={{ fontWeight: 700, color: colors.success, mt: 0.5 }}>
-                                            {reward.usdAmount} USDT
+                                    <Grid item xs={12} sm={6}>
+                                        <Typography variant="caption" sx={{ color: colors.textSecondary, textTransform: 'uppercase', fontWeight: 600 }}>Alternative Reward Type</Typography>
+                                        <Typography variant="h6" sx={{ fontWeight: 700, mt: 0.5 }}>
+                                            {reward.alternativeRewardType || 'Other Non-Cash Reward'}
                                         </Typography>
+                                    </Grid>
+                                    <Grid item xs={12} sm={6}>
+                                        <Typography variant="caption" sx={{ color: colors.textSecondary, textTransform: 'uppercase', fontWeight: 600 }}>Approval Status</Typography>
+                                        <Chip 
+                                            label={reward.alternativeApproved ? 'Approved' : 'Pending Approval'} 
+                                            size="small"
+                                            sx={{ 
+                                                bgcolor: reward.alternativeApproved ? '#E8F5E9' : '#FFF4E6',
+                                                color: reward.alternativeApproved ? '#2E7D32' : '#FF9800',
+                                                fontWeight: 700,
+                                                mt: 0.5
+                                            }} 
+                                        />
                                     </Grid>
                                     <Grid item xs={12}>
-                                        <Typography variant="caption" sx={{ color: colors.textSecondary, textTransform: 'uppercase', fontWeight: 600, mb: 1, display: 'block' }}>
-                                            Wallet Address
+                                        <Typography variant="caption" sx={{ color: colors.textSecondary, textTransform: 'uppercase', fontWeight: 600 }}>Amount (USD Equivalent)</Typography>
+                                        <Typography variant="h5" sx={{ fontWeight: 700, color: colors.success, mt: 0.5 }}>
+                                            ${reward.usdAmount}
                                         </Typography>
-                                        <Box sx={{ 
-                                            display: 'flex', 
-                                            alignItems: 'center', 
-                                            gap: 1, 
-                                            bgcolor: '#F9FAFB', 
-                                            p: 2, 
-                                            borderRadius: '8px', 
-                                            border: '1px solid #E5E7EB' 
-                                        }}>
-                                            <AccountBalanceWallet sx={{ fontSize: 20, color: colors.textSecondary, flexShrink: 0 }} />
-                                            <Typography 
-                                                variant="body2" 
-                                                sx={{ 
-                                                    fontFamily: 'monospace', 
-                                                    fontWeight: 600, 
-                                                    flex: 1, 
-                                                    wordBreak: 'break-all', 
-                                                    color: colors.brandBlack,
-                                                    fontSize: '14px'
-                                                }}
-                                            >
-                                                {reward.walletAddress || 'No address provided'}
-                                            </Typography>
-                                            <Tooltip title="Copy Address">
-                                                <IconButton 
-                                                    size="small" 
-                                                    onClick={handleCopyWalletAddress}
-                                                    sx={{ 
-                                                        bgcolor: colors.brandRed + '10',
-                                                        '&:hover': { bgcolor: colors.brandRed + '20' }
-                                                    }}
-                                                >
-                                                    <ContentCopy sx={{ fontSize: 16, color: colors.brandRed }} />
-                                                </IconButton>
-                                            </Tooltip>
-                                        </Box>
                                     </Grid>
+                                    {reward.alternativeReason && (
+                                        <Grid item xs={12}>
+                                            <Typography variant="caption" sx={{ color: colors.textSecondary, textTransform: 'uppercase', fontWeight: 600 }}>Reason for Alternative</Typography>
+                                            <Typography variant="body2" sx={{ mt: 0.5, color: colors.textSecondary }}>
+                                                {reward.alternativeReason}
+                                            </Typography>
+                                        </Grid>
+                                    )}
                                 </Grid>
                             ) : (
                                 <Grid container spacing={3}>
@@ -867,6 +988,46 @@ const RewardDetailsPage = () => {
                                             ${reward.usdAmount}
                                         </Typography>
                                     </Grid>
+                                    {reward.giftCardCode && (
+                                        <Grid item xs={12}>
+                                            <Typography variant="caption" sx={{ color: colors.textSecondary, textTransform: 'uppercase', fontWeight: 600, mb: 1, display: 'block' }}>Gift Card Code</Typography>
+                                            <Box sx={{ 
+                                                display: 'flex', 
+                                                alignItems: 'center', 
+                                                gap: 1, 
+                                                bgcolor: '#F9FAFB', 
+                                                p: 2, 
+                                                borderRadius: '8px', 
+                                                border: '1px solid #E5E7EB' 
+                                            }}>
+                                                <Typography 
+                                                    variant="body2" 
+                                                    sx={{ 
+                                                        fontFamily: 'monospace', 
+                                                        fontWeight: 600, 
+                                                        flex: 1, 
+                                                        wordBreak: 'break-all', 
+                                                        color: colors.brandBlack,
+                                                        fontSize: '14px'
+                                                    }}
+                                                >
+                                                    {reward.giftCardCode}
+                                                </Typography>
+                                                <Tooltip title="Copy Code">
+                                                    <IconButton 
+                                                        size="small" 
+                                                        onClick={() => navigator.clipboard.writeText(reward.giftCardCode)}
+                                                        sx={{ 
+                                                            bgcolor: colors.brandRed + '10',
+                                                            '&:hover': { bgcolor: colors.brandRed + '20' }
+                                                        }}
+                                                    >
+                                                        <ContentCopy sx={{ fontSize: 16, color: colors.brandRed }} />
+                                                    </IconButton>
+                                                </Tooltip>
+                                            </Box>
+                                        </Grid>
+                                    )}
                                 </Grid>
                             )}
                             <Box sx={{ 
@@ -945,7 +1106,7 @@ const RewardDetailsPage = () => {
                             }}>
                                 <Info sx={{ color: '#0369A1', fontSize: 18 }} />
                                 <Typography variant="caption" sx={{ color: '#0C4A6E', fontWeight: 500 }}>
-                                    Informational only • Does not affect reward approval or payout • No follow-ups in Phase 1
+                                    Informational only • Does not affect reward approval or fulfillment
                                 </Typography>
                             </Box>
                         </CardContent>
@@ -1033,7 +1194,7 @@ const RewardDetailsPage = () => {
                                 </Box>
                             )}
 
-                            {reward.status !== 'paid' && reward.status !== 'cancelled' ? (
+                            {reward.status !== 'fulfilled' && reward.status !== 'paid' && reward.status !== 'cancelled' ? (
                                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                                     <Button
                                         variant="contained"
@@ -1049,7 +1210,7 @@ const RewardDetailsPage = () => {
                                             textTransform: 'none'
                                         }}
                                     >
-                                        Mark as Paid
+                                        Mark as Fulfilled
                                     </Button>
                                     <Button
                                         variant="outlined"
@@ -1118,7 +1279,7 @@ const RewardDetailsPage = () => {
                                 placeholder="Add internal notes for audit purposes..."
                                 value={notes}
                                 onChange={(e) => setNotes(e.target.value)}
-                                disabled={reward.status === 'paid' || reward.status === 'cancelled'}
+                                disabled={reward.status === 'fulfilled' || reward.status === 'paid' || reward.status === 'cancelled'}
                                 sx={{ 
                                     mb: 2,
                                     '& .MuiOutlinedInput-root': {
@@ -1129,7 +1290,8 @@ const RewardDetailsPage = () => {
                             <Button 
                                 variant="contained" 
                                 size="small" 
-                                disabled={reward.status === 'paid' || reward.status === 'cancelled'}
+                                onClick={handleSaveNotes}
+                                disabled={reward.status === 'fulfilled' || reward.status === 'paid' || reward.status === 'cancelled'}
                                 sx={{
                                     bgcolor: colors.brandRed,
                                     '&:hover': { bgcolor: colors.brandDarkRed },
@@ -1140,7 +1302,7 @@ const RewardDetailsPage = () => {
                             >
                                 Save Notes
                             </Button>
-                            {(reward.status === 'paid' || reward.status === 'cancelled') && (
+                            {(reward.status === 'fulfilled' || reward.status === 'paid' || reward.status === 'cancelled') && (
                                 <Typography variant="caption" sx={{ color: colors.textSecondary, display: 'block', mt: 1 }}>
                                     Notes are locked once reward is {reward.status}
                                 </Typography>
@@ -1231,12 +1393,12 @@ const RewardDetailsPage = () => {
 
             <Dialog open={confirmPaidDialogOpen} onClose={() => setConfirmPaidDialogOpen(false)}>
                 <DialogContent>
-                    <Typography variant="h6" sx={{ mb: 2 }}>Confirm Payment</Typography>
-                    <Typography>Are you sure you want to mark this reward as PAID? This action cannot be undone.</Typography>
+                    <Typography variant="h6" sx={{ mb: 2 }}>Confirm Fulfillment</Typography>
+                    <Typography>Are you sure you want to mark this reward as FULFILLED? This action cannot be undone.</Typography>
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={() => setConfirmPaidDialogOpen(false)}>Cancel</Button>
-                    <Button variant="contained" color="success" onClick={handleMarkPaid}>Confirm Paid</Button>
+                    <Button variant="contained" color="success" onClick={handleMarkFulfilled}>Confirm Fulfilled</Button>
                 </DialogActions>
             </Dialog>
 

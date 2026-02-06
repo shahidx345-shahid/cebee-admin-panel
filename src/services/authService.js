@@ -14,7 +14,7 @@ import { saveAuthToken, removeAuthToken, getStoredSession } from './apiBase';
  */
 export const login = async (email, password) => {
   try {
-    const response = await apiPost('/auth/login', { email, password });
+    const response = await apiPost('/admin/login', { email, password });
 
     if (response.success && response.data?.user) {
       // Check if user is admin

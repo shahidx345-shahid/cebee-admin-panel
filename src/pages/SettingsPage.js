@@ -41,6 +41,7 @@ import {
 } from '@mui/icons-material';
 import { colors, constants } from '../config/theme';
 import { format } from 'date-fns';
+import apiService from '../services/apiService';
 
 const MAINTENANCE_DEFAULTS = {
   defaultTitle: 'Under Maintenance',
@@ -78,21 +79,89 @@ const SettingsPage = () => {
   const [maintenanceDialogOpen, setMaintenanceDialogOpen] = useState(false);
   const [isSuperAdmin, setIsSuperAdmin] = useState(true);
   const [isCheckingUpdates, setIsCheckingUpdates] = useState(false);
+  const [error, setError] = useState(null);
+  const [saveError, setSaveError] = useState(null);
+
+  // Helper function to map backend format to frontend format
+  const mapBackendToFrontend = useCallback((backendSettings) => {
+    if (!backendSettings) return null;
+
+    // Map date format: 'DD/MM/YYYY' -> 'ddMmYyyy', etc.
+    const dateFormatMap = {
+      'DD/MM/YYYY': 'ddMmYyyy',
+      'MM/DD/YYYY': 'mmDdYyyy',
+      'YYYY-MM-DD': 'yyyyMmDd',
+      'DD-MM-YYYY': 'ddMmYyyyDash', // Separate value for DD-MM-YYYY
+    };
+
+    // Map time format: '12-hour (AM/PM)' -> 'hour12', '24-hour' -> 'hour24'
+    const timeFormatMap = {
+      '12-hour (AM/PM)': 'hour12',
+      '24-hour': 'hour24',
+    };
+
+    return {
+      platformStatus: backendSettings.platformStatus || 'online',
+      appName: backendSettings.appName || 'CeBee Predict',
+      maintenanceTitle: backendSettings.maintenanceMessage?.title || MAINTENANCE_DEFAULTS.defaultTitle,
+      maintenanceMessage: backendSettings.maintenanceMessage?.body || MAINTENANCE_DEFAULTS.defaultMessage,
+      maintenanceStartedAt: null, // Not stored in backend
+      maintenanceStartedBy: null, // Not stored in backend
+      dateFormat: dateFormatMap[backendSettings.dateFormat] || 'ddMmYyyy',
+      timeFormat: timeFormatMap[backendSettings.timeFormat] || 'hour12',
+      androidAppVersion: backendSettings.appVersions?.android || '1.0.0',
+      iosAppVersion: backendSettings.appVersions?.ios || '1.0.0',
+      releaseNotes: backendSettings.releaseNotes || '',
+      lastVersionUpdate: backendSettings.releaseNotesUpdatedAt ? new Date(backendSettings.releaseNotesUpdatedAt) : null,
+      displayTimezone: backendSettings.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+    };
+  }, []);
+
+  // Helper function to map frontend format to backend format
+  const mapFrontendToBackend = useCallback((frontendSettings) => {
+    // Map date format: 'ddMmYyyy' -> 'DD/MM/YYYY', etc.
+    const dateFormatMap = {
+      'ddMmYyyy': 'DD/MM/YYYY',
+      'mmDdYyyy': 'MM/DD/YYYY',
+      'yyyyMmDd': 'YYYY-MM-DD',
+      'ddMmYyyyDash': 'DD-MM-YYYY', // Maps to DD-MM-YYYY
+    };
+
+    // Map time format: 'hour12' -> '12-hour (AM/PM)', 'hour24' -> '24-hour'
+    const timeFormatMap = {
+      'hour12': '12-hour (AM/PM)',
+      'hour24': '24-hour',
+    };
+
+    return {
+      dateFormat: dateFormatMap[frontendSettings.dateFormat] || 'DD/MM/YYYY',
+      timeFormat: timeFormatMap[frontendSettings.timeFormat] || '12-hour (AM/PM)',
+    };
+  }, []);
 
   const loadSettings = useCallback(async () => {
     try {
       setLoading(true);
-      // Simulating network delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-
-      // Data is already in initial state, no need to set anything
-      // This prevents unnecessary re-renders
+      setError(null);
+      
+      const response = await apiService.getSettings();
+      
+      if (response.success && response.data) {
+        const mappedSettings = mapBackendToFrontend(response.data);
+        if (mappedSettings) {
+          setSettings(mappedSettings);
+        }
+      } else {
+        setError(response.error || 'Failed to load settings');
+        console.error('Error loading settings:', response.error);
+      }
     } catch (error) {
       console.error('Error loading settings:', error);
+      setError(error.message || 'Failed to load settings');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [mapBackendToFrontend]);
 
   useEffect(() => {
     loadSettings();
@@ -109,71 +178,181 @@ const SettingsPage = () => {
 
   const performSave = useCallback(async () => {
     try {
-      // Mock save operation
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      setSaveError(null);
+      setLoading(true);
 
+      // Save all settings in parallel
+      const promises = [];
+
+      // 1. Save platform status if changed
+      promises.push(
+        apiService.updatePlatformStatus(settings.platformStatus)
+      );
+
+      // 2. Save maintenance message if changed
+      promises.push(
+        apiService.updateMaintenanceMessage({
+          title: settings.maintenanceTitle,
+          body: settings.maintenanceMessage,
+        })
+      );
+
+      // 3. Save general settings (appName, dateFormat, timeFormat)
+      const backendFormats = mapFrontendToBackend(settings);
+      promises.push(
+        apiService.updateGeneralSettings({
+          appName: settings.appName,
+          dateFormat: backendFormats.dateFormat,
+          timeFormat: backendFormats.timeFormat,
+        })
+      );
+
+      // 4. Save timezone if changed
+      promises.push(
+        apiService.updateTimezone(settings.displayTimezone || 'UTC')
+      );
+
+      // 5. Save app versions if changed
+      promises.push(
+        apiService.updateAppVersions({
+          ios: settings.iosAppVersion,
+          android: settings.androidAppVersion,
+        })
+      );
+
+      // 6. Save release notes if changed
+      if (settings.releaseNotes) {
+        promises.push(
+          apiService.updateReleaseNotes(settings.releaseNotes)
+        );
+      }
+
+      // Execute all updates
+      const results = await Promise.allSettled(promises);
+      
+      // Check for any failures
+      const failures = results.filter(r => r.status === 'rejected' || (r.value && !r.value.success));
+      
+      if (failures.length > 0) {
+        const errorMessages = failures
+          .map(r => r.status === 'rejected' ? r.reason?.message : r.value?.error)
+          .filter(Boolean)
+          .join(', ');
+        throw new Error(`Some settings failed to save: ${errorMessages}`);
+      }
+
+      // Reload settings to get the latest from backend
+      await loadSettings();
+      
       setHasUnsavedChanges(false);
       setSaveDialogOpen(false);
-      alert('Settings saved successfully! (Local Mock)');
+      
+      // Show success message
+      alert('Settings saved successfully!');
     } catch (error) {
       console.error('Error saving settings:', error);
-      alert('Failed to save settings');
+      setSaveError(error.message || 'Failed to save settings');
+      alert(`Failed to save settings: ${error.message || 'Unknown error'}`);
+    } finally {
+      setLoading(false);
     }
-  }, []);
+  }, [settings, mapFrontendToBackend, loadSettings]);
 
   const handleToggleMaintenance = useCallback(() => {
     setMaintenanceDialogOpen(true);
   }, []);
 
   const performToggleMaintenance = useCallback(async () => {
-    setSettings(prev => {
-      const isEnablingMaintenance = prev.platformStatus === 'online';
+    try {
+      setLoading(true);
+      setError(null);
+
+      const isEnablingMaintenance = settings.platformStatus === 'online';
       const newStatus = isEnablingMaintenance ? 'maintenance' : 'online';
 
-      const updatedSettings = {
-        ...prev,
-        platformStatus: newStatus,
-      };
+      const response = await apiService.updatePlatformStatus(newStatus);
 
-      if (isEnablingMaintenance) {
-        updatedSettings.maintenanceStartedAt = new Date();
-        updatedSettings.maintenanceStartedBy = 'Admin';
-      } else {
-        updatedSettings.maintenanceStartedAt = null;
-        updatedSettings.maintenanceStartedBy = null;
-      }
+      if (response.success) {
+        // Update local state
+        setSettings(prev => {
+          const updatedSettings = {
+            ...prev,
+            platformStatus: newStatus,
+          };
 
-      // Mock System Log
-      console.log(`[SYSTEM LOG] Maintenance mode ${isEnablingMaintenance ? 'ENABLED' : 'DISABLED'} by Super Admin at ${new Date().toISOString()}`);
+          if (isEnablingMaintenance) {
+            updatedSettings.maintenanceStartedAt = new Date();
+            updatedSettings.maintenanceStartedBy = 'Admin';
+          } else {
+            updatedSettings.maintenanceStartedAt = null;
+            updatedSettings.maintenanceStartedBy = null;
+          }
 
-      setTimeout(() => {
+          return updatedSettings;
+        });
+
+        setMaintenanceDialogOpen(false);
+        setHasUnsavedChanges(false);
+        
+        // Show success message
         alert(isEnablingMaintenance ? 'Maintenance mode enabled' : 'Platform is now online');
-      }, 0);
-
-      return updatedSettings;
-    });
-    
-    setHasUnsavedChanges(true);
-    setMaintenanceDialogOpen(false);
-  }, []);
+      } else {
+        throw new Error(response.error || 'Failed to update platform status');
+      }
+    } catch (error) {
+      console.error('Error toggling maintenance mode:', error);
+      setError(error.message || 'Failed to toggle maintenance mode');
+      alert(`Failed to ${settings.platformStatus === 'online' ? 'enable' : 'disable'} maintenance mode: ${error.message || 'Unknown error'}`);
+    } finally {
+      setLoading(false);
+    }
+  }, [settings.platformStatus]);
 
   const handleReset = useCallback(() => {
     setResetDialogOpen(true);
   }, []);
 
-  const performReset = useCallback(() => {
-    // Reset Button Scope: Only affects date format, time format, and timezone handling
-    // Platform status, app name, and maintenance message are NOT reset
-    setSettings(prev => ({
-      ...prev,
-      dateFormat: 'ddMmYyyy',
-      timeFormat: 'hour12',
-      displayTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    }));
-    setHasUnsavedChanges(true);
-    setResetDialogOpen(false);
-    console.log(`[SYSTEM LOG] Date/Time settings reset to defaults by Super Admin at ${new Date().toISOString()}`);
-    alert('Date/Time settings reset to defaults (logged)');
+  const performReset = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Reset Button Scope: Only affects date format, time format, and timezone handling
+      // Platform status, app name, and maintenance message are NOT reset
+      const defaultTimezone = 'UTC';
+      const defaultDateFormat = 'DD/MM/YYYY';
+      const defaultTimeFormat = '12-hour (AM/PM)';
+
+      // Update general settings (date format and time format)
+      const generalResponse = await apiService.updateGeneralSettings({
+        dateFormat: defaultDateFormat,
+        timeFormat: defaultTimeFormat,
+      });
+
+      // Update timezone
+      const timezoneResponse = await apiService.updateTimezone(defaultTimezone);
+
+      if (generalResponse.success && timezoneResponse.success) {
+        // Update local state
+        setSettings(prev => ({
+          ...prev,
+          dateFormat: 'ddMmYyyy',
+          timeFormat: 'hour12',
+          displayTimezone: defaultTimezone,
+        }));
+        setHasUnsavedChanges(false);
+        setResetDialogOpen(false);
+        alert('Date/Time settings reset to defaults');
+      } else {
+        throw new Error(generalResponse.error || timezoneResponse.error || 'Failed to reset settings');
+      }
+    } catch (error) {
+      console.error('Error resetting settings:', error);
+      setError(error.message || 'Failed to reset settings');
+      alert(`Failed to reset settings: ${error.message || 'Unknown error'}`);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   const handleResetMaintenanceMessage = useCallback(() => {
@@ -405,6 +584,32 @@ const SettingsPage = () => {
           </Button>
         </Box>
       </Box>
+
+      {/* Error Alert */}
+      {error && (
+        <Alert
+          severity="error"
+          onClose={() => setError(null)}
+          sx={{ mb: 3, borderRadius: '12px' }}
+        >
+          <Typography sx={{ fontWeight: 600, fontSize: 14 }}>
+            {error}
+          </Typography>
+        </Alert>
+      )}
+
+      {/* Save Error Alert */}
+      {saveError && (
+        <Alert
+          severity="error"
+          onClose={() => setSaveError(null)}
+          sx={{ mb: 3, borderRadius: '12px' }}
+        >
+          <Typography sx={{ fontWeight: 600, fontSize: 14 }}>
+            {saveError}
+          </Typography>
+        </Alert>
+      )}
 
       {/* Unsaved Changes Alert */}
       {hasUnsavedChanges && (
@@ -826,6 +1031,7 @@ const SettingsPage = () => {
               <MenuItem value="ddMmYyyy">DD/MM/YYYY</MenuItem>
               <MenuItem value="mmDdYyyy">MM/DD/YYYY</MenuItem>
               <MenuItem value="yyyyMmDd">YYYY-MM-DD</MenuItem>
+              <MenuItem value="ddMmYyyyDash">DD-MM-YYYY</MenuItem>
             </Select>
           </FormControl>
         </Box>
@@ -886,12 +1092,16 @@ const SettingsPage = () => {
           <TextField
             fullWidth
             value={settings.displayTimezone || 'UTC'}
-            disabled
-            helperText="System Default (UTC) - Auto-detected from user device on client-side"
+            onChange={(e) => handleChange('displayTimezone', e.target.value)}
+            placeholder="UTC"
+            helperText="Default timezone for the platform (e.g., UTC, Asia/Karachi)"
             sx={{
               '& .MuiOutlinedInput-root': {
                 borderRadius: '12px',
-                backgroundColor: '#F3F4F6'
+                backgroundColor: 'white',
+                '& fieldset': { borderColor: '#E9D5FF' },
+                '&:hover fieldset': { borderColor: '#C084FC' },
+                '&.Mui-focused fieldset': { borderColor: '#9333EA' },
               }
             }}
           />
@@ -1037,36 +1247,19 @@ const SettingsPage = () => {
                 Release Notes
               </Typography>
             </Box>
-            <Typography variant="caption" sx={{ color: colors.textSecondary }}>
-              Updated: {format(new Date('2026-01-18'), 'MMM dd, yyyy')}
-            </Typography>
+            {settings.lastVersionUpdate && (
+              <Typography variant="caption" sx={{ color: colors.textSecondary }}>
+                Updated: {format(new Date(settings.lastVersionUpdate), 'MMM dd, yyyy')}
+              </Typography>
+            )}
           </Box>
-          <Typography variant="caption" sx={{ display: 'block', mb: 1, color: colors.info, fontWeight: 500 }}>
-            Display only. Managed in Content & App Updates.
-          </Typography>
-          <Box
-            sx={{
-              padding: 3,
-              backgroundColor: '#F9FAFB', // Neutral Gray Background
-              borderRadius: '12px',
-              border: '1px solid #E5E7EB', // Neutral Gray Border
-              maxHeight: '300px',
-              overflowY: 'auto',
-              '&::-webkit-scrollbar': {
-                width: '6px',
-              },
-              '&::-webkit-scrollbar-track': {
-                background: 'transparent',
-              },
-              '&::-webkit-scrollbar-thumb': {
-                background: '#FCA5A5',
-                borderRadius: '3px',
-              },
-            }}
-          >
-            <Typography variant="body2" component="div" sx={{ color: colors.textSecondary, fontSize: 14, whiteSpace: 'pre-line' }}>
-              {settings.releaseNotes ? settings.releaseNotes :
-                `### Version 1.2.3 - Released on Jan 15, 2025
+          <TextField
+            fullWidth
+            multiline
+            rows={8}
+            value={settings.releaseNotes || ''}
+            onChange={(e) => handleChange('releaseNotes', e.target.value)}
+            placeholder="### Version 1.2.3 - Released on Jan 15, 2025
 
 **New Features:**
 - Enhanced prediction interface
@@ -1074,9 +1267,18 @@ const SettingsPage = () => {
 - New notification system
 
 **Bug Fixes:**
-- Fixed SP calculation edge cases`}
-            </Typography>
-          </Box>
+- Fixed SP calculation edge cases"
+            helperText="Markdown supported. Release notes displayed to users."
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                borderRadius: '12px',
+                backgroundColor: 'white',
+                '& fieldset': { borderColor: '#FECACA' },
+                '&:hover fieldset': { borderColor: '#FCA5A5' },
+                '&.Mui-focused fieldset': { borderColor: '#EF4444' },
+              }
+            }}
+          />
         </Box>
 
         <Button

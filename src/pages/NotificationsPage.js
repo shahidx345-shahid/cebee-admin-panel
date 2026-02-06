@@ -11,6 +11,9 @@ import {
   Menu,
   IconButton,
   Dialog,
+  CircularProgress,
+  Alert,
+  Snackbar,
 } from '@mui/material';
 import {
   Add,
@@ -40,198 +43,15 @@ import {
 import { colors } from '../config/theme';
 import DataTable from '../components/common/DataTable';
 import { format } from 'date-fns';
-
-// Static notifications data
-const staticNotifications = [
-  {
-    id: '1',
-    title: 'Welcome to CeBee Predict System',
-    body: 'Start making predictions and win rewards!',
-    type: 'Important Announcement',
-    audience: 'All Users',
-    status: 'sent',
-    sentCount: 15420,
-    deliveredCount: 15230,
-    openedCount: 8945,
-    openedPercentage: 58.7,
-    creator: 'ADMIN_001',
-    createdAt: new Date('2026-01-22T11:51:00'),
-    scheduledTime: null,
-  },
-  {
-    id: '2',
-    title: 'New Poll: Who Will Win the Title?',
-    body: 'Cast your vote for the league winner!',
-    type: 'New Poll Available',
-    audience: 'All Users',
-    status: 'sent',
-    sentCount: 15420,
-    deliveredCount: 15230,
-    openedCount: 8945,
-    openedPercentage: 58.7,
-    creator: 'ADMIN_001',
-    createdAt: new Date('2026-01-22T08:51:00'),
-    scheduledTime: null,
-  },
-  {
-    id: '3',
-    title: 'Poll Closing in 1 Hour!',
-    body: 'Last chance to vote on the current poll',
-    type: 'Poll Ending Soon',
-    audience: 'Active Users (30 days)',
-    status: 'sent',
-    sentCount: 8750,
-    deliveredCount: 8640,
-    openedCount: 6238,
-    openedPercentage: 72.2,
-    creator: 'ADMIN_001',
-    createdAt: new Date('2026-01-22T05:51:00'),
-    scheduledTime: null,
-  },
-  {
-    id: '4',
-    title: 'Your Reward Has Been Sent!',
-    body: 'Congratulations! Your reward has been processed.',
-    type: 'Reward Processed',
-    audience: 'Winners',
-    status: 'sent',
-    sentCount: 1,
-    deliveredCount: 1,
-    openedCount: 1,
-    openedPercentage: 100.0,
-    creator: 'ADMIN_001',
-    createdAt: new Date('2026-01-21T13:51:00'),
-    scheduledTime: null,
-  },
-  {
-    id: '5',
-    title: 'Premier League Matchday Info',
-    body: 'New matchday fixtures are now available',
-    type: 'New Matchday Available',
-    audience: 'All Users',
-    status: 'sent',
-    sentCount: 16230,
-    deliveredCount: 16010,
-    openedCount: 11527,
-    openedPercentage: 72.0,
-    creator: 'ADMIN_001',
-    createdAt: new Date('2026-01-21T13:51:00'),
-    scheduledTime: null,
-  },
-  {
-    id: '6',
-    title: 'Poll Results: Player of the Month',
-    body: 'The results are in! See who won.',
-    type: 'Poll Results Announced',
-    audience: 'All Users',
-    status: 'sent',
-    sentCount: 14500,
-    deliveredCount: 14200,
-    openedCount: 9798,
-    openedPercentage: 69.0,
-    creator: 'ADMIN_002',
-    createdAt: new Date('2026-01-21T08:51:00'),
-    scheduledTime: null,
-  },
-  {
-    id: '7',
-    title: 'Predictions Closing Soon!',
-    body: 'Submit your predictions before time runs out',
-    type: 'Prediction Reminder',
-    audience: 'Active Users (30 days)',
-    status: 'sent',
-    sentCount: 9500,
-    deliveredCount: 9380,
-    openedCount: 7234,
-    openedPercentage: 77.1,
-    creator: 'ADMIN_002',
-    createdAt: new Date('2026-01-20T13:51:00'),
-    scheduledTime: null,
-  },
-  {
-    id: '8',
-    title: "You're Now in the Top 100!",
-    body: 'Congratulations on reaching the top 100 leaderboard!',
-    type: 'Leaderboard Update',
-    audience: 'Active Users (30 days)',
-    status: 'sent',
-    sentCount: 150,
-    deliveredCount: 148,
-    openedCount: 142,
-    openedPercentage: 95.9,
-    creator: 'ADMIN_001',
-    createdAt: new Date('2026-01-20T10:51:00'),
-    scheduledTime: null,
-  },
-  {
-    id: '9',
-    title: 'Match Results Are In!',
-    body: 'Check out the latest match results and standings',
-    type: 'Match Ended',
-    audience: 'Active Users (30 days)',
-    status: 'sent',
-    sentCount: 8200,
-    deliveredCount: 8100,
-    openedCount: 6496,
-    openedPercentage: 80.2,
-    creator: 'ADMIN_001',
-    createdAt: new Date('2026-01-19T13:51:00'),
-    scheduledTime: null,
-  },
-  {
-    id: '10',
-    title: 'Your November Reward is Approved',
-    body: 'Your reward for November has been approved and will be sent soon',
-    type: 'Reward Approved',
-    audience: 'Winners',
-    status: 'sent',
-    sentCount: 1,
-    deliveredCount: 1,
-    openedCount: 1,
-    openedPercentage: 100.0,
-    creator: 'ADMIN_001',
-    createdAt: new Date('2026-01-19T12:51:00'),
-    scheduledTime: null,
-  },
-  {
-    id: '11',
-    title: 'System Maintenance Notice',
-    body: 'Scheduled maintenance on Sunday 2AM-4AM',
-    type: 'System Update',
-    audience: 'All Users',
-    status: 'sent',
-    sentCount: 16230,
-    deliveredCount: 16100,
-    openedCount: 7986,
-    openedPercentage: 49.6,
-    creator: 'ADMIN_001',
-    createdAt: new Date('2026-01-19T10:00:00'),
-    scheduledTime: null,
-  },
-  {
-    id: '12',
-    title: 'Referral Bonus Unlocked',
-    body: 'You earned 500 SP for referring friends!',
-    type: 'Referral Reward',
-    audience: 'Winners',
-    status: 'sent',
-    sentCount: 89,
-    deliveredCount: 89,
-    openedCount: 86,
-    openedPercentage: 96.6,
-    creator: 'ADMIN_001',
-    createdAt: new Date('2026-01-18T15:45:00'),
-    scheduledTime: null,
-  },
-];
+import { getNotifications, getNotificationStatistics } from '../services/notificationsService';
 
 const NotificationsPage = () => {
   const navigate = useNavigate();
-  const [notifications] = useState(staticNotifications);
-  const [filteredNotifications, setFilteredNotifications] = useState(staticNotifications);
-  const [loading] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [filteredNotifications, setFilteredNotifications] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState('sent');
+  const [selectedStatus, setSelectedStatus] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
   const [audienceFilter, setAudienceFilter] = useState('all');
   const [selectedSort, setSelectedSort] = useState('dateNewest');
@@ -243,6 +63,121 @@ const NotificationsPage = () => {
   const [activeRow, setActiveRow] = useState(null);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [selectedNotification, setSelectedNotification] = useState(null);
+  const [error, setError] = useState(null);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
+  const [statistics, setStatistics] = useState({
+    totalSent: 0,
+    totalDelivered: 0,
+    totalOpened: 0,
+    scheduledCount: 0,
+    deliveredRate: 0,
+    openedRate: 0,
+  });
+  const [pagination, setPagination] = useState({
+    page: 0,
+    limit: 10,
+    total: 0,
+    totalPages: 0,
+  });
+
+  // Load notifications from API
+  useEffect(() => {
+    loadNotifications();
+    loadStatistics();
+  }, [page, rowsPerPage, selectedStatus, typeFilter, audienceFilter, selectedSort]);
+
+  const loadNotifications = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const params = {
+        page: page,
+        limit: rowsPerPage,
+        status: selectedStatus !== 'all' ? selectedStatus : undefined,
+        type: typeFilter !== 'all' ? typeFilter : undefined,
+        audience: audienceFilter !== 'all' ? audienceFilter : undefined,
+        search: searchQuery || undefined,
+        sort: selectedSort,
+      };
+
+      // Remove undefined params
+      Object.keys(params).forEach(key => params[key] === undefined && delete params[key]);
+
+      const response = await getNotifications(params);
+
+      if (response.success && response.data) {
+        const notificationsData = response.data.notifications || [];
+        setNotifications(notificationsData);
+        setFilteredNotifications(notificationsData);
+        
+        if (response.data.pagination) {
+          setPagination({
+            page: (response.data.pagination.page || 1) - 1, // Convert to 0-based
+            limit: response.data.pagination.limit || rowsPerPage,
+            total: response.data.pagination.total || 0,
+            totalPages: response.data.pagination.pages || response.data.pagination.totalPages || 0,
+          });
+        } else {
+          // If no pagination, set defaults
+          setPagination({
+            page: 0,
+            limit: rowsPerPage,
+            total: notificationsData.length,
+            totalPages: Math.ceil(notificationsData.length / rowsPerPage),
+          });
+        }
+      } else {
+        setError(response.error || response.message || 'Failed to load notifications');
+        setNotifications([]);
+        setFilteredNotifications([]);
+        setPagination({
+          page: 0,
+          limit: rowsPerPage,
+          total: 0,
+          totalPages: 0,
+        });
+      }
+    } catch (err) {
+      setError(err.message || 'An error occurred while loading notifications');
+      setNotifications([]);
+      setFilteredNotifications([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadStatistics = async () => {
+    try {
+      const response = await getNotificationStatistics();
+      if (response.success && response.data) {
+        // Backend returns statistics as objects with value and trend
+        setStatistics({
+          totalSent: response.data.totalSent?.value || 0,
+          totalDelivered: response.data.delivered?.value || 0,
+          totalOpened: response.data.opened?.value || 0,
+          scheduledCount: response.data.scheduled?.value || 0,
+          deliveredRate: 0, // Calculate from data if needed
+          openedRate: 0, // Calculate from data if needed
+        });
+      }
+    } catch (err) {
+      console.error('Failed to load statistics:', err);
+    }
+  };
+
+  // Handle search with debounce
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (page === 0) {
+        loadNotifications();
+      } else {
+        setPage(0);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
 
   const handleRowClick = (notification) => {
     setSelectedNotification(notification);
@@ -254,78 +189,85 @@ const NotificationsPage = () => {
     setSelectedNotification(null);
   };
 
-  // Calculate stats from static data
-  const totalSent = staticNotifications.reduce((sum, notif) => sum + (notif.sentCount || 0), 0);
-  const totalDelivered = staticNotifications.reduce((sum, notif) => sum + (notif.deliveredCount || 0), 0);
-  const totalOpened = staticNotifications.reduce((sum, notif) => sum + (notif.openedCount || 0), 0);
-  const scheduledCount = staticNotifications.filter(n => n.status === 'scheduled').length;
+  const handleStatusChange = (status) => {
+    setSelectedStatus(status);
+    setPage(0);
+  };
+
+  const handleCloseSnackbar = () => {
+    setSnackbar({ ...snackbar, open: false });
+  };
+
+  // Calculate stats from loaded data
+  const totalSent = statistics.totalSent || notifications.reduce((sum, notif) => sum + (notif.sentCount || notif.totalSent || 0), 0);
+  const totalDelivered = statistics.totalDelivered || notifications.reduce((sum, notif) => sum + (notif.deliveredCount || 0), 0);
+  const totalOpened = statistics.totalOpened || notifications.reduce((sum, notif) => sum + (notif.openedCount || 0), 0);
+  const scheduledCount = statistics.scheduledCount || notifications.filter(n => (n.status || n.notificationStatus) === 'scheduled').length;
 
   const deliveredRate = totalSent > 0 ? ((totalDelivered / totalSent) * 100).toFixed(1) : '0.0';
   const openedRate = totalDelivered > 0 ? ((totalOpened / totalDelivered) * 100).toFixed(1) : '0.0';
 
+  // Filter and sort notifications (client-side filtering for now, can be moved to backend)
   useEffect(() => {
-    const filterAndSortNotifications = () => {
-      let filtered = [...notifications];
+    let filtered = [...notifications];
 
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase();
-        filtered = filtered.filter(
-          (notif) =>
-            notif.title?.toLowerCase().includes(query) ||
-            notif.body?.toLowerCase().includes(query) ||
-            notif.id?.toLowerCase().includes(query)
-        );
-      }
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (notif) =>
+          notif.title?.toLowerCase().includes(query) ||
+          notif.body?.toLowerCase().includes(query) ||
+          notif.id?.toLowerCase().includes(query)
+      );
+    }
 
-      if (selectedStatus !== 'all') {
-        filtered = filtered.filter((notif) => {
-          const status = notif.status || notif.notificationStatus;
-          return status === selectedStatus;
+    if (selectedStatus !== 'all') {
+      filtered = filtered.filter((notif) => {
+        const status = notif.status || notif.notificationStatus;
+        return status === selectedStatus;
+      });
+    }
+
+    if (typeFilter !== 'all') {
+      filtered = filtered.filter((notif) => notif.type === typeFilter);
+    }
+
+    if (audienceFilter !== 'all') {
+      filtered = filtered.filter((notif) => notif.audience === audienceFilter);
+    }
+
+    switch (selectedSort) {
+      case 'dateNewest':
+        filtered.sort((a, b) => {
+          const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
+          const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+          return dateB - dateA;
         });
-      }
+        break;
+      case 'dateOldest':
+        filtered.sort((a, b) => {
+          const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
+          const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+          return dateA - dateB;
+        });
+        break;
+      case 'titleAZ':
+        filtered.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+        break;
+      case 'titleZA':
+        filtered.sort((a, b) => (b.title || '').localeCompare(a.title || ''));
+        break;
+      case 'openRateHighest':
+        filtered.sort((a, b) => (b.openedPercentage || 0) - (a.openedPercentage || 0));
+        break;
+      case 'openRateLowest':
+        filtered.sort((a, b) => (a.openedPercentage || 0) - (b.openedPercentage || 0));
+        break;
+      default:
+        break;
+    }
 
-      if (typeFilter !== 'all') {
-        filtered = filtered.filter((notif) => notif.type === typeFilter);
-      }
-
-      if (audienceFilter !== 'all') {
-        filtered = filtered.filter((notif) => notif.audience === audienceFilter);
-      }
-
-      switch (selectedSort) {
-        case 'dateNewest':
-          filtered.sort((a, b) => {
-            const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
-            const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
-            return dateB - dateA;
-          });
-          break;
-        case 'dateOldest':
-          filtered.sort((a, b) => {
-            const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
-            const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
-            return dateA - dateB;
-          });
-          break;
-        case 'titleAZ':
-          filtered.sort((a, b) => (a.title || '').localeCompare(b.title || ''));
-          break;
-        case 'titleZA':
-          filtered.sort((a, b) => (b.title || '').localeCompare(a.title || ''));
-          break;
-        case 'openRateHighest':
-          filtered.sort((a, b) => (b.openedPercentage || 0) - (a.openedPercentage || 0));
-          break;
-        case 'openRateLowest':
-          filtered.sort((a, b) => (a.openedPercentage || 0) - (b.openedPercentage || 0));
-          break;
-        default:
-          break;
-      }
-
-      setFilteredNotifications(filtered);
-    };
-    filterAndSortNotifications();
+    setFilteredNotifications(filtered);
   }, [notifications, searchQuery, selectedStatus, typeFilter, audienceFilter, selectedSort]);
 
 
@@ -412,7 +354,7 @@ const NotificationsPage = () => {
       label: 'Creator',
       render: (_, row) => (
         <Typography variant="body2" sx={{ fontWeight: 500, fontSize: 13 }}>
-          {row.creator || row.createdBy || 'ADMIN_001'}
+          {row.creator?.username || row.creator?.fullName || row.createdBy?.username || row.createdBy?.fullName || row.createdBy || 'ADMIN_001'}
         </Typography>
       ),
     },
@@ -470,12 +412,12 @@ const NotificationsPage = () => {
     },
   ];
 
-  const paginatedNotifications = filteredNotifications.slice(
-    page * rowsPerPage,
-    page * rowsPerPage + rowsPerPage
-  );
-
   const statusTabs = [
+    {
+      value: 'all',
+      label: 'All',
+      count: notifications.length,
+    },
     {
       value: 'sent',
       label: 'Sent',
@@ -498,9 +440,35 @@ const NotificationsPage = () => {
     },
   ];
 
+  const paginatedNotifications = filteredNotifications.slice(
+    page * rowsPerPage,
+    page * rowsPerPage + rowsPerPage
+  );
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%' }}>
+      {/* Error Alert */}
+      {error && (
+        <Alert 
+          severity="error" 
+          onClose={() => setError(null)}
+          sx={{ mb: 3, borderRadius: '12px' }}
+        >
+          {error}
+        </Alert>
+      )}
+
+      {/* Snackbar for success messages */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+      >
+        <Alert onClose={handleCloseSnackbar} severity={snackbar.severity} sx={{ width: '100%' }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
       {!detailsDialogOpen ? (
         <>
           {/* Stats Cards */}
@@ -731,10 +699,11 @@ const NotificationsPage = () => {
               { id: 'failed', label: 'Failed', icon: <Error />, color: '#EF4444', bgColor: '#EF4444' },
             ].map((item) => {
               const isSelected = selectedStatus === item.id;
+              const tabData = statusTabs.find(t => t.value === item.id);
               return (
                 <Button
                   key={item.id}
-                  onClick={() => setSelectedStatus(item.id)}
+                  onClick={() => handleStatusChange(item.id)}
                   disableRipple
                   sx={{
                     flex: { xs: '0 0 auto', sm: '0 0 auto', md: 1 },
@@ -784,6 +753,20 @@ const NotificationsPage = () => {
                       }}
                     >
                       {item.label}
+                      {tabData && tabData.count > 0 && (
+                        <Chip
+                          label={tabData.count}
+                          size="small"
+                          sx={{
+                            ml: 1,
+                            height: 20,
+                            fontSize: 11,
+                            fontWeight: 600,
+                            backgroundColor: isSelected ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.1)',
+                            color: isSelected ? colors.brandWhite : colors.brandBlack,
+                          }}
+                        />
+                      )}
                     </Box>
                   </Box>
                 </Button>
@@ -1035,21 +1018,28 @@ const NotificationsPage = () => {
           </Card>
 
           {/* Data Table */}
+          {loading && notifications.length === 0 ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
+              <CircularProgress sx={{ color: colors.brandRed }} />
+            </Box>
+          ) : (
           <DataTable
             columns={columns}
             data={paginatedNotifications}
             loading={loading}
             page={page}
             rowsPerPage={rowsPerPage}
-            totalCount={filteredNotifications.length}
+              totalCount={pagination.total || filteredNotifications.length}
             onPageChange={(e, newPage) => setPage(newPage)}
             onRowsPerPageChange={(e) => {
-              setRowsPerPage(parseInt(e.target.value, 10));
+                const newRowsPerPage = parseInt(e.target.value, 10);
+                setRowsPerPage(newRowsPerPage);
               setPage(0);
             }}
             onRowClick={handleRowClick}
             emptyMessage="No notifications found"
           />
+          )}
           <Menu
             anchorEl={actionAnchorEl}
             open={Boolean(actionAnchorEl)}
@@ -1274,7 +1264,9 @@ const NotificationsPage = () => {
                     <Person sx={{ color: '#9CA3AF', fontSize: 20, mt: 0.5 }} />
                     <Box>
                       <Typography variant="caption" sx={{ color: '#9CA3AF', fontWeight: 600, display: 'block', mb: 0.5 }}>Created By</Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>{selectedNotification.creator || 'ADMIN_001'}</Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {selectedNotification.creator?.username || selectedNotification.creator?.fullName || selectedNotification.createdBy?.username || selectedNotification.createdBy?.fullName || selectedNotification.createdBy || 'ADMIN_001'}
+                      </Typography>
                     </Box>
                   </Box>
 

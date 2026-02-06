@@ -79,6 +79,15 @@ export const AuthProvider = ({ children }) => {
       // Call backend API
       const result = await authLogin(email.trim(), password);
 
+      // Pass through status code for error handling
+      if (!result.success) {
+        return {
+          success: false,
+          error: result.error || 'Login failed. Please try again.',
+          status: result.status,
+        };
+      }
+
       if (result.success && result.data?.user) {
         const user = result.data.user;
 
