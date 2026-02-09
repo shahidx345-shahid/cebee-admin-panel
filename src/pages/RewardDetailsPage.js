@@ -71,6 +71,18 @@ const RewardDetailsPage = () => {
         }
     };
 
+    // Helper function to safely format dates
+    const safeFormat = (date, formatString, fallback = '-') => {
+        if (!date) return fallback;
+        try {
+            const dateObj = date instanceof Date ? date : new Date(date);
+            if (isNaN(dateObj.getTime())) return fallback;
+            return format(dateObj, formatString);
+        } catch (e) {
+            return fallback;
+        }
+    };
+
     const loadReward = async () => {
         setLoading(true);
         try {
@@ -611,13 +623,13 @@ const RewardDetailsPage = () => {
                                 <Grid item xs={12} sm={6} md={3}>
                                     <Typography variant="caption" sx={{ color: colors.textSecondary, textTransform: 'uppercase', fontWeight: 600 }}>Registration Date</Typography>
                                     <Typography variant="body1" sx={{ fontWeight: 500, mt: 0.5 }}>
-                                        {format(reward.registrationDate, 'MMM dd, yyyy')}
+                                        {safeFormat(reward.registrationDate, 'MMM dd, yyyy')}
                                     </Typography>
                                 </Grid>
                                 <Grid item xs={12} sm={6} md={3}>
                                     <Typography variant="caption" sx={{ color: colors.textSecondary, textTransform: 'uppercase', fontWeight: 600 }}>Last Login Date</Typography>
                                     <Typography variant="body1" sx={{ fontWeight: 500, mt: 0.5 }}>
-                                        {format(reward.lastLoginDate, 'MMM dd, yyyy')}
+                                        {safeFormat(reward.lastLoginDate, 'MMM dd, yyyy')}
                                     </Typography>
                                 </Grid>
                             </Grid>
@@ -652,13 +664,13 @@ const RewardDetailsPage = () => {
                                 <Grid item xs={12} sm={6} md={3}>
                                     <Typography variant="caption" sx={{ color: colors.textSecondary, textTransform: 'uppercase', fontWeight: 600 }}>Claim Submitted At</Typography>
                                     <Typography variant="body1" sx={{ fontWeight: 600, mt: 0.5 }}>
-                                        {reward.claimSubmittedAt ? format(reward.claimSubmittedAt, 'MMM dd, yyyy HH:mm') : '-'}
+                                        {safeFormat(reward.claimSubmittedAt, 'MMM dd, yyyy HH:mm')}
                                     </Typography>
                                 </Grid>
                                 <Grid item xs={12} sm={6} md={3}>
                                     <Typography variant="caption" sx={{ color: colors.textSecondary, textTransform: 'uppercase', fontWeight: 600 }}>Claim Deadline</Typography>
                                     <Typography variant="body1" sx={{ fontWeight: 600, mt: 0.5, color: reward.claimDeadline && new Date() > reward.claimDeadline ? colors.error : colors.brandBlack }}>
-                                        {reward.claimDeadline ? format(reward.claimDeadline, 'MMM dd, yyyy HH:mm') : '-'}
+                                        {safeFormat(reward.claimDeadline, 'MMM dd, yyyy HH:mm')}
                                     </Typography>
                                 </Grid>
                                 <Grid item xs={12} sm={6} md={3}>
@@ -726,7 +738,7 @@ const RewardDetailsPage = () => {
                                 <Grid item xs={12} sm={6} md={4}>
                                     <Typography variant="caption" sx={{ color: colors.textSecondary, textTransform: 'uppercase', fontWeight: 600 }}>Verified At</Typography>
                                     <Typography variant="body1" sx={{ fontWeight: 600, mt: 0.5 }}>
-                                        {reward.kycVerifiedAt ? format(reward.kycVerifiedAt, 'MMM dd, yyyy HH:mm') : '-'}
+                                        {safeFormat(reward.kycVerifiedAt, 'MMM dd, yyyy HH:mm')}
                                     </Typography>
                                 </Grid>
                                 <Grid item xs={12} sm={6} md={4}>
@@ -1086,7 +1098,7 @@ const RewardDetailsPage = () => {
                                 <Grid item xs={12} sm={6} md={3}>
                                     <Typography variant="caption" sx={{ color: colors.textSecondary, textTransform: 'uppercase', fontWeight: 600 }}>Captured At</Typography>
                                     <Typography variant="body1" sx={{ fontWeight: 600, mt: 0.5 }}>
-                                        {reward.consentTimestamp ? format(reward.consentTimestamp, 'MMM dd, yyyy HH:mm') : '-'}
+                                        {safeFormat(reward.consentTimestamp, 'MMM dd, yyyy HH:mm')}
                                     </Typography>
                                 </Grid>
                                 <Grid item xs={12} sm={6} md={3}>
@@ -1159,7 +1171,7 @@ const RewardDetailsPage = () => {
                                 <Box sx={{ mb: 2 }}>
                                     <Typography variant="caption" sx={{ color: colors.textSecondary, textTransform: 'uppercase', fontWeight: 600 }}>Fulfilled At</Typography>
                                     <Typography variant="body2" sx={{ fontWeight: 600, mt: 0.5 }}>
-                                        {format(reward.fulfilledAt, 'MMM dd, yyyy HH:mm')}
+                                        {safeFormat(reward.fulfilledAt, 'MMM dd, yyyy HH:mm')}
                                     </Typography>
                                 </Box>
                             )}
@@ -1358,7 +1370,7 @@ const RewardDetailsPage = () => {
                                                 {event.action}
                                             </Typography>
                                             <Typography variant="caption" sx={{ color: colors.textSecondary, fontWeight: 500 }}>
-                                                {format(event.timestamp, 'MMM dd, yyyy • HH:mm')}
+                                                {safeFormat(event.timestamp, 'MMM dd, yyyy • HH:mm')}
                                             </Typography>
                                             <Typography variant="caption" sx={{ color: colors.textSecondary, display: 'block', mt: 0.5 }}>
                                                 Triggered by: <strong>{event.triggeredBy}</strong>

@@ -14,7 +14,15 @@ import { saveAuthToken, removeAuthToken, getStoredSession } from './apiBase';
  */
 export const login = async (email, password) => {
   try {
+    console.log('Login attempt:', { email, endpoint: '/admin/login' });
     const response = await apiPost('/admin/login', { email, password });
+    
+    console.log('Login response:', {
+      success: response.success,
+      status: response.status,
+      error: response.error,
+      data: response.data,
+    });
 
     if (response.success && response.data?.user) {
       // Check if user is admin
@@ -37,11 +45,19 @@ export const login = async (email, password) => {
       };
     }
 
+    // Provide more detailed error message for 500 errors
+    let errorMessage = response.error || 'Login failed. Please check your credentials.';
+    if (response.status === 500) {
+      errorMessage = `Server error (500): ${response.error || 'Internal server error. Please check if the backend server is running and accessible.'}`;
+    }
+
     return {
       success: false,
-      error: response.error || 'Login failed. Please check your credentials.',
+      error: errorMessage,
+      status: response.status,
     };
   } catch (error) {
+    console.error('Login exception:', error);
     return {
       success: false,
       error: error.message || 'An unexpected error occurred during login.',

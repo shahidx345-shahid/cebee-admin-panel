@@ -3,7 +3,7 @@
  * Common functions for all API calls including error handling, token management, and request handling
  */
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://cebee-backend-api-alpha.vercel.app/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
 
 /**
  * Get authentication token from localStorage
@@ -133,6 +133,15 @@ export const apiRequest = async (endpoint, options = {}) => {
 
     // Handle other errors
     if (!response.ok) {
+      // Log full error details for debugging
+      console.error('API Error Response:', {
+        status: response.status,
+        statusText: response.statusText,
+        endpoint: `${API_BASE_URL}${endpoint}`,
+        errorData: data,
+        errorDataString: typeof data === 'string' ? data : JSON.stringify(data, null, 2),
+      });
+      
       const errorMessage = data?.message || 
                           data?.error?.message || 
                           data?.error || 

@@ -157,9 +157,16 @@ export const createFixture = async (fixtureData) => {
     }
 
     console.log('Creating fixture - fixtureData received:', fixtureData);
-    console.log('Creating fixture - requestBody being sent:', requestBody);
+    console.log('Creating fixture - requestBody being sent:', JSON.stringify(requestBody, null, 2));
     
     const response = await apiPost('/fixtures', requestBody);
+    
+    console.log('Creating fixture - API response:', {
+      success: response.success,
+      status: response.status,
+      error: response.error,
+      data: response.data,
+    });
     
     if (response.success) {
       return {
@@ -169,9 +176,36 @@ export const createFixture = async (fixtureData) => {
       };
     }
     
+    // Provide detailed error message
+    let errorMessage = response.error || 'Failed to create fixture';
+    if (response.status === 500) {
+      // Try to extract more details from the error response
+      const errorData = response.data || {};
+      const backendError = errorData.error || errorData.message || errorData.errorName;
+      
+      if (backendError) {
+        // Show the actual backend error message
+        errorMessage = `Backend Error: ${backendError}`;
+        
+        // Add error name if available
+        if (errorData.errorName) {
+          errorMessage += ` (${errorData.errorName})`;
+        }
+        
+        // Add stack trace info if in development
+        if (process.env.NODE_ENV === 'development' && errorData.stack) {
+          console.error('Backend Error Stack:', errorData.stack);
+        }
+      } else {
+        errorMessage = 'Server error (500): Internal server error. Please check backend logs for details.';
+      }
+    }
+    
     return {
       success: false,
-      error: response.error || 'Failed to create fixture',
+      error: errorMessage,
+      status: response.status,
+      data: response.data,
     };
   } catch (error) {
     return {

@@ -1485,23 +1485,23 @@ const FixtureDetailsPage = () => {
           <Card sx={{ borderRadius: '20px', p: 3 }}>
             <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Match Timeline</Typography>
             <Box sx={{ position: 'relative', pl: 2, borderLeft: `2px solid ${colors.divider}` }}>
-              {fixture?.status === 'live' || fixture?.status === 'completed' ? [
-                { min: '90', event: 'Full Time', detail: fixture?.status === 'completed' ? `${fixture.homeScore}-${fixture.awayScore}` : '', color: colors.success },
-                { min: '78', event: 'Goal - Away', detail: fixture?.awayTeam, color: colors.info },
+              {(fixture?.status === 'live' || fixture?.status === 'completed' ? [
+                { min: '90', event: 'Full Time', detail: fixture?.status === 'completed' ? `${fixture.homeScore || 0}-${fixture.awayScore || 0}` : '', color: colors.success },
+                { min: '78', event: 'Goal - Away', detail: typeof fixture?.awayTeam === 'string' ? fixture.awayTeam : (fixture?.awayTeam?.team_name || fixture?.awayTeam?.name || 'Away Team'), color: colors.info },
                 { min: '65', event: 'Substitution', detail: 'Home Team', color: colors.warning },
                 { min: '45', event: 'Half Time', detail: '1-1', color: colors.textSecondary },
-                { min: '23', event: 'Goal - Home', detail: fixture?.homeTeam, color: colors.info },
+                { min: '23', event: 'Goal - Home', detail: typeof fixture?.homeTeam === 'string' ? fixture.homeTeam : (fixture?.homeTeam?.team_name || fixture?.homeTeam?.name || 'Home Team'), color: colors.info },
                 { min: '12', event: 'Yellow Card', detail: 'Away Team', color: colors.warning },
                 { min: '0', event: 'Kickoff', detail: '', color: colors.brandRed },
               ] : [
                 { min: '', event: 'Match Scheduled', detail: fixture?.kickoffTime && !isNaN(new Date(fixture.kickoffTime).getTime()) ? format(new Date(fixture.kickoffTime), 'MMM dd, yyyy HH:mm') : '', color: colors.info },
-                { min: '', event: 'Predictions Open', detail: `${predictions.length} predictions made`, color: colors.success },
-              ].map((ev, i) => (
+                { min: '', event: 'Predictions Open', detail: `${predictions.length || 0} predictions made`, color: colors.success },
+              ]).map((ev, i) => (
                 <Box key={i} sx={{ mb: 3, position: 'relative' }}>
                   <Box sx={{ position: 'absolute', left: -21, top: 0, width: 10, height: 10, borderRadius: '50%', bgcolor: ev.color }} />
-                  {ev.min && <Typography variant="caption" sx={{ color: colors.textSecondary, fontWeight: 700 }}>{ev.min}'</Typography>}
-                  <Typography variant="body2" fontWeight={600} sx={{ color: colors.brandBlack }}>{ev.event}</Typography>
-                  {ev.detail && <Typography variant="caption" sx={{ color: colors.textSecondary }}>{ev.detail}</Typography>}
+                  {ev.min && <Typography variant="caption" sx={{ color: colors.textSecondary, fontWeight: 700 }}>{String(ev.min)}'</Typography>}
+                  <Typography variant="body2" fontWeight={600} sx={{ color: colors.brandBlack }}>{String(ev.event)}</Typography>
+                  {ev.detail && <Typography variant="caption" sx={{ color: colors.textSecondary }}>{String(ev.detail)}</Typography>}
                 </Box>
               ))}
             </Box>
