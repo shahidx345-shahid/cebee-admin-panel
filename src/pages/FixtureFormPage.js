@@ -113,11 +113,11 @@ const FixtureFormPage = () => {
             fixtureCount: cmd.fixtureCount || 0,
           }));
           setCmds(formattedCmds);
-          
-          // Set current CMd (only one can be current)
+        
+        // Set current CMd (only one can be current)
           const current = formattedCmds.find(cmd => cmd.status === 'current');
-          if (current) {
-            setCurrentCmd(current);
+        if (current) {
+          setCurrentCmd(current);
             currentCmdId = current.id;
             setFormData(prev => ({ 
               ...prev, 
@@ -346,7 +346,7 @@ const FixtureFormPage = () => {
         setFormData(prev => ({ ...prev, [field]: value }));
       }
     } else {
-      setFormData({ ...formData, [field]: value });
+    setFormData({ ...formData, [field]: value });
     }
   };
 
@@ -366,10 +366,10 @@ const FixtureFormPage = () => {
 
     try {
       const result = await createCmd({
-        name: newCmdForm.name,
-        startDate: newCmdForm.startDate,
-        endDate: newCmdForm.endDate,
-        status: newCmdForm.status,
+      name: newCmdForm.name,
+      startDate: newCmdForm.startDate,
+      endDate: newCmdForm.endDate,
+      status: newCmdForm.status,
       });
 
       if (result.success && result.data) {
@@ -380,7 +380,7 @@ const FixtureFormPage = () => {
           endDate: result.data.endDate ? new Date(result.data.endDate) : newCmdForm.endDate,
           status: result.data.status,
           fixtureCount: result.data.fixtureCount || 0,
-        };
+    };
 
         // Reload all CMds to get updated statuses
         const cmdsResult = await getCmds();
@@ -396,8 +396,8 @@ const FixtureFormPage = () => {
           setCmds(formattedCmds);
           
           // Set current CMd if status is current
-          if (newCmdForm.status === 'current') {
-            setCurrentCmd(newCmd);
+    if (newCmdForm.status === 'current') {
+      setCurrentCmd(newCmd);
             setFormData(prev => ({ 
               ...prev, 
               cmdId: newCmd.id,
@@ -416,19 +416,19 @@ const FixtureFormPage = () => {
               // Auto-set matchday to CMd name for Community Featured
               matchday: featureType === 'community' ? newCmd.name : prev.matchday
             }));
-          }
+    }
         }
 
         alert(result.message || 'CMd created successfully');
-        
-        // Reset form
-        setNewCmdForm({
-          name: '',
-          startDate: new Date(),
-          endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-          status: 'current',
-        });
-        setShowNewCmdForm(false);
+
+    // Reset form
+    setNewCmdForm({
+      name: '',
+      startDate: new Date(),
+      endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      status: 'current',
+    });
+    setShowNewCmdForm(false);
       } else {
         alert(result.error || 'Failed to create CMd');
       }
@@ -470,12 +470,12 @@ const FixtureFormPage = () => {
           }
         } else {
           // Fallback: update local state
-          setCmds(prev => prev.map(cmd => 
-            cmd.id === cmdId ? { ...cmd, status: 'current' } : { ...cmd, status: 'completed' }
-          ));
-          const selectedCmd = cmds.find(cmd => cmd.id === cmdId);
-          if (selectedCmd) {
-            setCurrentCmd(selectedCmd);
+    setCmds(prev => prev.map(cmd => 
+      cmd.id === cmdId ? { ...cmd, status: 'current' } : { ...cmd, status: 'completed' }
+    ));
+    const selectedCmd = cmds.find(cmd => cmd.id === cmdId);
+    if (selectedCmd) {
+      setCurrentCmd(selectedCmd);
             setFormData(prev => ({ 
               ...prev, 
               cmdId: selectedCmd.id,
@@ -1113,7 +1113,7 @@ const FixtureFormPage = () => {
                 <InputLabel>Home Team *</InputLabel>
                 <Select
                   value={formData.homeTeam || ''}
-                  onChange={(e) => handleChange('homeTeam', e.target.value)}
+                onChange={(e) => handleChange('homeTeam', e.target.value)}
                   label="Home Team *"
                   disabled={Boolean(!formData.leagueId || loadingTeams)}
                   renderValue={(value) => {
@@ -1126,13 +1126,13 @@ const FixtureFormPage = () => {
                       return teamId === valueId;
                     });
                     return team ? (team.name || team.team_name || '') : '';
-                  }}
-                  sx={{
+                }}
+                sx={{
                     borderRadius: '12px',
                     '& .MuiOutlinedInput-notchedOutline': {
-                      borderRadius: '12px',
-                    },
-                  }}
+                    borderRadius: '12px',
+                  },
+                }}
                   MenuProps={{
                     PaperProps: {
                       sx: {
@@ -1283,28 +1283,28 @@ const FixtureFormPage = () => {
               </FormControl>
             </Grid>
             {featureType === 'community' && (
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  required
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                required
                   label="Matchday *"
                   value={formData.matchday || ''}
-                  InputProps={{
+                InputProps={{
                     readOnly: true,
                   }}
                   helperText="Automatically set from selected CMd"
-                  sx={{
+                sx={{
                     borderRadius: '12px',
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: '12px',
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '12px',
                       backgroundColor: colors.brandWhite,
                     },
                     '& .MuiInputBase-input': {
                       cursor: 'default',
-                    },
-                  }}
-                />
-              </Grid>
+                  },
+                }}
+              />
+            </Grid>
             )}
             <Grid item xs={12} md={featureType === 'community' ? 6 : 12}>
               <FormControl fullWidth required>

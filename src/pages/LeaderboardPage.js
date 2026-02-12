@@ -561,7 +561,7 @@ const LeaderboardPage = () => {
             )}
           </Box>
           <Typography variant="caption" sx={{ color: colors.textSecondary, fontSize: 11, ml: 4 }}>
-            {row.userEmail || row.email || 'No email'}
+            {row.userEmail || row.email || row.user_email || 'No email'}
           </Typography>
         </Box>
       ),
@@ -619,7 +619,42 @@ const LeaderboardPage = () => {
       id: 'lastUpdated',
       label: 'Last Updated',
       render: (value, row) => {
-        const date = value?.toDate ? value.toDate() : (row.updatedAt?.toDate ? row.updatedAt.toDate() : new Date(value || row.updatedAt));
+        let date;
+        
+        // Handle different date formats from backend
+        const dateValue = value || row.lastUpdated || row.lastPredictionTime || row.updatedAt;
+        
+        if (!dateValue) {
+          return (
+            <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13, fontWeight: 500 }}>
+              N/A
+            </Typography>
+          );
+        }
+        
+        if (dateValue?.toDate) {
+          // Firestore timestamp
+          date = dateValue.toDate();
+        } else if (dateValue instanceof Date) {
+          // Already a Date object
+          date = dateValue;
+        } else if (typeof dateValue === 'string') {
+          // ISO string or other string format
+          date = new Date(dateValue);
+        } else {
+          // Try to convert
+          date = new Date(dateValue);
+        }
+        
+        // Validate date before formatting
+        if (!date || isNaN(date.getTime())) {
+          return (
+            <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13, fontWeight: 500 }}>
+              N/A
+            </Typography>
+          );
+        }
+        
         return (
           <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13, fontWeight: 500 }}>
             {format(date, 'MMM dd, HH:mm')}

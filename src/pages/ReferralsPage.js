@@ -40,6 +40,7 @@ import { colors, constants } from '../config/theme';
 import SearchBar from '../components/common/SearchBar';
 import DataTable from '../components/common/DataTable';
 import ReferralDetailsView from '../components/referrals/ReferralDetailsView';
+import { getReferrals, getReferralStatistics } from '../services/referralService';
 
 import { format } from 'date-fns';
 
@@ -80,7 +81,8 @@ const ReferralsPage = () => {
 
   useEffect(() => {
     loadReferrals();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, rowsPerPage, searchQuery, statusFilter, countryFilter, selectedSort, timePeriod]);
 
   useEffect(() => {
     filterAndSortReferrals();
@@ -89,23 +91,114 @@ const ReferralsPage = () => {
   const loadReferrals = async () => {
     try {
       setLoading(true);
-      // Mock Data matching screenshot with Phase 1 refinements
-      const mockReferrals = [
-        { id: '1', referrerId: 'USR_1001', referrerUsername: 'PredictionMaster', referrerEmail: 'predmaster@example.com', referrerCountry: 'Nigeria', referredId: 'USR_2001', referredUsername: 'FootballFan2025', referredEmail: 'footballfan2025@example.com', referredCountry: 'Algeria', cpAwarded: 10, status: 'valid', referralDate: new Date('2026-01-15'), source: 'Invite Link', risk: false },
-        { id: '2', referrerId: 'USR_1002', referrerUsername: 'AfricanLegend', referrerEmail: 'legend@example.com', referrerCountry: 'Ghana', referredId: 'USR_2002', referredUsername: 'MatchMaster', referredEmail: 'matchmaster@example.com', referredCountry: 'Ivory Coast', cpAwarded: 10, status: 'valid', referralDate: new Date('2026-01-12'), source: 'Manual Code', risk: false },
-        { id: '3', referrerId: 'USR_1003', referrerUsername: 'GoalMachine', referrerEmail: 'goalmachine@example.com', referrerCountry: 'Kenya', referredId: 'USR_2003', referredUsername: 'TopScorer', referredEmail: 'topscorer@example.com', referredCountry: 'Senegal', cpAwarded: 10, status: 'valid', referralDate: new Date('2026-01-10'), source: 'Campaign', risk: false },
-        { id: '4', referrerId: 'USR_1004', referrerUsername: 'ScoreKing', referrerEmail: 'scoreking@example.com', referrerCountry: 'South Africa', referredId: 'USR_2004', referredUsername: 'ProPredictor', referredEmail: 'propredictor@example.com', referredCountry: 'Uganda', cpAwarded: 0, status: 'flagged', statusReason: 'Duplicate device detected', referralDate: new Date('2026-01-08'), source: 'Invite Link', risk: true, riskReason: 'Duplicate IP' },
-        { id: '5', referrerId: 'USR_1005', referrerUsername: 'ChiefPredictor', referrerEmail: 'chief@example.com', referrerCountry: 'Egypt', referredId: 'USR_2005', referredUsername: 'WinnerTakes', referredEmail: 'winnertakes@example.com', referredCountry: 'Tanzania', cpAwarded: 10, status: 'valid', referralDate: new Date('2025-12-05'), source: 'Invite Link', risk: false },
-        { id: '6', referrerId: 'USR_1006', referrerUsername: 'FootballWizard', referrerEmail: 'wizard@example.com', referrerCountry: 'Morocco', referredId: 'USR_2006', referredUsername: 'BetKing', referredEmail: 'betking@example.com', referredCountry: 'Cameroon', cpAwarded: 10, status: 'valid', referralDate: new Date('2025-12-01'), source: 'Manual Code', risk: false },
-        { id: '7', referrerId: 'USR_1007', referrerUsername: 'KingOfPredictions', referrerEmail: 'kingpred@example.com', referrerCountry: 'Nigeria', referredId: 'USR_2007', referredUsername: 'MatchDay', referredEmail: 'matchday@example.com', referredCountry: 'Morocco', cpAwarded: 0, status: 'invalid', statusReason: 'Self-referral', referralDate: new Date('2025-11-28'), source: 'Invite Link', risk: true, riskReason: 'Self-referral' },
-        // Added another referral for PredictionMaster (USR_1001) to test aggregation
-        { id: '8', referrerId: 'USR_1001', referrerUsername: 'PredictionMaster', referrerEmail: 'predmaster@example.com', referrerCountry: 'Nigeria', referredId: 'USR_2008', referredUsername: 'SoccerStar', referredEmail: 'soccerstar@example.com', referredCountry: 'Nigeria', cpAwarded: 10, status: 'valid', referralDate: new Date('2026-01-20'), source: 'Share Button', risk: false },
-      ];
+      
+      // Build query parameters from filters
+      const params = {
+        page: page,
+        limit: rowsPerPage,
+      };
 
-      setReferrals(mockReferrals);
-      setFilteredReferrals(mockReferrals);
+      if (searchQuery) {
+        params.search = searchQuery;
+      }
+
+      if (statusFilter !== 'all') {
+        params.status = statusFilter;
+      }
+
+      if (countryFilter !== 'all') {
+        params.country = countryFilter;
+      }
+
+      // Map sort to backend format
+      const sortMap = {
+        'dateNewest': 'newest',
+        'dateOldest': 'oldest',
+        'referrerAZ': 'referrer_asc',
+        'referrerZA': 'referrer_desc',
+        'cpHighest': 'cp_desc',
+        'cpLowest': 'cp_asc',
+      };
+      if (selectedSort && sortMap[selectedSort]) {
+        params.sort = sortMap[selectedSort];
+      }
+
+      // Add time period filter if monthly
+      if (timePeriod === 'monthly') {
+        const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM format
+        params.month = currentMonth;
+      }
+
+      const response = await getReferrals(params);
+      console.log('Referrals API response:', response);
+      
+      if (response.success) {
+        // Backend may return referrals array or paginated response
+        let referralsData = Array.isArray(response.data) 
+          ? response.data 
+          : (response.data.referrals || response.data.data || []);
+        
+        // Normalize the data to ensure each referral has required fields
+        // Map backend field names to frontend field names
+        referralsData = referralsData.map((referral, index) => {
+          // Handle date conversion - API returns formatted string like "Feb 12, 2026"
+          let referralDate = referral.date || referral.referralDate || referral.referral_date || referral.createdAt || referral.created_at;
+          if (referralDate) {
+            if (referralDate instanceof Date) {
+              // Already a Date object
+            } else if (typeof referralDate === 'string') {
+              // Try to parse the formatted date string
+              referralDate = new Date(referralDate);
+              // If parsing fails, use current date
+              if (isNaN(referralDate.getTime())) {
+                referralDate = new Date();
+              }
+            } else {
+              referralDate = new Date();
+            }
+          } else {
+            referralDate = new Date();
+          }
+          
+          // Map status to lowercase for consistency
+          const status = (referral.status || 'valid').toLowerCase();
+          
+          return {
+            ...referral,
+            id: referral.id || referral._id || `referral-${index}`,
+            // API returns referrer as username string, not object
+            referrerId: referral.referrerId || referral.referrer_id || referral.referrer || null,
+            referrerUsername: referral.referrerUsername || referral.referrer_username || referral.referrer || 'N/A',
+            referrerEmail: referral.referrerEmail || referral.referrer_email || null,
+            referrerCountry: referral.referrerCountry || referral.referrer_country || null,
+            // API returns referredUser as username string
+            referredId: referral.referredId || referral.referred_id || referral.referredUser || null,
+            referredUsername: referral.referredUsername || referral.referred_username || referral.referredUser || 'N/A',
+            referredEmail: referral.referredEmail || referral.referred_email || referral.email || null,
+            referredCountry: referral.referredCountry || referral.referred_country || referral.country || null,
+            cpAwarded: referral.cpAwarded || referral.cp_awarded || referral.cpEarned || referral.cp_earned || referral.cp || 0,
+            status: status,
+            statusReason: referral.statusReason || referral.status_reason || referral.reason || null,
+            referralDate: referralDate,
+            source: referral.source || referral.referralSource || referral.referral_source || 'Invite Link',
+            risk: referral.risk || referral.isRisk || referral.is_risk || false,
+            riskReason: referral.riskReason || referral.risk_reason || null,
+          };
+        });
+        
+        console.log('Normalized referrals data:', referralsData);
+        
+        setReferrals(referralsData);
+        // Note: filteredReferrals will be set by the filterAndSortReferrals effect
+      } else {
+        console.error("Failed to load referrals", response.error);
+        setReferrals([]);
+        setFilteredReferrals([]);
+      }
     } catch (error) {
-      console.error('Error loading referrals:', error);
+      console.error("Error loading referrals:", error);
+      setReferrals([]);
+      setFilteredReferrals([]);
     } finally {
       setLoading(false);
     }

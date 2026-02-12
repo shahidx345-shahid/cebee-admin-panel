@@ -43,12 +43,13 @@ import {
   Person,
   StopCircle,
   Save,
+  Visibility,
 } from '@mui/icons-material';
 import { format } from 'date-fns';
 import { colors, constants } from '../config/theme';
 import SearchBar from '../components/common/SearchBar';
 import DataTable from '../components/common/DataTable';
-import { getFixture, getFixturePredictions } from '../services/fixturesService';
+import { getFixture, getFixturePredictions, updateFixtureStatus, endMatch, updateFixtureResults } from '../services/fixturesService';
 
 const FixtureDetailsPage = () => {
   const navigate = useNavigate();
@@ -72,6 +73,85 @@ const FixtureDetailsPage = () => {
     markCompleted: true,
   });
   const [selectedFlowStatus, setSelectedFlowStatus] = useState(null);
+  const [updating, setUpdating] = useState(false);
+
+  // Helper function to reload fixture data from API
+  const reloadFixtureData = async () => {
+    if (!id) return;
+    try {
+      const fixtureResult = await getFixture(id);
+      if (fixtureResult.success && fixtureResult.data) {
+        const fixtureData = fixtureResult.data.fixture || fixtureResult.data;
+        
+        if (!fixtureData || typeof fixtureData !== 'object' || Array.isArray(fixtureData)) {
+          return;
+        }
+        
+        // Format fixture data to match expected structure
+        const formattedFixture = {
+          id: fixtureData._id || fixtureData.id,
+          matchId: fixtureData.matchId || fixtureData.match_id || fixtureData._id || fixtureData.id,
+          homeTeam: fixtureData.homeTeam || fixtureData.home_team || '',
+          awayTeam: fixtureData.awayTeam || fixtureData.away_team || '',
+          league: fixtureData.league || fixtureData.leagueName || fixtureData.league_name || (fixtureData.leagueId?.league_name) || '',
+          leagueId: fixtureData.leagueId?._id || fixtureData.leagueId || '',
+          kickoffTime: (() => {
+            const kickoff = fixtureData.kickoffTime || fixtureData.kickoff_time;
+            if (!kickoff) return null;
+            const date = new Date(kickoff);
+            return isNaN(date.getTime()) ? null : date;
+          })(),
+          status: fixtureData.status || fixtureData.matchStatus || 'scheduled',
+          matchStatus: fixtureData.matchStatus || fixtureData.status || 'scheduled',
+          predictions: fixtureData.totalPredictions || fixtureData.predictionCount || fixtureData.prediction_count || 0,
+          hot: fixtureData.isFeatured || fixtureData.isCeBeFeatured || false,
+          cmdId: fixtureData.cmdId?._id || fixtureData.cmdId || (typeof fixtureData.cmdId === 'string' ? fixtureData.cmdId : ''),
+          cmdName: fixtureData.cmdId?.name || fixtureData.cmdName || fixtureData.cmd_name || '',
+          venue: fixtureData.venue || '',
+          homeScore: fixtureData.homeScore || fixtureData.home_score || null,
+          awayScore: fixtureData.awayScore || fixtureData.away_score || null,
+          homeTeamLogo: fixtureData.homeTeamLogo || fixtureData.home_team_logo || null,
+          awayTeamLogo: fixtureData.awayTeamLogo || fixtureData.away_team_logo || null,
+          publishDateTime: (() => {
+            const publish = fixtureData.publishDateTime || fixtureData.publish_date_time;
+            if (!publish) return null;
+            const date = new Date(publish);
+            return isNaN(date.getTime()) ? null : date;
+          })(),
+          isCeBeFeatured: fixtureData.isCeBeFeatured || false,
+          isCommunityFeatured: fixtureData.isCommunityFeatured || false,
+          matchday: fixtureData.matchday || '',
+          currentState: fixtureData.currentState || null,
+          ...fixtureData,
+        };
+        
+        setFixture(formattedFixture);
+        
+        // Update selected flow status from backend
+        const backendMatchFlowStatus = formattedFixture.currentState || formattedFixture.matchStatus || null;
+        if (backendMatchFlowStatus) {
+          setSelectedFlowStatus(backendMatchFlowStatus);
+        } else {
+          const status = formattedFixture.status || 'scheduled';
+          const statusMap = {
+            'scheduled': 'predictionOpen',
+            'published': 'predictionOpen',
+            'predictionOpen': 'predictionOpen',
+            'predictionLock': 'predictionLock',
+            'predictionLocked': 'predictionLock',
+            'live': 'live',
+            'resultsProcessing': 'resultPending',
+            'pending': 'resultPending',
+            'resultPending': 'resultPending',
+            'completed': 'completed',
+          };
+          setSelectedFlowStatus(statusMap[status] || 'predictionOpen');
+        }
+      }
+    } catch (error) {
+      console.error('Error reloading fixture data:', error);
+    }
+  };
 
   useEffect(() => {
     const loadFixtureData = async () => {
@@ -141,6 +221,8 @@ const FixtureDetailsPage = () => {
               isCeBeFeatured: fixtureData.isCeBeFeatured || false,
               isCommunityFeatured: fixtureData.isCommunityFeatured || false,
               matchday: fixtureData.matchday || '',
+              // Match flow status from backend
+              currentState: fixtureData.currentState || null,
               // Include all other fields
               ...fixtureData,
             };
@@ -154,22 +236,33 @@ const FixtureDetailsPage = () => {
             setLoading(false);
             console.log('Loading set to false');
             
-            // Initialize selected flow status based on fixture status
-            const status = formattedFixture.status || formattedFixture.matchStatus || 'scheduled';
-            // Map fixture status to flow status
-            const statusMap = {
-              'scheduled': 'predictionOpen',
-              'published': 'predictionOpen',
-              'predictionOpen': 'predictionOpen',
-              'predictionLock': 'predictionLock',
-              'predictionLocked': 'predictionLock',
-              'live': 'live',
-              'resultsProcessing': 'resultPending',
-              'pending': 'resultPending',
-              'resultPending': 'resultPending',
-              'completed': 'completed',
-            };
-            setSelectedFlowStatus(statusMap[status] || 'predictionOpen');
+            // Use match flow status from backend (currentState or matchStatus)
+            // Backend provides currentState which represents the match flow status
+            const backendMatchFlowStatus = formattedFixture.currentState || formattedFixture.matchStatus || null;
+            
+            // Map backend match flow status to frontend flow status
+            // Backend values: predictionOpen, predictionLock, live, resultPending, completed
+            // Frontend values: predictionOpen, predictionLock, live, resultPending, completed
+            if (backendMatchFlowStatus) {
+              // Direct mapping since backend and frontend use same values
+              setSelectedFlowStatus(backendMatchFlowStatus);
+            } else {
+              // Fallback: if backend doesn't provide match flow status, use fixture status
+              const status = formattedFixture.status || 'scheduled';
+              const statusMap = {
+                'scheduled': 'predictionOpen',
+                'published': 'predictionOpen',
+                'predictionOpen': 'predictionOpen',
+                'predictionLock': 'predictionLock',
+                'predictionLocked': 'predictionLock',
+                'live': 'live',
+                'resultsProcessing': 'resultPending',
+                'pending': 'resultPending',
+                'resultPending': 'resultPending',
+                'completed': 'completed',
+              };
+              setSelectedFlowStatus(statusMap[status] || 'predictionOpen');
+            }
 
             // Fetch predictions from API (async, don't block UI)
             getFixturePredictions(id, { limit: 1000 })
@@ -230,22 +323,32 @@ const FixtureDetailsPage = () => {
   }, [id]);
 
   // Update selected flow status when fixture status changes
+  // Use backend match flow status (currentState or matchStatus) if available
   useEffect(() => {
     if (fixture) {
-      const status = fixture.status || fixture.matchStatus || 'scheduled';
-      const statusMap = {
-        'scheduled': 'predictionOpen',
-        'published': 'predictionOpen',
-        'predictionOpen': 'predictionOpen',
-        'predictionLock': 'predictionLock',
-        'live': 'live',
-        'resultsProcessing': 'resultPending',
-        'pending': 'resultPending',
-        'completed': 'completed',
-      };
-      setSelectedFlowStatus(statusMap[status] || 'predictionOpen');
+      // Use match flow status from backend (currentState or matchStatus)
+      const backendMatchFlowStatus = fixture.currentState || fixture.matchStatus || null;
+      
+      if (backendMatchFlowStatus) {
+        // Direct mapping since backend and frontend use same values
+        setSelectedFlowStatus(backendMatchFlowStatus);
+      } else {
+        // Fallback: if backend doesn't provide match flow status, use fixture status
+        const status = fixture.status || 'scheduled';
+        const statusMap = {
+          'scheduled': 'predictionOpen',
+          'published': 'predictionOpen',
+          'predictionOpen': 'predictionOpen',
+          'predictionLock': 'predictionLock',
+          'live': 'live',
+          'resultsProcessing': 'resultPending',
+          'pending': 'resultPending',
+          'completed': 'completed',
+        };
+        setSelectedFlowStatus(statusMap[status] || 'predictionOpen');
+      }
     }
-  }, [fixture?.status, fixture?.matchStatus]);
+  }, [fixture?.currentState, fixture?.matchStatus, fixture?.status]);
 
   useEffect(() => {
     const filterPredictions = () => {
@@ -584,29 +687,56 @@ const FixtureDetailsPage = () => {
     setApproveDialogOpen(true);
   };
 
-  const confirmApproval = () => {
-    setIsApproved(true);
-    setApproveDialogOpen(false);
-    // In production, this would update the backend
-    console.log(`[SYSTEM LOG] Match details approved for ${id}`);
+  const confirmApproval = async () => {
+    if (!id) return;
+    
+    try {
+      setUpdating(true);
+      // Approve means moving from scheduled to published/predictionOpen
+      const result = await updateFixtureStatus(id, 'predictionOpen');
+      
+      if (result.success) {
+        setIsApproved(true);
+        setApproveDialogOpen(false);
+        // Reload fixture data to get updated status from backend
+        await reloadFixtureData();
+        alert('Match details approved successfully!');
+      } else {
+        alert(result.error || 'Failed to approve match details');
+      }
+    } catch (error) {
+      console.error('Error approving match:', error);
+      alert('An error occurred while approving match details');
+    } finally {
+      setUpdating(false);
+    }
   };
 
   const handleEndMatch = () => {
     setEndMatchDialogOpen(true);
   };
 
-  const confirmEndMatch = () => {
-    // Update fixture status to 'resultsProcessing' (Full Time - Results Processing) without scores
-    setFixture(prev => ({
-      ...prev,
-      status: 'resultsProcessing',
-      matchStatus: 'resultsProcessing',
-    }));
-    setEndMatchDialogOpen(false);
-    // Update flow status to reflect the change
-    setSelectedFlowStatus('resultsProcessing');
-    console.log(`[SYSTEM LOG] Match ${id} ended - now in Full Time (Results Processing) state`);
-    alert('Match ended successfully. Match is now in Full Time (Results Processing) state. You can upload the score later.');
+  const confirmEndMatch = async () => {
+    if (!id) return;
+    
+    try {
+      setUpdating(true);
+      const result = await endMatch(id);
+      
+      if (result.success) {
+        setEndMatchDialogOpen(false);
+        // Reload fixture data to get updated status from backend
+        await reloadFixtureData();
+        alert('Match ended successfully. Match is now in Result Pending state. You can upload the score later.');
+      } else {
+        alert(result.error || 'Failed to end match');
+      }
+    } catch (error) {
+      console.error('Error ending match:', error);
+      alert('An error occurred while ending the match');
+    } finally {
+      setUpdating(false);
+    }
   };
 
   const handleOpenScoreDialog = () => {
@@ -620,36 +750,42 @@ const FixtureDetailsPage = () => {
     setScoreDialogOpen(true);
   };
 
-  const handleSaveScore = () => {
+  const handleSaveScore = async () => {
+    if (!id) return;
+    
     // Validate scores - all required: home score, away score, first goal scorer, and first goal minute
     if (scoreForm.homeScore === '' || scoreForm.awayScore === '' || !scoreForm.firstGoalScorer || !scoreForm.firstGoalMinute) {
       alert('Please enter all required fields: home score, away score, first goal scorer, and first goal minute');
       return;
     }
 
-    // Update fixture with scores - if markCompleted is checked, go to completed, otherwise resultsProcessing
-    const newStatus = scoreForm.markCompleted ? 'completed' : 'resultsProcessing';
-    
-    setFixture(prev => ({
-      ...prev,
-      homeScore: parseInt(scoreForm.homeScore),
-      awayScore: parseInt(scoreForm.awayScore),
-      firstGoalScorer: scoreForm.firstGoalScorer,
-      firstGoalMinute: parseInt(scoreForm.firstGoalMinute),
-      status: newStatus,
-      matchStatus: newStatus,
-    }));
-
-    // Update flow status to reflect the change
-    setSelectedFlowStatus(newStatus);
-
-    setScoreDialogOpen(false);
-    console.log(`[SYSTEM LOG] Score saved for match ${id}:`, scoreForm);
-    
-    if (scoreForm.markCompleted) {
-      alert('Score saved and match completed! Match is now in Completed state.');
-    } else {
-      alert('Score saved. Match is now in Full Time (Results Processing) state.');
+    try {
+      setUpdating(true);
+      
+      // Prepare results data
+      const resultsData = {
+        homeScore: parseInt(scoreForm.homeScore, 10),
+        awayScore: parseInt(scoreForm.awayScore, 10),
+        firstGoalScorer: scoreForm.firstGoalScorer.trim(),
+        firstGoalMinute: parseInt(scoreForm.firstGoalMinute, 10),
+      };
+      
+      // Update fixture results via API (backend automatically sets status to 'completed')
+      const result = await updateFixtureResults(id, resultsData);
+      
+      if (result.success) {
+        setScoreDialogOpen(false);
+        // Reload fixture data to get updated status and scores from backend
+        await reloadFixtureData();
+        alert('Score saved and match completed! Match is now in Completed state.');
+      } else {
+        alert(result.error || 'Failed to save score');
+      }
+    } catch (error) {
+      console.error('Error saving score:', error);
+      alert('An error occurred while saving the score');
+    } finally {
+      setUpdating(false);
     }
   };
 
@@ -735,32 +871,40 @@ const FixtureDetailsPage = () => {
     );
   }
 
-  const getStatusChip = (status) => {
-    // Map old statuses to new match flow states for backward compatibility
-    const statusMap = {
-      scheduled: 'predictionOpen',
-      published: 'predictionOpen',
-      predictionOpen: 'predictionOpen',
-      predictionLocked: 'predictionLocked',
-      locked: 'predictionLocked',
-      live: 'live',
-      fullTime: 'fullTime',
-      resultsProcessing: 'fullTimeProcessing',
-      fullTimeProcessing: 'fullTimeProcessing',
-      completed: 'fullTimeCompleted',
-      fullTimeCompleted: 'fullTimeCompleted',
-    };
-
-    const mappedStatus = statusMap[status] || 'predictionOpen';
-
+  const getStatusChip = (status, matchStatus = null) => {
+    // Show actual backend status values directly
+    // Use matchStatus if available, otherwise use status
+    const displayStatus = matchStatus || status;
+    
+    // Map to display labels (keeping backend status names but formatting for display)
     const statusConfig = {
+      scheduled: {
+        label: 'Scheduled',
+        color: '#9E9E9E',
+        icon: Schedule
+      },
+      published: {
+        label: 'Published',
+        color: '#1976D2',
+        icon: Visibility
+      },
       predictionOpen: {
         label: 'Prediction Open',
         color: colors.info,
         icon: AccessTime
       },
+      predictionLock: {
+        label: 'Prediction Lock',
+        color: colors.warning,
+        icon: Lock
+      },
       predictionLocked: {
         label: 'Prediction Locked',
+        color: colors.warning,
+        icon: Lock
+      },
+      locked: {
+        label: 'Locked',
         color: colors.warning,
         icon: Lock
       },
@@ -769,19 +913,35 @@ const FixtureDetailsPage = () => {
         color: colors.error,
         icon: PlayCircle
       },
-      fullTimeProcessing: {
-        label: 'Full Time (Results Processing)',
+      resultPending: {
+        label: 'Result Pending',
         color: colors.warning,
         icon: HourglassEmpty
       },
-      fullTimeCompleted: {
-        label: 'Full Time (Completed)',
+      resultsProcessing: {
+        label: 'Results Processing',
+        color: colors.warning,
+        icon: HourglassEmpty
+      },
+      pending: {
+        label: 'Pending',
+        color: colors.warning,
+        icon: HourglassEmpty
+      },
+      completed: {
+        label: 'Completed',
         color: colors.success,
         icon: CheckCircle
       },
     };
 
-    const config = statusConfig[mappedStatus] || statusConfig.predictionOpen;
+    // Use actual backend status, fallback to formatted status if not in config
+    const config = statusConfig[displayStatus] || {
+      label: (displayStatus || 'Unknown').replace(/_/g, ' ').replace(/([A-Z])/g, ' $1').trim(),
+      color: '#9E9E9E',
+      icon: Schedule
+    };
+    
     const Icon = config.icon;
 
     return (
@@ -1047,6 +1207,9 @@ const FixtureDetailsPage = () => {
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
             <Chip icon={<CalendarToday sx={{ fontSize: 14, color: '#fff !important' }} />} label={fixture.kickoffTime && !isNaN(new Date(fixture.kickoffTime).getTime()) ? format(new Date(fixture.kickoffTime), 'EEE, MMM dd • HH:mm') : 'TBD'} sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: '#fff', border: '1px solid rgba(255,255,255,0.3)', fontWeight: 600 }} />
             <Chip label={(fixture.status || 'scheduled').toUpperCase()} sx={{ fontWeight: 700, bgcolor: fixture.status === 'live' ? colors.brandBlack : 'rgba(255,255,255,0.2)', color: '#fff' }} />
+            {fixture.matchStatus && fixture.matchStatus !== fixture.status && (
+              <Chip label={`Match: ${(fixture.matchStatus || '').toUpperCase()}`} sx={{ fontWeight: 700, bgcolor: 'rgba(255,255,255,0.2)', color: '#fff', ml: 1 }} />
+            )}
           </Box>
 
           <Grid container alignItems="center" justifyContent="center" spacing={2}>
@@ -1172,28 +1335,22 @@ const FixtureDetailsPage = () => {
               const selectedOrder = statusOrder[selectedFlowStatus] ?? 0;
               const isActive = step.order <= selectedOrder;
               
-              const isClickable = true;
+              // Status steps are display-only - they show the current status from API
+              // Status changes should be done through specific action buttons (Approve, End Match, etc.)
+              const isClickable = false;
               
               return (
                 <Box
                   key={step.key}
-                  onClick={() => {
-                    if (isClickable) {
-                      setSelectedFlowStatus(step.key);
-                    }
-                  }}
                   sx={{
                     position: 'relative',
                     zIndex: 2,
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
-                    cursor: isClickable ? 'pointer' : 'default',
+                    cursor: 'default',
                     flex: 1,
                     transition: 'transform 0.2s',
-                    '&:hover': isClickable ? {
-                      transform: 'scale(1.1)',
-                    } : {},
                   }}
                 >
                   {/* Status Circle */}
@@ -1255,13 +1412,17 @@ const FixtureDetailsPage = () => {
           textAlign: 'center',
         }}>
           <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack }}>
-            Current Status: <span style={{ color: colors.brandRed, textTransform: 'uppercase' }}>
-              {selectedFlowStatus === 'predictionOpen' ? 'Prediction Open' :
-               selectedFlowStatus === 'predictionLock' ? 'Prediction Lock' :
-               selectedFlowStatus === 'live' ? 'Live' :
-               selectedFlowStatus === 'resultPending' || selectedFlowStatus === 'resultsProcessing' || selectedFlowStatus === 'pending' ? 'Result Pending' :
-               selectedFlowStatus === 'completed' ? 'Completed' : 'Prediction Open'}
+            Status: <span style={{ color: colors.brandRed, textTransform: 'uppercase' }}>
+              {fixture?.status || 'N/A'}
             </span>
+            {fixture?.matchStatus && fixture.matchStatus !== fixture?.status && (
+              <>
+                <br />
+                Match Flow: <span style={{ color: colors.brandRed, textTransform: 'uppercase' }}>
+                  {fixture.matchStatus}
+                </span>
+              </>
+            )}
           </Typography>
         </Box>
       </Card>
@@ -1493,10 +1654,24 @@ const FixtureDetailsPage = () => {
                 { min: '23', event: 'Goal - Home', detail: typeof fixture?.homeTeam === 'string' ? fixture.homeTeam : (fixture?.homeTeam?.team_name || fixture?.homeTeam?.name || 'Home Team'), color: colors.info },
                 { min: '12', event: 'Yellow Card', detail: 'Away Team', color: colors.warning },
                 { min: '0', event: 'Kickoff', detail: '', color: colors.brandRed },
-              ] : [
-                { min: '', event: 'Match Scheduled', detail: fixture?.kickoffTime && !isNaN(new Date(fixture.kickoffTime).getTime()) ? format(new Date(fixture.kickoffTime), 'MMM dd, yyyy HH:mm') : '', color: colors.info },
-                { min: '', event: 'Predictions Open', detail: `${predictions.length || 0} predictions made`, color: colors.success },
-              ]).map((ev, i) => (
+              ] : (() => {
+                const timelineEvents = [
+                  { min: '', event: 'Match Scheduled', detail: fixture?.kickoffTime && !isNaN(new Date(fixture.kickoffTime).getTime()) ? format(new Date(fixture.kickoffTime), 'MMM dd, yyyy HH:mm') : '', color: colors.info },
+                ];
+                
+                // Only show "Predictions Open" when fixture status is published or predictionOpen
+                const fixtureStatus = fixture?.status || fixture?.matchStatus || '';
+                if (fixtureStatus === 'published' || fixtureStatus === 'predictionOpen') {
+                  timelineEvents.push({
+                    min: '',
+                    event: 'Predictions Open',
+                    detail: `${predictions.length || 0} predictions made`,
+                    color: colors.success
+                  });
+                }
+                
+                return timelineEvents;
+              })()).map((ev, i) => (
                 <Box key={i} sx={{ mb: 3, position: 'relative' }}>
                   <Box sx={{ position: 'absolute', left: -21, top: 0, width: 10, height: 10, borderRadius: '50%', bgcolor: ev.color }} />
                   {ev.min && <Typography variant="caption" sx={{ color: colors.textSecondary, fontWeight: 700 }}>{String(ev.min)}'</Typography>}
@@ -1551,15 +1726,20 @@ const FixtureDetailsPage = () => {
           <Button 
             onClick={confirmApproval}
             variant="contained"
-            startIcon={<CheckCircle />}
+            startIcon={updating ? <CircularProgress size={20} sx={{ color: 'white' }} /> : <CheckCircle />}
+            disabled={updating}
             sx={{ 
               bgcolor: colors.success,
               textTransform: 'none',
               fontWeight: 700,
-              '&:hover': { bgcolor: '#059669' }
+              '&:hover': { bgcolor: '#059669' },
+              '&.Mui-disabled': {
+                bgcolor: colors.divider,
+                color: colors.textSecondary,
+              }
             }}
           >
-            Confirm Approval
+            {updating ? 'Approving...' : 'Confirm Approval'}
           </Button>
         </DialogActions>
       </Dialog>
@@ -1589,7 +1769,10 @@ const FixtureDetailsPage = () => {
               • Match ID: {id}
             </Typography>
             <Typography variant="body2" sx={{ fontSize: 13 }}>
-              • Current Status: {fixture?.status || 'N/A'}
+              • Status: {fixture?.status || 'N/A'}
+              {fixture?.matchStatus && fixture.matchStatus !== fixture?.status && (
+                <> • Match Flow: {fixture.matchStatus}</>
+              )}
             </Typography>
           </Alert>
           <Typography variant="body2" sx={{ mb: 2 }}>
@@ -1609,15 +1792,20 @@ const FixtureDetailsPage = () => {
           <Button 
             onClick={confirmEndMatch}
             variant="contained"
-            startIcon={<StopCircle />}
+            startIcon={updating ? <CircularProgress size={20} sx={{ color: 'white' }} /> : <StopCircle />}
+            disabled={updating}
             sx={{ 
               bgcolor: colors.warning,
               textTransform: 'none',
               fontWeight: 700,
-              '&:hover': { bgcolor: '#D97706' }
+              '&:hover': { bgcolor: '#D97706' },
+              '&.Mui-disabled': {
+                bgcolor: colors.divider,
+                color: colors.textSecondary,
+              }
             }}
           >
-            End Match
+            {updating ? 'Ending Match...' : 'End Match'}
           </Button>
         </DialogActions>
       </Dialog>
@@ -1786,8 +1974,8 @@ const FixtureDetailsPage = () => {
           <Button 
             onClick={handleSaveScore}
             variant="contained"
-            startIcon={<Save />}
-            disabled={!scoreForm.homeScore || !scoreForm.awayScore || !scoreForm.firstGoalScorer || !scoreForm.firstGoalMinute}
+            startIcon={updating ? <CircularProgress size={20} sx={{ color: 'white' }} /> : <Save />}
+            disabled={updating || !scoreForm.homeScore || !scoreForm.awayScore || !scoreForm.firstGoalScorer || !scoreForm.firstGoalMinute}
             sx={{ 
               bgcolor: colors.success,
               textTransform: 'none',
@@ -1799,7 +1987,7 @@ const FixtureDetailsPage = () => {
               }
             }}
           >
-            Save Score
+            {updating ? 'Saving...' : 'Save Score'}
           </Button>
         </DialogActions>
       </Dialog>

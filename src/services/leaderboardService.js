@@ -49,9 +49,38 @@ export const getLeaderboard = async (params = {}) => {
     const response = await apiGet('/leaderboard', backendParams);
     
     if (response.success) {
+      // Backend now returns both formats, so we just need to ensure compatibility
+      const data = response.data;
+      if (data.leaderboard && Array.isArray(data.leaderboard)) {
+        data.leaderboard = data.leaderboard.map(entry => ({
+          // Backend now includes both formats, but ensure all fields are present
+          id: entry.id || entry.user_id,
+          userId: entry.user_id || entry.id,
+          rank: entry.rank,
+          username: entry.username,
+          userEmail: entry.userEmail || entry.email || entry.user_email || null,
+          email: entry.email || entry.userEmail || entry.user_email || null,
+          fullName: entry.fullName || entry.full_name,
+          avatar: entry.avatar,
+          country: entry.country,
+          points: entry.points || entry.spTotal || entry.total_monthly_sp || 0,
+          spTotal: entry.spTotal || entry.points || entry.total_monthly_sp || 0,
+          totalPredictions: entry.totalPredictions || entry.predictions || entry.total_predictions || 0,
+          predictions: entry.predictions || entry.totalPredictions || entry.total_predictions || 0,
+          correctPredictions: entry.correctPredictions || entry.correct_predictions || 0,
+          accuracyRate: entry.accuracyRate || entry.accuracy || entry.accuracy_percentage || 0,
+          accuracy: entry.accuracy || entry.accuracyRate || entry.accuracy_percentage || 0,
+          isVerified: entry.isVerified || entry.is_verified || false,
+          lastUpdated: entry.lastUpdated || entry.lastPredictionTime || entry.last_prediction_time || null,
+          lastPredictionTime: entry.lastPredictionTime || entry.lastUpdated || entry.last_prediction_time || null,
+          period: entry.period || backendParams.period || 'allTime',
+          isCurrentUser: entry.isCurrentUser || false,
+        }));
+      }
+      
       return {
         success: true,
-        data: response.data,
+        data: data,
       };
     }
     

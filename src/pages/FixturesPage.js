@@ -160,9 +160,9 @@ const FixturesPage = () => {
         
         // Set current CMd
         const current = formattedCmds.find(cmd => cmd.status === 'current');
-        if (current) {
+    if (current) {
           currentCmdData = current;
-          setCurrentCmd(current);
+      setCurrentCmd(current);
         } else {
           // Try to get current CMd if not found in list
           const currentCmdResult = await getCurrentCmd();
@@ -260,7 +260,7 @@ const FixturesPage = () => {
     } catch (error) {
       console.error('Error loading fixtures:', error);
     } finally {
-      setLoading(false);
+    setLoading(false);
     }
   };
 
@@ -313,22 +313,31 @@ const FixturesPage = () => {
       // Status filter - map match flow states to backend statuses
       if (selectedStatus && selectedStatus !== 'all') {
         filtered = filtered.filter((fixture) => {
-          const status = fixture.matchStatus || fixture.status;
+          const fixtureStatus = fixture.status;
+          const matchStatus = fixture.matchStatus;
+          
           // Map filter values to backend statuses
           if (selectedStatus === 'scheduled') {
-            return status === 'scheduled' || status === 'draft';
+            return fixtureStatus === 'scheduled' || fixtureStatus === 'draft';
           }
           if (selectedStatus === 'published') {
-            return status === 'published' || status === 'predictionOpen';
+            // Published fixtures include:
+            // - status='published' with matchStatus='predictionOpen' (predictions open)
+            // - status='published' with matchStatus='predictionLock' (predictions locked, but still published)
+            // Both are published fixtures, just at different stages of the match flow
+            return (fixtureStatus === 'published' && (matchStatus === 'predictionOpen' || matchStatus === 'predictionLock' || !matchStatus)) ||
+                   fixtureStatus === 'predictionOpen';
           }
           if (selectedStatus === 'predictionLocked') {
-            return status === 'predictionLocked' || status === 'locked';
+            // This filter is for specifically locked fixtures (but they should also appear under published)
+            return matchStatus === 'predictionLock' || matchStatus === 'predictionLocked' || fixtureStatus === 'locked';
           }
           if (selectedStatus === 'resultsProcessing') {
             // Result Pending includes both resultsProcessing and pending statuses
-            return status === 'resultsProcessing' || status === 'pending' || status === 'fullTimeProcessing';
+            return fixtureStatus === 'resultPending' || fixtureStatus === 'resultsProcessing' || fixtureStatus === 'pending' || fixtureStatus === 'fullTimeProcessing';
           }
-          return status === selectedStatus;
+          // For other statuses, check both fixture status and match status
+          return fixtureStatus === selectedStatus || matchStatus === selectedStatus;
         });
       }
 
@@ -422,57 +431,76 @@ const FixturesPage = () => {
 
 
 
-  const getStatusChip = (status) => {
-    // Map backend statuses to match flow states
-    const statusMap = {
-      scheduled: 'predictionOpen',
-      published: 'predictionOpen',
-      predictionOpen: 'predictionOpen',
-      predictionLocked: 'predictionLocked',
-      locked: 'predictionLocked',
-      live: 'live',
-      completed: 'completed',
-      resultsProcessing: 'resultsProcessing',
-      fullTimeProcessing: 'resultsProcessing',
-      fullTimeCompleted: 'completed',
-    };
-
-    const mappedStatus = statusMap[status] || 'predictionOpen';
-
+  const getStatusChip = (status, matchStatus = null) => {
+    // Show actual backend status values directly
+    // Use matchStatus if available, otherwise use status
+    const displayStatus = matchStatus || status;
+    
+    // Map to display labels (keeping backend status names but formatting for display)
     const statusConfig = {
+      scheduled: {
+        label: 'SCHEDULED',
+        backgroundColor: '#9E9E9E',
+        textColor: '#FFFFFF'
+      },
+      published: {
+        label: 'PUBLISHED',
+        backgroundColor: '#1976D2',
+        textColor: '#FFFFFF'
+      },
       predictionOpen: {
         label: 'PREDICTION OPEN',
         backgroundColor: '#E3F2FD',
-        color: '#1976D2',
         textColor: '#1976D2'
+      },
+      predictionLock: {
+        label: 'PREDICTION LOCK',
+        backgroundColor: '#FFF3E0',
+        textColor: '#E65100'
       },
       predictionLocked: {
         label: 'PREDICTION LOCKED',
         backgroundColor: '#FFF3E0',
-        color: '#E65100',
+        textColor: '#E65100'
+      },
+      locked: {
+        label: 'LOCKED',
+        backgroundColor: '#FFF3E0',
         textColor: '#E65100'
       },
       live: {
         label: 'LIVE',
         backgroundColor: colors.brandRed,
-        color: colors.brandWhite,
+        textColor: colors.brandWhite
+      },
+      resultPending: {
+        label: 'RESULT PENDING',
+        backgroundColor: colors.warning,
+        textColor: colors.brandWhite
+      },
+      resultsProcessing: {
+        label: 'RESULTS PROCESSING',
+        backgroundColor: colors.warning,
+        textColor: colors.brandWhite
+      },
+      pending: {
+        label: 'PENDING',
+        backgroundColor: colors.warning,
         textColor: colors.brandWhite
       },
       completed: {
         label: 'COMPLETED',
         backgroundColor: '#E8F5E9',
-        color: '#2E7D32',
         textColor: '#2E7D32'
-      },
-      resultsProcessing: {
-        label: 'RESULT PENDING',
-        backgroundColor: colors.warning,
-        color: colors.brandWhite,
-        textColor: colors.brandWhite
       },
     };
 
-    const config = statusConfig[mappedStatus] || statusConfig.predictionOpen;
+    // Use actual backend status, fallback to uppercase of status if not in config
+    const config = statusConfig[displayStatus] || {
+      label: (displayStatus || 'UNKNOWN').toUpperCase().replace(/_/g, ' '),
+      backgroundColor: '#9E9E9E',
+      textColor: '#FFFFFF'
+    };
 
     return (
       <Chip
@@ -687,27 +715,22 @@ const FixturesPage = () => {
       id: 'status',
       label: 'Status',
       render: (_, row) => {
-        const status = row.matchStatus || row.status;
-        const isResultPending = status === 'resultsProcessing' || status === 'pending';
-
-        if (isResultPending) {
+        // Show actual backend status values
+        const fixtureStatus = row.status;
+        const matchStatus = row.matchStatus;
+        
+        // If both status and matchStatus exist and are different, show both
+        if (fixtureStatus && matchStatus && fixtureStatus !== matchStatus) {
           return (
-            <Chip
-              label="RESULT PENDING"
-              sx={{
-                backgroundColor: colors.warning,
-                color: colors.brandWhite,
-                fontWeight: 700,
-                fontSize: 11,
-                height: 28,
-                borderRadius: '8px',
-                border: 'none',
-                textTransform: 'uppercase',
-              }}
-            />
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+              {getStatusChip(fixtureStatus)}
+              {getStatusChip(matchStatus)}
+            </Box>
           );
         }
-        return getStatusChip(status);
+        
+        // Otherwise show the matchStatus if available, or status
+        return getStatusChip(matchStatus || fixtureStatus);
       },
     },
     {
@@ -853,8 +876,11 @@ const FixturesPage = () => {
           <StatCard
             title="Published"
             value={fixtures.filter((f) => {
-              const status = f.matchStatus || f.status;
-              return status === 'published' || status === 'predictionOpen';
+              const fixtureStatus = f.status;
+              const matchStatus = f.matchStatus;
+              // Published fixtures include both predictionOpen and predictionLock
+              return (fixtureStatus === 'published' && (matchStatus === 'predictionOpen' || matchStatus === 'predictionLock' || !matchStatus)) ||
+                     fixtureStatus === 'predictionOpen';
             }).length.toString()}
             subtitle="Predictions Open"
             icon={Visibility}
