@@ -1,0 +1,1823 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import {
+  Box,
+  Typography,
+  Button,
+  Card,
+  CardContent,
+  Grid,
+  Chip,
+  CircularProgress,
+  Stepper,
+  Step,
+  StepLabel,
+  Divider,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Alert,
+  TextField,
+  Checkbox,
+  FormControlLabel,
+  LinearProgress,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
+} from '@mui/material';
+import {
+  ArrowBack,
+  Schedule,
+  Lock,
+  PlayCircle,
+  CheckCircle,
+  SportsSoccer,
+  AccessTime,
+  HourglassEmpty,
+  LocationOn,
+  CalendarToday,
+  People,
+  ArrowUpward,
+  Person,
+  StopCircle,
+  Save,
+} from '@mui/icons-material';
+import { format } from 'date-fns';
+import { colors, constants } from '../config/theme';
+import SearchBar from '../components/common/SearchBar';
+import DataTable from '../components/common/DataTable';
+import { getFixture, getFixturePredictions } from '../services/fixturesService';
+
+const FixtureDetailsPage = () => {
+  const navigate = useNavigate();
+  const { id } = useParams();
+  const [fixture, setFixture] = useState(null);
+  const [predictions, setPredictions] = useState([]);
+  const [filteredPredictions, setFilteredPredictions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [approveDialogOpen, setApproveDialogOpen] = useState(false);
+  const [isApproved, setIsApproved] = useState(false);
+  const [scoreDialogOpen, setScoreDialogOpen] = useState(false);
+  const [endMatchDialogOpen, setEndMatchDialogOpen] = useState(false);
+  const [scoreForm, setScoreForm] = useState({
+    homeScore: '',
+    awayScore: '',
+    firstGoalScorer: '',
+    firstGoalMinute: '',
+    markCompleted: true,
+  });
+  const [selectedFlowStatus, setSelectedFlowStatus] = useState(null);
+
+  useEffect(() => {
+    const loadFixtureData = async () => {
+      try {
+        setLoading(true);
+
+        if (!id) {
+          console.error('Fixture ID is missing');
+          setLoading(false);
+          return;
+        }
+
+        // Fetch fixture from API
+        console.log('Loading fixture with ID:', id);
+        const fixtureResult = await getFixture(id);
+        console.log('Fixture API response:', fixtureResult);
+
+        if (fixtureResult.success && fixtureResult.data) {
+          // Backend returns { success: true, data: { fixture: {...} } }
+          // The fixture object is nested in data.fixture
+          const fixtureData = fixtureResult.data.fixture || fixtureResult.data;
+          console.log('Fixture data extracted:', fixtureData);
+
+          // Check if fixtureData is actually an object
+          if (!fixtureData || typeof fixtureData !== 'object' || Array.isArray(fixtureData)) {
+            console.error('Invalid fixture data structure:', fixtureData);
+            setLoading(false);
+            setFixture(null);
+            return;
+          }
+
+          console.log('Processing fixture data, homeTeam:', fixtureData.homeTeam || fixtureData.home_team);
+
+          // Format fixture data to match expected structure
+          let formattedFixture;
+          try {
+            formattedFixture = {
+              id: fixtureData._id || fixtureData.id,
+              matchId: fixtureData.matchId || fixtureData.match_id || fixtureData._id || fixtureData.id,
+              homeTeam: fixtureData.homeTeam || fixtureData.home_team || '',
+              awayTeam: fixtureData.awayTeam || fixtureData.away_team || '',
+              league: fixtureData.league || fixtureData.leagueName || fixtureData.league_name || (fixtureData.leagueId?.league_name) || '',
+              leagueId: fixtureData.leagueId?._id || fixtureData.leagueId || '',
+              kickoffTime: (() => {
+                const kickoff = fixtureData.kickoffTime || fixtureData.kickoff_time;
+                if (!kickoff) return null;
+                const date = new Date(kickoff);
+                return isNaN(date.getTime()) ? null : date;
+              })(),
+              status: fixtureData.status || fixtureData.matchStatus || 'scheduled',
+              matchStatus: fixtureData.matchStatus || fixtureData.status || 'scheduled',
+              predictions: fixtureData.totalPredictions || fixtureData.predictionCount || fixtureData.prediction_count || 0,
+              hot: fixtureData.isFeatured || fixtureData.isCeBeFeatured || false,
+              cmdId: fixtureData.cmdId?._id || fixtureData.cmdId || (typeof fixtureData.cmdId === 'string' ? fixtureData.cmdId : ''),
+              cmdName: fixtureData.cmdId?.name || fixtureData.cmdName || fixtureData.cmd_name || '',
+              venue: fixtureData.venue || '',
+              homeScore: fixtureData.homeScore || fixtureData.home_score || null,
+              awayScore: fixtureData.awayScore || fixtureData.away_score || null,
+              homeTeamLogo: fixtureData.homeTeamLogo || fixtureData.home_team_logo || null,
+              awayTeamLogo: fixtureData.awayTeamLogo || fixtureData.away_team_logo || null,
+              publishDateTime: (() => {
+                const publish = fixtureData.publishDateTime || fixtureData.publish_date_time;
+                if (!publish) return null;
+                const date = new Date(publish);
+                return isNaN(date.getTime()) ? null : date;
+              })(),
+              isCeBeFeatured: fixtureData.isCeBeFeatured || false,
+              isCommunityFeatured: fixtureData.isCommunityFeatured || false,
+              matchday: fixtureData.matchday || '',
+              // Include all other fields
+              ...fixtureData,
+            };
+
+            console.log('Setting fixture state with formatted data:', formattedFixture);
+            setFixture(formattedFixture);
+            console.log('Fixture state set successfully');
+
+            // Set loading to false IMMEDIATELY after fixture is set
+            // Don't wait for predictions to load
+            setLoading(false);
+            console.log('Loading set to false');
+
+            // Initialize selected flow status based on fixture status
+            const status = formattedFixture.status || formattedFixture.matchStatus || 'scheduled';
+            // Map fixture status to strictly follow the 5-state match flow
+            const statusMap = {
+              'scheduled': 'predictionOpen',
+              'published': 'predictionOpen',
+              'predictionOpen': 'predictionOpen',
+              'predictionLocked': 'predictionLocked',
+              'predictionLock': 'predictionLocked',
+              'locked': 'predictionLocked',
+              'live': 'live',
+              'resultsProcessing': 'fullTimeProcessing',
+              'fullTimeProcessing': 'fullTimeProcessing',
+              'pending': 'fullTimeProcessing',
+              'resultPending': 'fullTimeProcessing',
+              'completed': 'fullTimeCompleted',
+              'fullTimeCompleted': 'fullTimeCompleted',
+            };
+            setSelectedFlowStatus(statusMap[status] || 'predictionOpen');
+
+            // Fetch predictions from API (async, don't block UI)
+            getFixturePredictions(id, { limit: 1000 })
+              .then(predictionsResult => {
+                if (predictionsResult.success && predictionsResult.data) {
+                  const predictionsArray = predictionsResult.data.predictions || predictionsResult.data || [];
+                  const formattedPredictions = predictionsArray.map(pred => ({
+                    id: pred._id || pred.id,
+                    userId: pred.userId || pred.user_id || '',
+                    username: pred.username || pred.userName || 'Unknown User',
+                    userEmail: pred.userEmail || pred.user_email || '',
+                    userCountry: pred.userCountry || pred.user_country || '',
+                    fixtureId: pred.fixtureId || pred.fixture_id || id,
+                    homeTeam: pred.homeTeam || pred.home_team || formattedFixture.homeTeam,
+                    awayTeam: pred.awayTeam || pred.away_team || formattedFixture.awayTeam,
+                    predictedHomeScore: pred.predictedHomeScore || pred.predicted_home_score || pred.homeScore || 0,
+                    predictedAwayScore: pred.predictedAwayScore || pred.predicted_away_score || pred.awayScore || 0,
+                    firstGoalScorer: pred.firstGoalScorer || pred.first_goal_scorer || '',
+                    firstGoalMinute: pred.firstGoalMinute || pred.first_goal_minute || null,
+                    createdAt: pred.createdAt ? new Date(pred.createdAt) : pred.created_at ? new Date(pred.created_at) : new Date(),
+                    points: pred.points || 0,
+                    isCorrect: pred.isCorrect || pred.is_correct || false,
+                  }));
+
+                  setPredictions(formattedPredictions);
+                  setFilteredPredictions(formattedPredictions);
+                } else {
+                  setPredictions([]);
+                  setFilteredPredictions([]);
+                }
+              })
+              .catch(predError => {
+                console.error('Error loading predictions:', predError);
+                setPredictions([]);
+                setFilteredPredictions([]);
+              });
+          } catch (formatError) {
+            console.error('Error formatting fixture data:', formatError);
+            setLoading(false);
+            setFixture(null);
+            return;
+          }
+        } else {
+          console.error('Failed to load fixture:', fixtureResult);
+          console.error('Error details:', fixtureResult.error);
+          // Set loading to false even on error so UI doesn't hang
+          setLoading(false);
+          // Set empty fixture to show error state
+          setFixture(null);
+        }
+      } catch (error) {
+        console.error('Error loading fixture:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadFixtureData();
+  }, [id]);
+
+  // Update selected flow status when fixture status changes
+  useEffect(() => {
+    if (fixture) {
+      const status = fixture.status || fixture.matchStatus || 'scheduled';
+      const statusMap = {
+        'scheduled': 'predictionOpen',
+        'published': 'predictionOpen',
+        'predictionOpen': 'predictionOpen',
+        'predictionLocked': 'predictionLocked',
+        'predictionLock': 'predictionLocked',
+        'locked': 'predictionLocked',
+        'live': 'live',
+        'resultsProcessing': 'fullTimeProcessing',
+        'fullTimeProcessing': 'fullTimeProcessing',
+        'pending': 'fullTimeProcessing',
+        'resultPending': 'fullTimeProcessing',
+        'completed': 'fullTimeCompleted',
+        'fullTimeCompleted': 'fullTimeCompleted',
+      };
+      setSelectedFlowStatus(statusMap[status] || 'predictionOpen');
+    }
+  }, [fixture?.status, fixture?.matchStatus]);
+
+  useEffect(() => {
+    const filterPredictions = () => {
+      if (!searchQuery) {
+        setFilteredPredictions(predictions);
+        return;
+      }
+      const query = searchQuery.toLowerCase();
+      const filtered = predictions.filter(
+        (pred) =>
+          pred.username?.toLowerCase().includes(query) ||
+          pred.userId?.toLowerCase().includes(query) ||
+          pred.email?.toLowerCase().includes(query) ||
+          pred.fullName?.toLowerCase().includes(query)
+      );
+      setFilteredPredictions(filtered);
+    };
+    filterPredictions();
+  }, [predictions, searchQuery]);
+
+  const getSampleFixtures = () => {
+    const now = new Date();
+    return [
+      // Match fixtures from FixturesPage - using same IDs
+      {
+        id: 'MATCH_001',
+        matchId: 'MATCH_123',
+        homeTeam: 'Arsenal',
+        awayTeam: 'Chelsea',
+        league: 'Premier League',
+        kickoffTime: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
+        matchStatus: 'scheduled',
+        status: 'scheduled',
+        homeScore: undefined,
+        awayScore: undefined,
+        predictions: 1543,
+        hot: true,
+      },
+      {
+        id: 'MATCH_002',
+        matchId: 'MATCH_124',
+        homeTeam: 'Real Madrid',
+        awayTeam: 'Barcelona',
+        league: 'La Liga',
+        kickoffTime: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+        matchStatus: 'scheduled',
+        status: 'scheduled',
+        homeScore: undefined,
+        awayScore: undefined,
+        predictions: 2891,
+        hot: true,
+      },
+      {
+        id: 'MATCH_003',
+        matchId: 'MATCH_125',
+        homeTeam: 'Manchester City',
+        awayTeam: 'Liverpool',
+        league: 'Premier League',
+        kickoffTime: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000),
+        matchStatus: 'scheduled',
+        status: 'scheduled',
+        homeScore: undefined,
+        awayScore: undefined,
+        predictions: 1876,
+        hot: false,
+      },
+      {
+        id: 'MATCH_004',
+        matchId: 'MATCH_126',
+        homeTeam: 'Bayern Munich',
+        awayTeam: 'Dortmund',
+        league: 'Bundesliga',
+        kickoffTime: new Date(Date.now() - 2 * 60 * 60 * 1000),
+        matchStatus: 'resultsProcessing',
+        status: 'resultsProcessing',
+        homeScore: 3,
+        awayScore: 1,
+        firstGoalScorer: 'Kane',
+        firstGoalMinute: '12',
+        predictions: 1245,
+        hot: false,
+      },
+      // Additional sample fixtures for variety
+      {
+        id: 'MATCH_001',
+        homeTeam: 'Manchester United',
+        awayTeam: 'Liverpool',
+        league: 'Premier League',
+        kickoffTime: new Date('2026-01-22T20:15:00'),
+        matchStatus: 'scheduled',
+        status: 'scheduled',
+        homeScore: undefined,
+        awayScore: undefined,
+        predictions: 0,
+      },
+      {
+        id: 'MATCH_006',
+        homeTeam: 'Real Madrid',
+        awayTeam: 'Barcelona',
+        league: 'La Liga',
+        kickoffTime: new Date('2026-01-25T20:15:00'),
+        matchStatus: 'scheduled',
+        status: 'scheduled',
+        homeScore: undefined,
+        awayScore: undefined,
+        predictions: 0,
+      },
+      {
+        id: 'MATCH_007',
+        homeTeam: 'Bayern Munich',
+        awayTeam: 'Borussia Dortmund',
+        league: 'Bundesliga',
+        kickoffTime: new Date('2026-01-27T20:15:00'),
+        matchStatus: 'scheduled',
+        status: 'scheduled',
+        homeScore: undefined,
+        awayScore: undefined,
+        predictions: 0,
+      },
+      {
+        id: 'MATCH_012',
+        homeTeam: 'PSG',
+        awayTeam: 'Marseille',
+        league: 'Ligue 1',
+        kickoffTime: new Date('2026-01-23T21:00:00'),
+        matchStatus: 'scheduled',
+        status: 'scheduled',
+        homeScore: undefined,
+        awayScore: undefined,
+        predictions: 0,
+      },
+      // Published fixtures
+      {
+        id: 'MATCH_014',
+        homeTeam: 'Manchester City',
+        awayTeam: 'Tottenham',
+        league: 'Premier League',
+        kickoffTime: new Date('2026-01-21T15:00:00'),
+        matchStatus: 'published',
+        status: 'published',
+        homeScore: undefined,
+        awayScore: undefined,
+        predictions: 25,
+      },
+      {
+        id: 'MATCH_015',
+        homeTeam: 'AC Milan',
+        awayTeam: 'Inter Milan',
+        league: 'Serie A',
+        kickoffTime: new Date('2026-01-21T20:00:00'),
+        matchStatus: 'published',
+        status: 'published',
+        homeScore: undefined,
+        awayScore: undefined,
+        predictions: 18,
+      },
+      // Live fixtures
+      {
+        id: 'MATCH_003',
+        homeTeam: 'Arsenal',
+        awayTeam: 'Chelsea',
+        league: 'Premier League',
+        kickoffTime: new Date(now.getTime() - 1 * 60 * 60 * 1000),
+        matchStatus: 'live',
+        status: 'live',
+        homeScore: 1,
+        awayScore: 1,
+        predictions: 52,
+      },
+      {
+        id: 'MATCH_016',
+        homeTeam: 'Leicester City',
+        awayTeam: 'Southampton',
+        league: 'Premier League',
+        kickoffTime: new Date(now.getTime() - 0.5 * 60 * 60 * 1000),
+        matchStatus: 'live',
+        status: 'live',
+        homeScore: 2,
+        awayScore: 0,
+        predictions: 31,
+      },
+      // Result Pending fixtures
+      {
+        id: 'MATCH_009',
+        homeTeam: 'Everton',
+        awayTeam: 'Fulham',
+        league: 'Premier League',
+        kickoffTime: new Date('2026-01-20T18:15:00'),
+        matchStatus: 'resultsProcessing',
+        status: 'resultsProcessing',
+        homeScore: 1,
+        awayScore: 2,
+        firstGoalScorer: '',
+        firstGoalMinute: '',
+        predictions: 45,
+      },
+      {
+        id: 'MATCH_010',
+        homeTeam: 'Tottenham',
+        awayTeam: 'Newcastle',
+        league: 'Premier League',
+        kickoffTime: new Date(now.getTime() - 3 * 60 * 60 * 1000),
+        matchStatus: 'resultsProcessing',
+        status: 'resultsProcessing',
+        homeScore: 2,
+        awayScore: 1,
+        firstGoalScorer: '',
+        firstGoalMinute: '',
+        predictions: 38,
+      },
+      {
+        id: 'MATCH_011',
+        homeTeam: 'Brighton',
+        awayTeam: 'Crystal Palace',
+        league: 'Premier League',
+        kickoffTime: new Date(now.getTime() - 4 * 60 * 60 * 1000),
+        matchStatus: 'pending',
+        status: 'pending',
+        homeScore: 0,
+        awayScore: 1,
+        firstGoalScorer: '',
+        firstGoalMinute: '',
+        predictions: 22,
+      },
+      // Completed fixtures
+      {
+        id: 'MATCH_004',
+        homeTeam: 'Newcastle',
+        awayTeam: 'Brighton',
+        league: 'Premier League',
+        kickoffTime: new Date('2026-01-19T20:15:00'),
+        matchStatus: 'completed',
+        status: 'completed',
+        homeScore: 2,
+        awayScore: 1,
+        firstGoalScorer: 'Wilson',
+        firstGoalMinute: 23,
+        predictions: 48,
+      },
+      {
+        id: 'MATCH_005',
+        homeTeam: 'West Ham',
+        awayTeam: 'Aston Villa',
+        league: 'Premier League',
+        kickoffTime: new Date('2026-01-18T20:15:00'),
+        matchStatus: 'completed',
+        status: 'completed',
+        homeScore: 1,
+        awayScore: 1,
+        firstGoalScorer: 'Watkins',
+        firstGoalMinute: 15,
+        predictions: 42,
+      },
+      {
+        id: 'MATCH_008',
+        homeTeam: 'Wolves',
+        awayTeam: 'Crystal Palace',
+        league: 'Premier League',
+        kickoffTime: new Date('2026-01-17T20:15:00'),
+        matchStatus: 'completed',
+        status: 'completed',
+        homeScore: 3,
+        awayScore: 0,
+        firstGoalScorer: 'Neto',
+        firstGoalMinute: 8,
+        predictions: 35,
+      },
+      {
+        id: 'MATCH_017',
+        homeTeam: 'Burnley',
+        awayTeam: 'Sheffield United',
+        league: 'Premier League',
+        kickoffTime: new Date('2026-01-16T15:00:00'),
+        matchStatus: 'completed',
+        status: 'completed',
+        homeScore: 2,
+        awayScore: 2,
+        firstGoalScorer: 'Brownhill',
+        firstGoalMinute: 12,
+        predictions: 28,
+      },
+      {
+        id: 'MATCH_018',
+        homeTeam: 'Brentford',
+        awayTeam: 'Nottingham Forest',
+        league: 'Premier League',
+        kickoffTime: new Date('2026-01-15T17:30:00'),
+        matchStatus: 'completed',
+        status: 'completed',
+        homeScore: 1,
+        awayScore: 0,
+        firstGoalScorer: 'Toney',
+        firstGoalMinute: 34,
+        predictions: 39,
+      },
+    ];
+  };
+
+  const getSamplePredictions = (fixtureId) => {
+    // Sample predictions data matching the design
+    return [
+      {
+        id: 'PRED_001',
+        userId: 'USER001',
+        username: 'john_doe',
+        email: 'john@example.com',
+        fullName: 'John Doe',
+        prediction: 'Newcastle Win',
+        predictionTime: new Date('2026-01-18T20:17:00'),
+        status: 'won',
+      },
+      {
+        id: 'PRED_002',
+        userId: 'USER006',
+        username: 'emma_davis',
+        email: 'emma@example.com',
+        fullName: 'Emma Davis',
+        prediction: 'Brighton Win',
+        predictionTime: new Date('2026-01-18T20:17:00'),
+        status: 'lost',
+      },
+      {
+        id: 'PRED_003',
+        userId: 'USER007',
+        username: 'alex_miller',
+        email: 'alex@example.com',
+        fullName: 'Alex Miller',
+        prediction: 'Newcastle Win',
+        predictionTime: new Date('2026-01-18T20:17:00'),
+        status: 'won',
+      },
+    ];
+  };
+
+  const handleApproveMatch = () => {
+    setApproveDialogOpen(true);
+  };
+
+  const confirmApproval = () => {
+    setIsApproved(true);
+    setApproveDialogOpen(false);
+    // In production, this would update the backend
+    console.log(`[SYSTEM LOG] Match details approved for ${id}`);
+  };
+
+  const handleEndMatch = () => {
+    setEndMatchDialogOpen(true);
+  };
+
+  const confirmEndMatch = () => {
+    // Update fixture status to 'resultsProcessing' (Full Time - Results Processing) without scores
+    setFixture(prev => ({
+      ...prev,
+      status: 'resultsProcessing',
+      matchStatus: 'resultsProcessing',
+    }));
+    setEndMatchDialogOpen(false);
+    // Update flow status to reflect the change
+    setSelectedFlowStatus('fullTimeProcessing');
+    console.log(`[SYSTEM LOG] Match ${id} ended - now in Full Time (Results Processing) state`);
+    alert('Match ended successfully. Match is now in Full Time (Results Processing) state. You can upload the score later.');
+  };
+
+  const handleOpenScoreDialog = () => {
+    setScoreForm({
+      homeScore: fixture.homeScore || '',
+      awayScore: fixture.awayScore || '',
+      firstGoalScorer: fixture.firstGoalScorer || '',
+      firstGoalMinute: fixture.firstGoalMinute || '',
+      markCompleted: true,
+    });
+    setScoreDialogOpen(true);
+  };
+
+  const handleSaveScore = () => {
+    // Validate scores - all required: home score, away score, first goal scorer, and first goal minute
+    if (scoreForm.homeScore === '' || scoreForm.awayScore === '' || !scoreForm.firstGoalScorer || !scoreForm.firstGoalMinute) {
+      alert('Please enter all required fields: home score, away score, first goal scorer, and first goal minute');
+      return;
+    }
+
+    // Calculate new status based on markCompleted
+    const newStatus = scoreForm.markCompleted ? 'completed' : 'resultsProcessing';
+
+    // Update fixture with scores
+    setFixture(prev => ({
+      ...prev,
+      homeScore: parseInt(scoreForm.homeScore),
+      awayScore: parseInt(scoreForm.awayScore),
+      firstGoalScorer: scoreForm.firstGoalScorer,
+      firstGoalMinute: parseInt(scoreForm.firstGoalMinute),
+      status: newStatus,
+      matchStatus: newStatus,
+    }));
+
+    // Update flow status for the specific completed state
+    const flowStatusMap = {
+      'completed': 'fullTimeCompleted',
+      'resultsProcessing': 'fullTimeProcessing'
+    };
+    setSelectedFlowStatus(flowStatusMap[newStatus] || 'fullTimeProcessing');
+
+    setScoreDialogOpen(false);
+    console.log(`[SYSTEM LOG] Score saved for match ${id}:`, scoreForm);
+
+    if (scoreForm.markCompleted) {
+      alert('Score saved and match completed! Match is now in Completed state.');
+    } else {
+      alert('Score saved. Match is now in Full Time (Results Processing) state.');
+    }
+  };
+
+  const getFlowProgress = () => {
+    const status = fixture?.status || 'scheduled';
+    if (status === 'scheduled' || status === 'published') return 0;
+    if (status === 'predictionLocked' || status === 'locked' || status === 'predictionLock') return 25;
+    if (status === 'live') return 50;
+    if (status === 'resultsProcessing' || status === 'pending' || status === 'resultPending' || status === 'fullTimeProcessing') return 75;
+    if (status === 'completed' || status === 'fullTimeCompleted') return 100;
+    return 0;
+  };
+
+  const getFlowStatus = () => {
+    const status = fixture?.status || 'scheduled';
+    if (status === 'scheduled' || status === 'published' || status === 'predictionOpen') return 'Prediction Open';
+    if (status === 'predictionLocked' || status === 'locked' || status === 'predictionLock') return 'Prediction Locked';
+    if (status === 'live') return 'Live';
+    if (status === 'resultsProcessing' || status === 'pending' || status === 'resultPending' || status === 'fullTimeProcessing') return 'Full Time (Results Processing)';
+    if (status === 'completed' || status === 'fullTimeCompleted') return 'Full Time (Completed)';
+    return 'Unknown';
+  };
+
+  const getFlowColor = () => {
+    const progress = getFlowProgress();
+    if (progress === 0) return '#EBF5FF';
+    if (progress === 25) return '#FFF4E6';
+    if (progress === 50) return '#FEF3C7';
+    if (progress === 75) return '#FFF7ED';
+    if (progress === 100) return '#ECFDF5';
+    return '#F3F4F6';
+  };
+
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+        <CircularProgress sx={{ color: colors.brandRed }} />
+      </Box>
+    );
+  }
+
+  if (!fixture) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Button
+          startIcon={<ArrowBack />}
+          onClick={() => navigate(constants.routes.fixtures)}
+          sx={{
+            mb: 3,
+            color: colors.brandRed,
+            textTransform: 'none',
+            fontWeight: 600,
+          }}
+        >
+          Back to Fixtures
+        </Button>
+        <Alert severity="error" sx={{ mb: 2 }}>
+          Fixture not found or failed to load. Please try again.
+        </Alert>
+      </Box>
+    );
+  }
+
+  if (!fixture) {
+    return (
+      <Box sx={{ textAlign: 'center', padding: 6 }}>
+        <Typography variant="h6" sx={{ color: colors.error, mb: 2 }}>
+          Fixture not found
+        </Typography>
+        <Button
+          variant="contained"
+          onClick={() => navigate(constants.routes.fixtures)}
+          sx={{
+            background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
+            borderRadius: '12px',
+            textTransform: 'none',
+            fontWeight: 600,
+          }}
+        >
+          Back to Fixtures
+        </Button>
+      </Box>
+    );
+  }
+
+  const getStatusChip = (status) => {
+    // Map old statuses to new match flow states for backward compatibility
+    const statusMap = {
+      scheduled: 'predictionOpen',
+      published: 'predictionOpen',
+      predictionOpen: 'predictionOpen',
+      predictionLocked: 'predictionLocked',
+      predictionLock: 'predictionLocked',
+      locked: 'predictionLocked',
+      live: 'live',
+      resultsProcessing: 'fullTimeProcessing',
+      fullTimeProcessing: 'fullTimeProcessing',
+      pending: 'fullTimeProcessing',
+      resultPending: 'fullTimeProcessing',
+      completed: 'fullTimeCompleted',
+      fullTimeCompleted: 'fullTimeCompleted',
+    };
+
+    const mappedStatus = statusMap[status] || 'predictionOpen';
+
+    const statusConfig = {
+      predictionOpen: {
+        label: 'Prediction Open',
+        color: colors.info,
+        icon: AccessTime
+      },
+      predictionLocked: {
+        label: 'Prediction Locked',
+        color: colors.warning,
+        icon: Lock
+      },
+      live: {
+        label: 'Live',
+        color: colors.error,
+        icon: PlayCircle
+      },
+      fullTimeProcessing: {
+        label: 'Full Time (Results Processing)',
+        color: colors.warning,
+        icon: HourglassEmpty
+      },
+      fullTimeCompleted: {
+        label: 'Full Time (Completed)',
+        color: colors.success,
+        icon: CheckCircle
+      },
+    };
+
+    const config = statusConfig[mappedStatus] || statusConfig.predictionOpen;
+    const Icon = config.icon;
+
+    return (
+      <Chip
+        icon={<Icon />}
+        label={config.label}
+        sx={{
+          backgroundColor: `${config.color}1A`,
+          color: config.color,
+          fontWeight: 600,
+        }}
+      />
+    );
+  };
+
+  const steps = [
+    'Prediction Open',
+    'Prediction Locked',
+    'Live',
+    'Full Time (Results Processing)',
+    'Full Time (Completed)'
+  ];
+
+  const getActiveStep = () => {
+    const status = fixture.matchStatus || fixture.status;
+
+    // Map old statuses to new match flow states
+    const statusMap = {
+      scheduled: 'predictionOpen',
+      published: 'predictionOpen',
+      predictionOpen: 'predictionOpen',
+      predictionLocked: 'predictionLocked',
+      locked: 'predictionLocked',
+      live: 'live',
+      fullTime: 'fullTimeProcessing',
+      resultsProcessing: 'fullTimeProcessing',
+      fullTimeProcessing: 'fullTimeProcessing',
+      completed: 'fullTimeCompleted',
+      fullTimeCompleted: 'fullTimeCompleted',
+    };
+
+    const mappedStatus = statusMap[status] || 'predictionOpen';
+
+    // Return step index based on match flow state
+    if (mappedStatus === 'predictionOpen') return 0;
+    if (mappedStatus === 'predictionLocked') return 1;
+    if (mappedStatus === 'live') return 2;
+    if (mappedStatus === 'fullTimeProcessing') return 3;
+    if (mappedStatus === 'fullTimeCompleted') return 4;
+
+    return 0;
+  };
+
+  const columns = [
+    {
+      id: 'userId',
+      label: 'User ID',
+      render: (_, row) => (
+        <Chip
+          label={row.userId || 'N/A'}
+          sx={{
+            backgroundColor: '#FFE5E5',
+            color: colors.brandRed,
+            fontWeight: 600,
+            fontSize: 11,
+            height: 28,
+            borderRadius: '20px',
+            border: 'none',
+          }}
+        />
+      ),
+    },
+    {
+      id: 'username',
+      label: 'Username',
+      render: (_, row) => (
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Box
+            sx={{
+              width: 32,
+              height: 32,
+              borderRadius: '50%',
+              backgroundColor: colors.brandRed,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Person sx={{ fontSize: 18, color: colors.brandWhite }} />
+          </Box>
+          <Box>
+            <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack }}>
+              {row.username || row.fullName || 'N/A'}
+            </Typography>
+            <Typography variant="caption" sx={{ color: colors.textSecondary, fontSize: 11 }}>
+              {row.email || ''}
+            </Typography>
+          </Box>
+        </Box>
+      ),
+    },
+    {
+      id: 'prediction',
+      label: 'Prediction',
+      render: (_, row) => (
+        <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack }}>
+          {row.prediction || row.selectedTeam || 'N/A'}
+        </Typography>
+      ),
+    },
+    {
+      id: 'predictionTime',
+      label: 'Prediction Time',
+      render: (_, row) => {
+        if (!row.predictionTime) return <Typography variant="body2" sx={{ color: colors.brandBlack }}>N/A</Typography>;
+        const time = row.predictionTime?.toDate ? row.predictionTime.toDate() : new Date(row.predictionTime);
+        const isValidDate = time instanceof Date && !isNaN(time.getTime());
+        return (
+          <Typography variant="body2" sx={{ color: colors.brandBlack }}>
+            {isValidDate ? format(time, 'MMM dd, yyyy HH:mm') : 'N/A'}
+          </Typography>
+        );
+      },
+    },
+    {
+      id: 'status',
+      label: 'Status',
+      render: (_, row) => {
+        const status = row.status || row.predictionStatus;
+        const statusConfig = {
+          won: { label: 'WON', color: colors.success },
+          lost: { label: 'LOST', color: colors.error },
+          correct: { label: 'WON', color: colors.success },
+          incorrect: { label: 'LOST', color: colors.error },
+          ongoing: { label: 'Ongoing', color: colors.info },
+          pending: { label: 'Pending', color: colors.warning },
+        };
+        const config = statusConfig[status] || statusConfig.ongoing;
+        return (
+          <Chip
+            label={config.label}
+            size="small"
+            sx={{
+              backgroundColor: `${config.color}1A`,
+              color: config.color,
+              fontWeight: 700,
+              fontSize: 11,
+              height: 28,
+              borderRadius: '20px',
+            }}
+          />
+        );
+      },
+    },
+  ];
+
+  const paginatedPredictions = filteredPredictions.slice(
+    page * rowsPerPage,
+    page * rowsPerPage + rowsPerPage
+  );
+
+  const getStatusInfo = () => {
+    const status = fixture.matchStatus || fixture.status;
+    const statusMap = {
+      scheduled: 'predictionOpen',
+      published: 'predictionOpen',
+      predictionOpen: 'predictionOpen',
+      predictionLocked: 'predictionLocked',
+      locked: 'predictionLocked',
+      live: 'live',
+      fullTime: 'fullTimeProcessing',
+      resultsProcessing: 'fullTimeProcessing',
+      fullTimeProcessing: 'fullTimeProcessing',
+      completed: 'fullTimeCompleted',
+      fullTimeCompleted: 'fullTimeCompleted',
+    };
+    return statusMap[status] || 'predictionOpen';
+  };
+
+  const getStatusCardConfig = () => {
+    const status = getStatusInfo();
+    const configs = {
+      predictionOpen: {
+        title: 'Prediction Open',
+        subtitle: 'Users can predict',
+        icon: AccessTime,
+        color: colors.info,
+        isPrimary: false,
+      },
+      predictionLocked: {
+        title: 'Prediction Locked',
+        subtitle: 'Predictions closed',
+        icon: Lock,
+        color: colors.warning,
+        isPrimary: false,
+      },
+      live: {
+        title: 'Live',
+        subtitle: 'Match in progress',
+        icon: PlayCircle,
+        color: colors.brandRed,
+        isPrimary: true,
+      },
+      fullTimeProcessing: {
+        title: 'Full Time (Results Processing)',
+        subtitle: 'Score upload pending',
+        icon: HourglassEmpty,
+        color: colors.warning,
+        isPrimary: false,
+      },
+      fullTimeCompleted: {
+        title: 'Full Time (Completed)',
+        subtitle: 'Match ended & settled',
+        icon: CheckCircle,
+        color: colors.success,
+        isPrimary: false,
+      },
+    };
+    return configs[status];
+  };
+
+  const statusConfig = getStatusCardConfig();
+  const StatusIcon = statusConfig.icon;
+
+  return (
+    <Box sx={{ width: '100%', maxWidth: '100%', pb: 4 }}>
+      {/* Back Button */}
+      <Button
+        startIcon={<ArrowBack />}
+        onClick={() => navigate(constants.routes.fixtures)}
+        sx={{
+          mb: 3,
+          color: colors.brandRed,
+          textTransform: 'none',
+          fontWeight: 600,
+          '&:hover': {
+            backgroundColor: `${colors.brandRed}0A`,
+          },
+        }}
+      >
+        Back to Fixtures
+      </Button>
+
+      {/* Scorecard Header */}
+      <Card
+        sx={{
+          mb: 3,
+          borderRadius: '24px',
+          background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
+          boxShadow: `0 8px 32px ${colors.brandRed}40`,
+          position: 'relative',
+          overflow: 'hidden',
+          color: colors.brandWhite
+        }}
+      >
+        <Box sx={{
+          position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+          opacity: 0.1,
+          backgroundImage: 'radial-gradient(circle at 10% 20%, rgba(255,255,255,0.4) 0%, transparent 20%), radial-gradient(circle at 90% 80%, rgba(255,255,255,0.4) 0%, transparent 20%)'
+        }} />
+
+        <CardContent sx={{ p: 4, position: 'relative', zIndex: 1 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Chip icon={<CalendarToday sx={{ fontSize: 14, color: '#fff !important' }} />} label={fixture.kickoffTime && !isNaN(new Date(fixture.kickoffTime).getTime()) ? format(new Date(fixture.kickoffTime), 'EEE, MMM dd • HH:mm') : 'TBD'} sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: '#fff', border: '1px solid rgba(255,255,255,0.3)', fontWeight: 600 }} />
+            <Chip label={(fixture.status || 'scheduled').toUpperCase()} sx={{ fontWeight: 700, bgcolor: fixture.status === 'live' ? colors.brandBlack : 'rgba(255,255,255,0.2)', color: '#fff' }} />
+          </Box>
+
+          <Grid container alignItems="center" justifyContent="center" spacing={2}>
+            {/* Home Team */}
+            <Grid item xs={4} sx={{ textAlign: 'center' }}>
+              <Box sx={{ width: 80, height: 80, borderRadius: '50%', bgcolor: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
+                <SportsSoccer sx={{ fontSize: 40, color: colors.brandBlack }} />
+              </Box>
+              <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>{fixture.homeTeam}</Typography>
+              <Typography variant="body2" sx={{ opacity: 0.8 }}>Home</Typography>
+            </Grid>
+
+            {/* Score */}
+            <Grid item xs={4} sx={{ textAlign: 'center' }}>
+              <Box sx={{ bgcolor: 'rgba(0,0,0,0.2)', borderRadius: '16px', px: 4, py: 2, display: 'inline-block' }}>
+                <Typography variant="h2" sx={{ fontWeight: 800, lineHeight: 1 }}>
+                  {fixture.homeScore !== undefined ? fixture.homeScore : '-'} : {fixture.awayScore !== undefined ? fixture.awayScore : '-'}
+                </Typography>
+                {(fixture.status === 'live' || fixture.status === 'fullTime') && (
+                  <Typography variant="caption" sx={{ display: 'block', mt: 1, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>
+                    {fixture.status === 'live' ? 'Live' : 'Full Time'}
+                  </Typography>
+                )}
+              </Box>
+            </Grid>
+
+            {/* Away Team */}
+            <Grid item xs={4} sx={{ textAlign: 'center' }}>
+              <Box sx={{ width: 80, height: 80, borderRadius: '50%', bgcolor: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
+                <SportsSoccer sx={{ fontSize: 40, color: colors.brandBlack }} />
+              </Box>
+              <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>{fixture.awayTeam}</Typography>
+              <Typography variant="body2" sx={{ opacity: 0.8 }}>Away</Typography>
+            </Grid>
+          </Grid>
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2, mt: 3, opacity: 0.9 }}>
+            <LocationOn sx={{ fontSize: 18 }} />
+            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+              {fixture?.homeTeam === 'Arsenal' ? 'Emirates Stadium' :
+                fixture?.homeTeam === 'Manchester United' ? 'Old Trafford' :
+                  fixture?.homeTeam === 'Liverpool' ? 'Anfield' :
+                    fixture?.homeTeam === 'Newcastle' ? 'St James\' Park' :
+                      'Stadium TBD'}
+            </Typography>
+            <Typography variant="body2" sx={{ opacity: 0.7 }}>•</Typography>
+            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+              {fixture?.league || 'Premier League'}
+            </Typography>
+          </Box>
+        </CardContent>
+      </Card>
+
+      {/* Interactive Match State Flow - Full Width */}
+      <Card sx={{ borderRadius: '20px', p: 3, mb: 3, bgcolor: '#FFFFFF', border: `1px solid ${colors.divider}` }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 700, color: colors.brandBlack }}>
+            Match State Flow
+          </Typography>
+        </Box>
+
+        <Box sx={{ position: 'relative', mb: 2 }}>
+          {/* Flow Steps */}
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', mb: 3 }}>
+            {/* Connecting Line */}
+            <Box
+              sx={{
+                position: 'absolute',
+                top: '20px',
+                left: '8%',
+                right: '8%',
+                height: '3px',
+                bgcolor: '#E5E7EB',
+                zIndex: 0,
+              }}
+            />
+            {/* Progress Line */}
+            <Box
+              sx={{
+                position: 'absolute',
+                top: '20px',
+                left: '8%',
+                width: (() => {
+                  const statusOrder = {
+                    'predictionOpen': 0,
+                    'predictionLock': 1,
+                    'live': 2,
+                    'resultPending': 3,
+                    'resultsProcessing': 3,
+                    'pending': 3,
+                    'completed': 4,
+                  };
+                  const selectedOrder = statusOrder[selectedFlowStatus] ?? 0;
+                  const totalSteps = 4;
+                  const progressPercent = (selectedOrder / totalSteps) * 84; // 84% is the width between 8% and 92%
+                  return `${progressPercent}%`;
+                })(),
+                height: '3px',
+                bgcolor: colors.brandRed,
+                zIndex: 1,
+                transition: 'width 0.3s ease',
+              }}
+            />
+
+            {/* Status Steps */}
+            {[
+              { key: 'predictionOpen', label: 'Prediction Open', order: 0 },
+              { key: 'predictionLocked', label: 'Prediction Locked', order: 1 },
+              { key: 'live', label: 'Live', order: 2 },
+              { key: 'fullTimeProcessing', label: 'Full Time (Results Processing)', order: 3 },
+              { key: 'fullTimeCompleted', label: 'Full Time (Completed)', order: 4 },
+            ].map((step, index) => {
+              // Map selected status to order
+              const statusOrder = {
+                'predictionOpen': 0,
+                'predictionLocked': 1,
+                'live': 2,
+                'fullTimeProcessing': 3,
+                'fullTimeCompleted': 4,
+              };
+
+              const selectedOrder = statusOrder[selectedFlowStatus] ?? 0;
+              const isActive = step.order <= selectedOrder;
+
+              const isClickable = true;
+
+              return (
+                <Box
+                  key={step.key}
+                  onClick={() => {
+                    if (isClickable) {
+                      setSelectedFlowStatus(step.key);
+                    }
+                  }}
+                  sx={{
+                    position: 'relative',
+                    zIndex: 2,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    cursor: isClickable ? 'pointer' : 'default',
+                    flex: 1,
+                    transition: 'transform 0.2s',
+                    '&:hover': isClickable ? {
+                      transform: 'scale(1.1)',
+                    } : {},
+                  }}
+                >
+                  {/* Status Circle */}
+                  <Box
+                    sx={{
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '50%',
+                      bgcolor: isActive ? colors.brandRed : '#E5E7EB',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      mb: 1,
+                      border: `3px solid ${isActive ? colors.brandRed : '#E5E7EB'}`,
+                      transition: 'all 0.3s ease',
+                      boxShadow: isActive ? `0 4px 12px ${colors.brandRed}40` : 'none',
+                    }}
+                  >
+                    {isActive && (
+                      <Box
+                        sx={{
+                          width: '12px',
+                          height: '12px',
+                          borderRadius: '50%',
+                          bgcolor: colors.brandWhite,
+                        }}
+                      />
+                    )}
+                  </Box>
+                  {/* Status Label */}
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      fontWeight: isActive ? 700 : 500,
+                      color: isActive ? colors.brandRed : colors.textSecondary,
+                      fontSize: '11px',
+                      textAlign: 'center',
+                      transition: 'all 0.3s ease',
+                    }}
+                  >
+                    {step.label}
+                  </Typography>
+                </Box>
+              );
+            })}
+          </Box>
+        </Box>
+
+        {/* Current Status Display */}
+        <Box sx={{
+          mt: 2,
+          p: 2,
+          borderRadius: '12px',
+          bgcolor: selectedFlowStatus === 'predictionOpen' ? '#E3F2FD' :
+            selectedFlowStatus === 'predictionLock' ? '#FFF4E6' :
+              selectedFlowStatus === 'live' ? '#FFE5E5' :
+                selectedFlowStatus === 'resultPending' || selectedFlowStatus === 'resultsProcessing' || selectedFlowStatus === 'pending' ? '#FFF4E6' :
+                  selectedFlowStatus === 'completed' ? '#ECFDF5' : '#F3F4F6',
+          textAlign: 'center',
+        }}>
+          <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack }}>
+            Current Status: <span style={{ color: colors.brandRed, textTransform: 'uppercase' }}>
+              {selectedFlowStatus === 'predictionOpen' ? 'Prediction Open' :
+                selectedFlowStatus === 'predictionLocked' ? 'Prediction Locked' :
+                  selectedFlowStatus === 'live' ? 'Live' :
+                    selectedFlowStatus === 'fullTimeProcessing' ? 'Full Time (Results Processing)' :
+                      selectedFlowStatus === 'fullTimeCompleted' ? 'Full Time (Completed)' : 'Prediction Open'}
+            </span>
+          </Typography>
+        </Box>
+      </Card>
+
+      <Grid container spacing={3}>
+        {/* Match Stats */}
+        <Grid item xs={12} md={8}>
+          <Card sx={{ borderRadius: '20px', mb: 3, p: 3 }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 3 }}>Match Statistics</Typography>
+
+            {(fixture?.status === 'live' || fixture?.status === 'completed') ? (
+              <>
+                {[
+                  { stat: 'Possession', home: '55%', away: '45%', homeVal: 0.55 },
+                  { stat: 'Shots on Target', home: '6', away: '3', homeVal: 0.67 },
+                  { stat: 'Corners', home: '7', away: '4', homeVal: 0.64 },
+                  { stat: 'Fouls', home: '8', away: '12', homeVal: 0.40 },
+                  { stat: 'Offsides', home: '2', away: '3', homeVal: 0.40 },
+                ].map((item, i) => (
+                  <Box key={item.stat} sx={{ mb: 3 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                      <Typography variant="body2" fontWeight={700} sx={{ color: colors.brandRed }}>{item.home}</Typography>
+                      <Typography variant="body2" color="text.secondary" fontWeight={600}>{item.stat}</Typography>
+                      <Typography variant="body2" fontWeight={700} sx={{ color: colors.brandBlack }}>{item.away}</Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', gap: 1, height: 8, borderRadius: 4, overflow: 'hidden' }}>
+                      <Box sx={{ flex: item.homeVal, bgcolor: colors.brandRed, borderRadius: '4px 0 0 4px' }} />
+                      <Box sx={{ flex: 1 - item.homeVal, bgcolor: '#E5E7EB', borderRadius: '0 4px 4px 0' }} />
+                    </Box>
+                  </Box>
+                ))}
+              </>
+            ) : (
+              <Box sx={{ textAlign: 'center', py: 4 }}>
+                <Schedule sx={{ fontSize: 48, color: colors.textSecondary, mb: 2 }} />
+                <Typography variant="body2" sx={{ color: colors.textSecondary }}>
+                  Match statistics will be available once the match starts
+                </Typography>
+              </Box>
+            )}
+          </Card>
+
+          {/* Predictions List */}
+          <Card sx={{ borderRadius: '20px', p: 0 }}>
+            <Box sx={{ p: 3, borderBottom: `1px solid ${colors.divider}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Box>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>User Predictions</Typography>
+                <Typography variant="caption" sx={{ color: colors.textSecondary }}>
+                  {filteredPredictions.length} predictions made for this fixture
+                </Typography>
+              </Box>
+              <Chip
+                label={`${predictions.length} Total`}
+                sx={{
+                  bgcolor: `${colors.brandRed}20`,
+                  color: colors.brandRed,
+                  fontWeight: 700
+                }}
+              />
+            </Box>
+            <DataTable
+              columns={[
+                {
+                  id: 'username',
+                  label: 'User',
+                  render: (_, row) => (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      <Box sx={{ width: 32, height: 32, borderRadius: '50%', bgcolor: '#F3F4F6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Person sx={{ fontSize: 16, color: '#9CA3AF' }} /></Box>
+                      <Box>
+                        <Typography variant="body2" fontWeight={600}>{row.username}</Typography>
+                        <Typography variant="caption" color="text.secondary">ID: {row.userId}</Typography>
+                      </Box>
+                    </Box>
+                  )
+                },
+                {
+                  id: 'prediction',
+                  label: 'Prediction',
+                  render: (_, row) => <Typography variant="body2" fontWeight={600}>{row.prediction}</Typography>
+                },
+                {
+                  id: 'status',
+                  label: 'Fixture Flow Status',
+                  render: (_, row) => {
+                    const pStatus = row.status || 'ongoing';
+                    let label = 'Unknown';
+                    let color = 'default';
+                    let icon = AccessTime;
+
+                    if (pStatus === 'won') { label = 'WON'; color = 'success'; icon = CheckCircle; }
+                    else if (pStatus === 'lost') { label = 'LOST'; color = 'error'; icon = CheckCircle; }
+                    else {
+                      const fStatus = fixture.status || 'scheduled';
+                      if (fStatus === 'scheduled') { label = 'Open'; color = 'info'; }
+                      else if (fStatus === 'live') { label = 'Locked / Live'; color = 'warning'; icon = Lock; }
+                      else if (fStatus === 'completed' || fStatus === 'resultsProcessing') { label = 'Awaiting Settlement'; color = 'warning'; icon = HourglassEmpty; }
+                      else { label = 'Open'; color = 'info'; }
+                    }
+
+                    return (
+                      <Chip
+                        icon={<Box component={icon} sx={{ fontSize: '14px !important' }} />}
+                        label={label}
+                        size="small"
+                        color={color === 'default' ? 'default' : color}
+                        variant={color === 'default' ? 'outlined' : 'filled'}
+                        sx={{ fontWeight: 700, height: 24, fontSize: 11 }}
+                      />
+                    );
+                  }
+                }
+              ]}
+              data={filteredPredictions}
+              page={page}
+              rowsPerPage={rowsPerPage}
+              totalCount={filteredPredictions.length}
+              onPageChange={(e, p) => setPage(p)}
+              onRowsPerPageChange={(e) => setRowsPerPage(e.target.value)}
+              emptyMessage="No predictions found"
+            />
+          </Card>
+        </Grid>
+
+        {/* Right Sidebar: Timeline & Actions */}
+        <Grid item xs={12} md={4}>
+          {/* Admin Actions */}
+          <Card sx={{ borderRadius: '20px', p: 3, mb: 3, bgcolor: '#FFF8F6', border: `1px solid ${colors.brandRed}20` }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2, color: colors.brandRed }}>Admin Actions</Typography>
+
+            {isApproved && (
+              <Alert severity="success" sx={{ mb: 2, borderRadius: '8px' }}>
+                <Typography variant="body2" sx={{ fontWeight: 600, fontSize: 13 }}>
+                  Match Details Approved
+                </Typography>
+              </Alert>
+            )}
+
+            <Button
+              fullWidth
+              variant="contained"
+              disabled={isApproved}
+              startIcon={<CheckCircle />}
+              onClick={handleApproveMatch}
+              sx={{
+                mb: 1,
+                bgcolor: colors.brandRed,
+                textTransform: 'none',
+                fontWeight: 600,
+                '&:hover': { bgcolor: colors.brandDarkRed },
+                '&.Mui-disabled': {
+                  bgcolor: colors.divider,
+                  color: colors.textSecondary,
+                }
+              }}
+            >
+              {isApproved ? 'Match Details Approved' : 'Approve Match Details'}
+            </Button>
+
+            {/* End Live Match Button (only show when match is live) */}
+            {fixture?.status === 'live' && (
+              <Button
+                fullWidth
+                variant="outlined"
+                startIcon={<StopCircle />}
+                onClick={handleEndMatch}
+                sx={{
+                  mb: 1,
+                  borderColor: colors.warning,
+                  color: colors.warning,
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  '&:hover': {
+                    borderColor: colors.warning,
+                    bgcolor: `${colors.warning}14`,
+                  }
+                }}
+              >
+                End Live Match
+              </Button>
+            )}
+
+            {/* End Match Button (show when match is not completed) */}
+            {fixture?.status !== 'completed' && fixture?.status !== 'resultsProcessing' && fixture?.status !== 'pending' && (
+              <Button
+                fullWidth
+                variant="outlined"
+                startIcon={<StopCircle />}
+                onClick={handleEndMatch}
+                sx={{
+                  mb: 1,
+                  borderColor: colors.warning,
+                  color: colors.warning,
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  '&:hover': {
+                    borderColor: colors.warning,
+                    bgcolor: `${colors.warning}14`,
+                  }
+                }}
+              >
+                End Match
+              </Button>
+            )}
+
+            <Button
+              fullWidth
+              variant="outlined"
+              color="error"
+              startIcon={<Save />}
+              onClick={handleOpenScoreDialog}
+              sx={{
+                textTransform: 'none',
+                fontWeight: 600,
+              }}
+            >
+              Update Score
+            </Button>
+          </Card>
+
+          {/* Key Events Timeline */}
+          <Card sx={{ borderRadius: '20px', p: 3 }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Match Timeline</Typography>
+            <Box sx={{ position: 'relative', pl: 2, borderLeft: `2px solid ${colors.divider}` }}>
+              {(fixture?.status === 'live' || fixture?.status === 'completed' ? [
+                { min: '90', event: 'Full Time', detail: fixture?.status === 'completed' ? `${fixture.homeScore || 0}-${fixture.awayScore || 0}` : '', color: colors.success },
+                { min: '78', event: 'Goal - Away', detail: typeof fixture?.awayTeam === 'string' ? fixture.awayTeam : (fixture?.awayTeam?.team_name || fixture?.awayTeam?.name || 'Away Team'), color: colors.info },
+                { min: '65', event: 'Substitution', detail: 'Home Team', color: colors.warning },
+                { min: '45', event: 'Half Time', detail: '1-1', color: colors.textSecondary },
+                { min: '23', event: 'Goal - Home', detail: typeof fixture?.homeTeam === 'string' ? fixture.homeTeam : (fixture?.homeTeam?.team_name || fixture?.homeTeam?.name || 'Home Team'), color: colors.info },
+                { min: '12', event: 'Yellow Card', detail: 'Away Team', color: colors.warning },
+                { min: '0', event: 'Kickoff', detail: '', color: colors.brandRed },
+              ] : [
+                { min: '', event: 'Match Scheduled', detail: fixture?.kickoffTime && !isNaN(new Date(fixture.kickoffTime).getTime()) ? format(new Date(fixture.kickoffTime), 'MMM dd, yyyy HH:mm') : '', color: colors.info },
+                { min: '', event: 'Predictions Open', detail: `${predictions.length || 0} predictions made`, color: colors.success },
+              ]).map((ev, i) => (
+                <Box key={i} sx={{ mb: 3, position: 'relative' }}>
+                  <Box sx={{ position: 'absolute', left: -21, top: 0, width: 10, height: 10, borderRadius: '50%', bgcolor: ev.color }} />
+                  {ev.min && <Typography variant="caption" sx={{ color: colors.textSecondary, fontWeight: 700 }}>{String(ev.min)}'</Typography>}
+                  <Typography variant="body2" fontWeight={600} sx={{ color: colors.brandBlack }}>{String(ev.event)}</Typography>
+                  {ev.detail && <Typography variant="caption" sx={{ color: colors.textSecondary }}>{String(ev.detail)}</Typography>}
+                </Box>
+              ))}
+            </Box>
+          </Card>
+        </Grid>
+      </Grid>
+
+      {/* Approve Match Details Dialog */}
+      <Dialog
+        open={approveDialogOpen}
+        onClose={() => setApproveDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: { borderRadius: '16px' }
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 700, color: colors.brandRed }}>
+          Approve Match Details
+        </DialogTitle>
+        <DialogContent>
+          <Alert severity="info" sx={{ mb: 2 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
+              You are about to approve:
+            </Typography>
+            <Typography variant="body2" sx={{ fontSize: 13 }}>
+              • Match: {fixture?.homeTeam} vs {fixture?.awayTeam}
+            </Typography>
+            <Typography variant="body2" sx={{ fontSize: 13 }}>
+              • Match ID: {id}
+            </Typography>
+            <Typography variant="body2" sx={{ fontSize: 13 }}>
+              • Status: {fixture?.status}
+            </Typography>
+          </Alert>
+          <Typography variant="body2">
+            This action confirms the match details are accurate and ready for predictions. This action will be logged.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 3, pt: 0 }}>
+          <Button
+            onClick={() => setApproveDialogOpen(false)}
+            sx={{ textTransform: 'none', fontWeight: 600 }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={confirmApproval}
+            variant="contained"
+            startIcon={<CheckCircle />}
+            sx={{
+              bgcolor: colors.success,
+              textTransform: 'none',
+              fontWeight: 700,
+              '&:hover': { bgcolor: '#059669' }
+            }}
+          >
+            Confirm Approval
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* End Match Dialog */}
+      <Dialog
+        open={endMatchDialogOpen}
+        onClose={() => setEndMatchDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: { borderRadius: '16px' }
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 700, color: colors.warning }}>
+          {fixture?.status === 'live' ? 'End Live Match' : 'End Match'}
+        </DialogTitle>
+        <DialogContent>
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
+              You are about to end the match:
+            </Typography>
+            <Typography variant="body2" sx={{ fontSize: 13 }}>
+              • Match: {fixture?.homeTeam} vs {fixture?.awayTeam}
+            </Typography>
+            <Typography variant="body2" sx={{ fontSize: 13 }}>
+              • Match ID: {id}
+            </Typography>
+            <Typography variant="body2" sx={{ fontSize: 13 }}>
+              • Current Status: {fixture?.status || 'N/A'}
+            </Typography>
+          </Alert>
+          <Typography variant="body2" sx={{ mb: 2 }}>
+            This will change the match status to <strong>"Full Time (Results Processing)"</strong> without uploading the final score yet.
+          </Typography>
+          <Typography variant="body2" sx={{ color: colors.textSecondary }}>
+            The match will move to the "Result Pending" state in the flow. You can return later to upload the final score and complete the match.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ p: 3, pt: 0 }}>
+          <Button
+            onClick={() => setEndMatchDialogOpen(false)}
+            sx={{ textTransform: 'none', fontWeight: 600 }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={confirmEndMatch}
+            variant="contained"
+            startIcon={<StopCircle />}
+            sx={{
+              bgcolor: colors.warning,
+              textTransform: 'none',
+              fontWeight: 700,
+              '&:hover': { bgcolor: '#D97706' }
+            }}
+          >
+            End Match
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Score Upload Dialog */}
+      <Dialog
+        open={scoreDialogOpen}
+        onClose={() => setScoreDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{
+          sx: { borderRadius: '16px' }
+        }}
+      >
+        <DialogTitle sx={{ fontWeight: 700, color: colors.brandRed }}>
+          Enter Match Results
+        </DialogTitle>
+        <DialogContent>
+          <Alert severity="info" sx={{ mb: 3, mt: 1 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+              {fixture?.homeTeam} vs {fixture?.awayTeam}
+            </Typography>
+            <Typography variant="caption" sx={{ color: colors.textSecondary }}>
+              Match ID: {id}
+            </Typography>
+          </Alert>
+
+          <Alert severity="info" sx={{ mb: 3, bgcolor: '#E3F2FD', border: '1px solid #1976D2' }}>
+            <Typography variant="body2" sx={{ fontWeight: 600, fontSize: 13 }}>
+              All 4 prediction outcomes require results - Correct Scoreline - Total Goal Range - First Player to Score - First Goal Minute
+            </Typography>
+          </Alert>
+
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2, color: colors.brandBlack }}>
+              1. Final Score
+            </Typography>
+            <Grid container spacing={2} alignItems="flex-end">
+              <Grid item xs={5}>
+                <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, color: colors.brandBlack }}>
+                  {fixture?.homeTeam}
+                </Typography>
+                <TextField
+                  fullWidth
+                  type="number"
+                  value={scoreForm.homeScore}
+                  onChange={(e) => setScoreForm({ ...scoreForm, homeScore: e.target.value })}
+                  required
+                  InputProps={{
+                    inputProps: { min: 0 }
+                  }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '12px',
+                    }
+                  }}
+                />
+              </Grid>
+              <Grid item xs={2} sx={{ textAlign: 'center', pb: 1 }}>
+                <Typography variant="h6" sx={{ fontWeight: 700, color: colors.brandBlack }}>
+                  -
+                </Typography>
+              </Grid>
+              <Grid item xs={5}>
+                <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, color: colors.brandBlack }}>
+                  {fixture?.awayTeam}
+                </Typography>
+                <TextField
+                  fullWidth
+                  type="number"
+                  value={scoreForm.awayScore}
+                  onChange={(e) => setScoreForm({ ...scoreForm, awayScore: e.target.value })}
+                  required
+                  InputProps={{
+                    inputProps: { min: 0 }
+                  }}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '12px',
+                    }
+                  }}
+                />
+              </Grid>
+            </Grid>
+            <Typography variant="caption" sx={{ color: colors.textSecondary, mt: 1, display: 'block' }}>
+              This also determines total Goal Range outcome
+            </Typography>
+          </Box>
+
+          <Grid container spacing={2}>
+            <Grid item xs={12}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: colors.brandBlack }}>
+                2. First Goal Scorer (Featured Team)
+              </Typography>
+              <TextField
+                fullWidth
+                placeholder="Enter player name..."
+                value={scoreForm.firstGoalScorer}
+                onChange={(e) => setScoreForm({ ...scoreForm, firstGoalScorer: e.target.value })}
+                required
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '12px',
+                  }
+                }}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1, color: colors.brandBlack }}>
+                3. First Goal Minute
+              </Typography>
+              <TextField
+                fullWidth
+                placeholder="Enter minute (1-120)..."
+                type="number"
+                value={scoreForm.firstGoalMinute}
+                onChange={(e) => setScoreForm({ ...scoreForm, firstGoalMinute: e.target.value })}
+                required
+                InputProps={{
+                  inputProps: { min: 1, max: 120 }
+                }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '12px',
+                  }
+                }}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={scoreForm.markCompleted}
+                    onChange={(e) => setScoreForm({ ...scoreForm, markCompleted: e.target.checked })}
+                    sx={{
+                      color: colors.brandRed,
+                      '&.Mui-checked': {
+                        color: colors.brandRed,
+                      }
+                    }}
+                  />
+                }
+                label={
+                  <Box>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                      Mark as Completed
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: colors.textSecondary }}>
+                      {scoreForm.markCompleted
+                        ? 'Match will move to "Completed" state and trigger prediction settlement'
+                        : 'Match will move to "Full Time (Results Processing)" state. Check to complete the match.'}
+                    </Typography>
+                  </Box>
+                }
+              />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions sx={{ p: 3, pt: 0 }}>
+          <Button
+            onClick={() => setScoreDialogOpen(false)}
+            sx={{ textTransform: 'none', fontWeight: 600 }}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleSaveScore}
+            variant="contained"
+            startIcon={<Save />}
+            disabled={!scoreForm.homeScore || !scoreForm.awayScore || !scoreForm.firstGoalScorer || !scoreForm.firstGoalMinute}
+            sx={{
+              bgcolor: colors.success,
+              textTransform: 'none',
+              fontWeight: 700,
+              '&:hover': { bgcolor: '#059669' },
+              '&.Mui-disabled': {
+                bgcolor: colors.divider,
+                color: colors.textSecondary,
+              }
+            }}
+          >
+            Save Score
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+};
+
+export default FixtureDetailsPage;
