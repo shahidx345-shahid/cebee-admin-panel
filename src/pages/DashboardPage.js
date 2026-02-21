@@ -242,7 +242,7 @@ const DashboardPage = () => {
     {
       title: 'Estimated Rewards Value',
       value: `$${dashboardData.stats.estimatedRewardsValue.toLocaleString(undefined, { maximumFractionDigits: 0 })}`,
-      subtitle: 'USD converted payouts',
+      subtitle: 'USD value of fulfilled rewards',
       icon: AttachMoney,
       color: '#2196F3', // Blue
       isPrimary: false,

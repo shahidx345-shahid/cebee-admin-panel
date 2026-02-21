@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -60,9 +60,11 @@ const RewardsPage = () => {
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedMonth, setSelectedMonth] = useState('2025-09');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const searchDebounceRef = useRef(null);
+  const [selectedMonth, setSelectedMonth] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [rankFilter, setRankFilter] = useState('1st-3rd');
+  const [rankFilter, setRankFilter] = useState('all');
   const [selectedSort, setSelectedSort] = useState('rankLowest');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -94,13 +96,15 @@ const RewardsPage = () => {
 
   const loadStatistics = async () => {
     try {
-      const statsResult = await getRewardStatistics({ month: selectedMonth !== 'all' ? selectedMonth : undefined });
+      const statsParams = selectedMonth && selectedMonth !== 'all' ? { month: selectedMonth } : {};
+      const statsResult = await getRewardStatistics(statsParams);
       if (statsResult.success && statsResult.data) {
+        const d = statsResult.data;
         setStatistics({
-          currentMonthWinners: statsResult.data.currentMonthWinners || 0,
-          pendingPayouts: statsResult.data.pendingPayouts || 0,
-          processingCount: statsResult.data.processingCount || 0,
-          totalPaid: statsResult.data.totalPaid || 0,
+          currentMonthWinners: d.currentMonthWinners ?? 0,
+          pendingPayouts: d.pendingPayouts ?? 0,
+          processingCount: d.processingCount ?? 0,
+          totalPaid: d.totalPaid ?? 0,
         });
       }
     } catch (error) {
@@ -108,13 +112,33 @@ const RewardsPage = () => {
     }
   };
 
+  // Compute stats from current list when API returns all zeros (fallback so cards aren't stuck at 0)
+  const deriveStatsFromList = (list) => {
+    if (!list || list.length === 0) return null;
+    const status = (r) => (r.status || r.rewardStatus || '').toLowerCase();
+    const pending = list.filter((r) => status(r) === 'pending').length;
+    const processing = list.filter((r) => status(r) === 'processing').length;
+    const fulfilled = list.filter((r) => status(r) === 'fulfilled' || status(r) === 'paid').length;
+    const totalPaidSum = list
+      .filter((r) => status(r) === 'fulfilled' || status(r) === 'paid')
+      .reduce((sum, r) => sum + (Number(r.usdAmount ?? r.amount ?? r.rewardAmount) || 0), 0);
+    return {
+      currentMonthWinners: list.length,
+      pendingPayouts: pending,
+      processingCount: processing,
+      totalPaid: Math.round(totalPaidSum),
+    };
+  };
+
   const loadRewards = async () => {
     setLoading(true);
     try {
-      // Build query parameters from filters
+      const hasFilters = searchQuery || (selectedMonth && selectedMonth !== 'all') || statusFilter !== 'all' || (rankFilter && rankFilter !== 'all') || consentFilter !== 'all';
+      // When no filters: fetch more so "show all" works; when filters applied: use pagination
+      const limit = !hasFilters ? 100 : rowsPerPage;
       const params = {
-        page: page,
-        limit: rowsPerPage,
+        page: hasFilters ? page : 0,
+        limit,
       };
 
       if (searchQuery) {
@@ -161,27 +185,53 @@ const RewardsPage = () => {
       console.log('Rewards API response:', response);
       
       if (response.success) {
-        // Backend may return rewards array or paginated response
-        let rewardsData = Array.isArray(response.data) 
-          ? response.data 
-          : (response.data.rewards || response.data.data || []);
-        
-        // Normalize the data to ensure each reward has an 'id' field
-        // The API might use _id, reward_id, or id
-        rewardsData = rewardsData.map((reward, index) => ({
-          ...reward,
-          id: reward.id || reward._id || reward.reward_id || reward.rewardId || `reward-${index}`,
-        }));
-        
-        console.log('Normalized rewards data:', rewardsData);
-        
-        // Get pagination info if available
-        const pagination = response.data.pagination || response.data;
-        const total = pagination.total || pagination.totalCount || rewardsData.length;
-        
-        setRewards(rewardsData);
-        setFilteredRewards(rewardsData);
-        setTotalCount(total);
+        // Service returns normalized { rewards, pagination }; rewards are already camelCase with id, month, etc.
+        const { rewards: rewardsData = [], pagination: paginationData = {} } = response.data || {};
+        const list = Array.isArray(rewardsData) ? rewardsData : [];
+
+        // Apply client-side filters so table reflects selected filters even if backend doesn't
+        const rewardMonth = (r) => (r.month || r.monthYear || r.rewardMonth || '').toString().slice(0, 7);
+        const rewardStatus = (r) => (r.status || r.rewardStatus || '').toLowerCase();
+        const rewardRank = (r) => (r.rank ?? r.position ?? 0);
+        const rewardConsent = (r) => r.consentOptIn ?? r.consent ?? r.videoConsent;
+        const rewardSearch = (r) => {
+          const u = r.username || r.userName || r.user?.username || r.user?.email || '';
+          const e = r.email || r.user?.email || '';
+          const q = (searchQuery || '').toLowerCase();
+          return !q || `${u} ${e}`.toLowerCase().includes(q);
+        };
+        let filtered = rewardsData;
+        if (selectedMonth && selectedMonth !== 'all') {
+          filtered = filtered.filter((r) => rewardMonth(r) === selectedMonth);
+        }
+        if (statusFilter !== 'all') {
+          filtered = filtered.filter((r) => rewardStatus(r) === statusFilter);
+        }
+        if (rankFilter && rankFilter !== 'all') {
+          if (rankFilter === '1st-3rd') {
+            filtered = filtered.filter((r) => rewardRank(r) >= 1 && rewardRank(r) <= 3);
+          } else if (rankFilter === '1st') filtered = filtered.filter((r) => rewardRank(r) === 1);
+          else if (rankFilter === '2nd') filtered = filtered.filter((r) => rewardRank(r) === 2);
+          else if (rankFilter === '3rd') filtered = filtered.filter((r) => rewardRank(r) === 3);
+        }
+        if (consentFilter !== 'all') {
+          filtered = filtered.filter((r) =>
+            consentFilter === 'yes' ? rewardConsent(r) === true : rewardConsent(r) !== true
+          );
+        }
+        filtered = filtered.filter(rewardSearch);
+
+        setRewards(list);
+        setFilteredRewards(filtered);
+        setTotalCount(paginationData.total ?? filtered.length);
+        // When stats API returns all zeros, derive stats from list so cards aren't stuck at 0
+        setStatistics((prev) => {
+          if (prev.currentMonthWinners === 0 && prev.pendingPayouts === 0 && prev.processingCount === 0 && prev.totalPaid === 0 && list.length > 0) {
+            const derived = deriveStatsFromList(list);
+            return derived || prev;
+          }
+          return prev;
+        });
       } else {
         console.error("Failed to load rewards", response.error);
         setRewards([]);
@@ -473,8 +523,8 @@ const RewardsPage = () => {
     },
   ];
 
-  // Pagination is handled by the backend, so we use filteredRewards directly
-  const paginatedRewards = filteredRewards;
+  // Paginate filtered list for display (filters applied client-side on current response)
+  const paginatedRewards = filteredRewards.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%' }}>
@@ -564,10 +614,10 @@ const RewardsPage = () => {
                   {currentMonthWinners}
                 </Typography>
                 <Typography variant="body2" sx={{ fontWeight: 600, color: '#4A4A4A', fontSize: 14, mb: 0.5 }}>
-                  Current Month Winners
+                  {selectedMonth === 'all' ? 'All time winners' : 'Month winners'}
                 </Typography>
                 <Typography variant="caption" sx={{ color: '#9E9E9E', fontSize: 12 }}>
-                  Top 3 from November 2025
+                  {selectedMonth === 'all' ? 'All times' : `Top 3 from ${format(new Date(selectedMonth + '-01'), 'MMMM yyyy')}`}
                 </Typography>
               </Card>
             </Grid>
@@ -812,10 +862,11 @@ const RewardsPage = () => {
                   whiteSpace: 'nowrap',
                 }}
               >
-                Rank: {rankFilter === '1st-3rd' ? '1st to 3rd' :
-                  rankFilter === '1st' ? '1st' :
-                    rankFilter === '2nd' ? '2nd' :
-                      rankFilter === '3rd' ? '3rd' : '1st to 3rd'}
+                Rank: {rankFilter === 'all' ? 'All' :
+                  rankFilter === '1st-3rd' ? '1st to 3rd' :
+                    rankFilter === '1st' ? '1st' :
+                      rankFilter === '2nd' ? '2nd' :
+                        rankFilter === '3rd' ? '3rd' : 'All'}
               </Box>
             </Button>
             <Menu
@@ -830,6 +881,9 @@ const RewardsPage = () => {
                 },
               }}
             >
+              <MenuItem onClick={() => { setRankFilter('all'); setRankAnchor(null); }}>
+                All
+              </MenuItem>
               <MenuItem onClick={() => { setRankFilter('1st-3rd'); setRankAnchor(null); }}>
                 1st to 3rd
               </MenuItem>
@@ -1004,7 +1058,7 @@ const RewardsPage = () => {
                   whiteSpace: 'nowrap',
                 }}
               >
-                {selectedMonth === 'all' ? 'All Months' : format(new Date(selectedMonth + '-01'), 'MMMM yyyy')}
+                {selectedMonth === 'all' ? 'All times' : format(new Date(selectedMonth + '-01'), 'MMMM yyyy')}
               </Box>
             </Button>
             <Menu
@@ -1022,22 +1076,59 @@ const RewardsPage = () => {
                 },
               }}
             >
-              {Array.from({ length: 6 }, (_, i) => {
-                const date = new Date(2025, 10 - i, 1); // Fixed to start from Nov 2025 like screenshot or use new Date() for real time. 
-                // Screenshot shows Nov 2025. Given static data is 2025-09. 
-                // System time is 2026. 
-                // I will use real time relative to "Nov 2025" if I want to match screenshot exactly, but for a dynamic app `new Date()` is better.
-                // However, user said "only remaining month of the year". 
-                // Since data is static (2025), if I show 2026 months, no data will show.
-                // I will anchor the date to Nov 2025 for this demo to ensure checking works.
-                // Actually, let's use a logic that makes sense:
-                // Start from Nov 2025 and go back.
-
-                const d = new Date('2025-11-01');
-                d.setMonth(d.getMonth() - i);
-
-                const monthValue = format(d, 'yyyy-MM');
-                const monthLabel = format(d, 'MMMM yyyy');
+              <MenuItem
+                onClick={() => { setSelectedMonth('all'); setMonthAnchor(null); }}
+                sx={{
+                  borderRadius: '12px',
+                  mb: 0.5,
+                  py: 1.5,
+                  px: 2,
+                  backgroundColor: selectedMonth === 'all' ? '#E5E7EB' : 'transparent',
+                  '&:hover': { backgroundColor: selectedMonth === 'all' ? '#E5E7EB' : '#F3F4F6' },
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 2
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Box sx={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: '10px',
+                    backgroundColor: selectedMonth === 'all' ? '#FCA5A5' : '#F9FAFB',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    border: selectedMonth === 'all' ? 'none' : '1px solid #E5E7EB'
+                  }}>
+                    <CalendarToday sx={{ fontSize: 18, color: selectedMonth === 'all' ? '#B91C1C' : '#9CA3AF' }} />
+                  </Box>
+                  <Typography variant="body2" sx={{ fontWeight: selectedMonth === 'all' ? 700 : 500, color: colors.brandBlack, fontSize: 14 }}>
+                    All times
+                  </Typography>
+                </Box>
+                {selectedMonth === 'all' && (
+                  <Box sx={{
+                    width: 20, height: 20, borderRadius: '50%', backgroundColor: '#FECACA',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center'
+                  }}>
+                    <Check sx={{ fontSize: 14, color: '#B91C1C' }} />
+                  </Box>
+                )}
+              </MenuItem>
+              {(() => {
+                // Build list of months: from current month back 24 months (covers 2026, 2025, and part of 2024)
+                const now = new Date();
+                const months = [];
+                for (let i = 0; i < 24; i++) {
+                  const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                  months.push({
+                    value: format(d, 'yyyy-MM'),
+                    label: format(d, 'MMMM yyyy'),
+                  });
+                }
+                return months.map(({ value: monthValue, label: monthLabel }) => {
                 const isSelected = selectedMonth === monthValue;
 
                 return (
@@ -1084,7 +1175,8 @@ const RewardsPage = () => {
                     )}
                   </MenuItem>
                 );
-              })}
+              });
+              })()}
 
             </Menu>
             <Button
@@ -1437,7 +1529,15 @@ const RewardsPage = () => {
                   <Typography variant="caption" sx={{ opacity: 0.7, mb: 0.5, display: 'block' }}>Reward Month</Typography>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                     <CalendarToday sx={{ fontSize: 16 }} />
-                    <Typography variant="body2" sx={{ fontWeight: 700 }}>November 2025</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                      {(() => {
+                        const raw = (selectedReward?.month || selectedReward?.monthYear || '').toString().trim();
+                        if (!raw) return '—';
+                        const yyyyMm = raw.slice(0, 7);
+                        if (!/^\d{4}-\d{2}$/.test(yyyyMm)) return raw;
+                        return format(new Date(yyyyMm + '-01'), 'MMMM yyyy');
+                      })()}
+                    </Typography>
                   </Box>
                 </Box>
               </Box>

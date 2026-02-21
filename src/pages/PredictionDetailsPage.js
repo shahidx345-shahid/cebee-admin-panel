@@ -115,6 +115,8 @@ const PredictionDetailsPage = () => {
             actualResult: actualResult,
             totalPredictions: matchSummary.totalPredictions || 0,
             totalSPWon: matchSummary.totalSPWon || 0,
+            isCommunityFeatured: fixture.isCommunityFeatured || false,
+            hot: fixture.isFeatured || fixture.isCeBeFeatured || fixture.isCommunityFeatured || false,
           });
           
           // Set as single prediction array for display
@@ -231,18 +233,29 @@ const PredictionDetailsPage = () => {
           <Grid container spacing={3} alignItems="center">
             {/* Match Info */}
             <Grid item xs={12} md={8}>
-              <Chip
-                label={`Match ID: ${groupData.fixtureId || groupData.matchId}`}
-                sx={{
-                  backgroundColor: colors.brandWhite,
-                  color: colors.brandRed,
-                  fontWeight: 700,
-                  fontSize: 11,
-                  height: 28,
-                  borderRadius: '8px',
-                  mb: 2,
-                }}
-              />
+              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center', mb: 2 }}>
+                <Chip
+                  label={`Match ID: ${groupData.fixtureId || groupData.matchId}`}
+                  sx={{
+                    backgroundColor: colors.brandWhite,
+                    color: colors.brandRed,
+                    fontWeight: 700,
+                    fontSize: 11,
+                    height: 28,
+                    borderRadius: '8px',
+                  }}
+                />
+                {(groupData.hot || groupData.isCommunityFeatured) && (
+                  <>
+                    {groupData.isCommunityFeatured && (
+                      <Chip label="Featured Team" size="small" sx={{ bgcolor: 'rgba(255,255,255,0.3)', color: '#fff', border: '1px solid rgba(255,255,255,0.5)', fontWeight: 700, height: 24 }} />
+                    )}
+                    {groupData.hot && (
+                      <Chip label="Featured Fixture" size="small" sx={{ bgcolor: 'rgba(255,255,255,0.25)', color: '#fff', border: '1px solid rgba(255,255,255,0.4)', fontWeight: 600, height: 24 }} />
+                    )}
+                  </>
+                )}
+              </Box>
               <Typography variant="h3" sx={{ fontWeight: 700, color: colors.brandWhite, mb: 2, fontSize: { xs: 28, md: 36 } }}>
                 {groupData.matchName}
               </Typography>

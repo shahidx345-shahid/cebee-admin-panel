@@ -1,46 +1,33 @@
 /**
  * Dashboard Service
- * Handles all dashboard-related API calls
+ * Handles all dashboard-related API calls. Responses normalized for UI (camelCase).
  */
 
 import { apiGet } from './apiBase';
 
+const normalizeDashboardStats = (data) => {
+  const d = data?.stats ?? data ?? {};
+  return {
+    totalUsers: Number(d.totalUsers ?? d.total_users ?? 0),
+    activeUsers: Number(d.activeUsers ?? d.active_users ?? 0),
+    totalSPIssued: Number(d.totalSPIssued ?? d.total_sp_issued ?? 0),
+    estimatedRewardsValue: Number(d.estimatedRewardsValue ?? d.estimated_rewards_value ?? 0),
+  };
+};
+
 /**
- * Get dashboard statistics
- * @returns {Promise<{success: boolean, data?: object, error?: string}>}
+ * Get dashboard statistics. Returns normalized camelCase stats for the UI.
  */
 export const getDashboardStats = async () => {
+  const empty = { totalUsers: 0, activeUsers: 0, totalSPIssued: 0, estimatedRewardsValue: 0 };
   try {
     const response = await apiGet('/admin/dashboard/stats');
-    
     if (response.success) {
-      return {
-        success: true,
-        data: response.data,
-      };
+      return { success: true, data: normalizeDashboardStats(response.data) };
     }
-    
-    return {
-      success: false,
-      error: response.error,
-      data: {
-        totalUsers: 0,
-        activeUsers: 0,
-        totalSPIssued: 0,
-        estimatedRewardsValue: 0,
-      },
-    };
+    return { success: false, error: response.error, data: empty };
   } catch (error) {
-    return {
-      success: false,
-      error: error.message || 'Failed to fetch dashboard statistics',
-      data: {
-        totalUsers: 0,
-        activeUsers: 0,
-        totalSPIssued: 0,
-        estimatedRewardsValue: 0,
-      },
-    };
+    return { success: false, error: error.message || 'Failed to fetch dashboard statistics', data: empty };
   }
 };
 
@@ -170,53 +157,44 @@ export const getDashboardData = async () => {
     if (dashboardResponse.success && dashboardResponse.data) {
       const backendData = dashboardResponse.data;
       
-      // Map backend response structure to frontend format
-      // Backend returns: { success: true, data: { stats: { ... } } }
-      const stats = backendData.stats || {};
-      const todayMatches = stats.todayMatches || {};
-      
-      // Get alerts from separate endpoint or from main response
+      // Map backend response to frontend format (support camelCase and snake_case)
+      const stats = backendData.stats || backendData.statistics || {};
+      const todayMatches = stats.todayMatches || stats.today_matches || {};
+      const todaySummary = backendData.todaySummary || backendData.today_summary || {};
+      const nextFixture = backendData.nextFixture ?? backendData.next_fixture ?? null;
+
       let alerts = [];
       if (alertsResponse.success) {
-        // Alerts endpoint might return { alerts: [...] } or just [...]
-        if (Array.isArray(alertsResponse.data)) {
-          alerts = alertsResponse.data;
-        } else if (alertsResponse.data?.alerts && Array.isArray(alertsResponse.data.alerts)) {
-          alerts = alertsResponse.data.alerts;
-        } else if (alertsResponse.data?.data && Array.isArray(alertsResponse.data.data)) {
-          alerts = alertsResponse.data.data;
-        }
-      } else if (backendData.alerts && Array.isArray(backendData.alerts)) {
-        // Fallback to alerts in main dashboard response
+        const ad = alertsResponse.data;
+        if (Array.isArray(ad)) alerts = ad;
+        else if (Array.isArray(ad?.alerts)) alerts = ad.alerts;
+        else if (Array.isArray(ad?.data)) alerts = ad.data;
+      } else if (Array.isArray(backendData.alerts)) {
         alerts = backendData.alerts;
       }
-      
-      // Debug logging
-      console.log('Dashboard API Response:', {
-        backendData,
-        stats,
-        todayMatches,
-        alertsResponse,
-      });
-      
+
       const mappedData = {
         stats: {
-          totalUsers: stats.totalUsers || 0,
-          activeUsers: stats.activeUsers || 0,
-          totalSPIssued: stats.totalSPIssued || 0,
-          estimatedRewardsValue: stats.estimatedRewardsValue || 0,
+          totalUsers: Number(stats.totalUsers ?? stats.total_users ?? 0),
+          activeUsers: Number(stats.activeUsers ?? stats.active_users ?? 0),
+          totalSPIssued: Number(stats.totalSPIssued ?? stats.total_sp_issued ?? 0),
+          estimatedRewardsValue: Number(stats.estimatedRewardsValue ?? stats.estimated_rewards_value ?? 0),
         },
         todaySummary: {
-          totalMatches: todayMatches.total || 0,
-          completedMatches: todayMatches.completed || 0,
-          liveMatches: todayMatches.live || 0,
-          pendingResults: todayMatches.pendingResults || 0,
+          totalMatches: Number(todaySummary.totalMatches ?? todaySummary.total_matches ?? todayMatches.total ?? 0),
+          completedMatches: Number(todaySummary.completedMatches ?? todaySummary.completed_matches ?? todayMatches.completed ?? 0),
+          liveMatches: Number(todaySummary.liveMatches ?? todaySummary.live_matches ?? todayMatches.live ?? 0),
+          pendingResults: Number(todaySummary.pendingResults ?? todaySummary.pending_results ?? todayMatches.pendingResults ?? todayMatches.pending_results ?? 0),
         },
-        nextFixture: backendData.nextFixture || null,
+        nextFixture: nextFixture && typeof nextFixture === 'object' ? {
+          ...nextFixture,
+          kickoffTime: nextFixture.kickoffTime ?? nextFixture.kickoff_time ?? nextFixture.kickoff,
+          homeTeam: nextFixture.homeTeam ?? nextFixture.home_team,
+          awayTeam: nextFixture.awayTeam ?? nextFixture.away_team,
+          leagueName: nextFixture.leagueName ?? nextFixture.league_name,
+        } : null,
         alerts: Array.isArray(alerts) ? alerts : [],
       };
-      
-      console.log('Mapped Dashboard Data:', mappedData);
       
       return {
         success: true,

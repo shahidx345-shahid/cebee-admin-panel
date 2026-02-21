@@ -592,8 +592,12 @@ const PollFormPage = () => {
                           <Typography variant="subtitle2" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 2 }}>
                             Match {fixture.matchNum}
                           </Typography>
+                          <Box sx={{ display: 'flex', gap: 0.5, mb: 1.5, flexWrap: 'wrap' }}>
+                            <Chip label="Featured Fixture" size="small" sx={{ backgroundColor: `${colors.brandRed}15`, color: colors.brandRed, fontWeight: 600, fontSize: 9, height: 18 }} />
+                            <Chip label="Featured Team" size="small" sx={{ backgroundColor: `${colors.brandRed}22`, color: colors.brandRed, fontWeight: 700, fontSize: 9, height: 18 }} />
+                          </Box>
 
-                          {/* Team A (Home) Selection */}
+                          {/* Team A (Home) – Featured Team Selection */}
                           <FormControl 
                             fullWidth 
                             sx={{ 
@@ -604,11 +608,11 @@ const PollFormPage = () => {
                               }
                             }}
                           >
-                            <InputLabel>Team A (Home)</InputLabel>
+                            <InputLabel>Team A (Home) – Featured Team</InputLabel>
                             <Select
                               value={fixture.teamA}
                               onChange={(e) => handleTeamSelect(fixture.matchNum, 'teamA', e.target.value)}
-                              label="Team A (Home)"
+                              label="Team A (Home) – Featured Team"
                             >
                               <MenuItem value="">
                                 <em>Select Team A</em>
@@ -695,7 +699,10 @@ const PollFormPage = () => {
                                 Match {fixture.matchNum} Ready
                               </Typography>
                               <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack, mt: 0.5 }}>
-                                {availableTeams.find(t => t.id === fixture.teamA)?.name} vs {availableTeams.find(t => t.id === fixture.teamB)?.name}
+                                {availableTeams.find(t => t.id === fixture.teamA)?.name}
+                                <Chip label="Featured Team" size="small" sx={{ ml: 0.5, verticalAlign: 'middle', backgroundColor: `${colors.brandRed}22`, color: colors.brandRed, fontWeight: 700, fontSize: 9, height: 16 }} />
+                                {' vs '}
+                                {availableTeams.find(t => t.id === fixture.teamB)?.name}
                               </Typography>
                             </Box>
                           )}

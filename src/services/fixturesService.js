@@ -733,8 +733,37 @@ export const getFixturePredictions = async (fixtureId, params = {}) => {
 };
 
 /**
- * Get fixture statistics
- * NOTE: This endpoint may not exist in backend - statistics might be included in fixture details
+ * Get fixture statistics (status counts) for dashboard
+ * Backend: GET /api/fixtures/statistics?cmdId=...
+ * @param {object} params - Optional { cmdId } to restrict counts to a matchday
+ * @returns {Promise<{success: boolean, data?: { statistics: object }, error?: string}>}
+ */
+export const getFixtureStatistics = async (params = {}) => {
+  try {
+    const response = await apiGet('/fixtures/statistics', params);
+    if (response.success && response.data?.statistics) {
+      return {
+        success: true,
+        data: { statistics: response.data.statistics },
+      };
+    }
+    return {
+      success: false,
+      error: response.error || 'Failed to fetch fixture statistics',
+      data: { statistics: null },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message || 'Failed to fetch fixture statistics',
+      data: { statistics: null },
+    };
+  }
+};
+
+/**
+ * Get fixture statistics (single fixture - details)
+ * NOTE: This gets fixture details; for dashboard status counts use getFixtureStatistics()
  * @param {string} fixtureId - Fixture ID
  * @returns {Promise<{success: boolean, data?: object, error?: string}>}
  */
@@ -747,16 +776,13 @@ export const getFixtureStats = async (fixtureId) => {
       };
     }
 
-    // Backend endpoint may not exist - try getting fixture details which may include stats
     const response = await apiGet(`/fixtures/${fixtureId}`);
-    
     if (response.success) {
       return {
         success: true,
         data: response.data,
       };
     }
-    
     return {
       success: false,
       error: response.error,

@@ -1170,11 +1170,24 @@ const FixtureFormPage = () => {
                   ) : (
                     (featureType === 'community' ? availableTeams : teams).map((team) => (
                       <MenuItem key={team.id} value={team.id}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%', flexWrap: 'wrap' }}>
                           {(team.isFeatured || featureType === 'community') && (
                             <Star sx={{ fontSize: 16, color: colors.brandRed }} />
                           )}
                           <Typography sx={{ flex: 1 }}>{team.name}</Typography>
+                          {featureType === 'community' && team.isTeamA && (
+                            <Chip
+                              label="Featured Team"
+                              size="small"
+                              sx={{
+                                backgroundColor: `${colors.brandRed}22`,
+                                color: colors.brandRed,
+                                fontWeight: 700,
+                                fontSize: 10,
+                                height: 20,
+                              }}
+                            />
+                          )}
                           {(team.isFeatured || featureType === 'community') && (
                             <Chip
                               label={featureType === 'community' ? 'Featured Fixture' : 'Featured'}
@@ -1193,6 +1206,11 @@ const FixtureFormPage = () => {
                     ))
                   )}
                 </Select>
+                {featureType === 'community' && (teams.some(t => t.isTeamA) || availableTeams.some(t => t.isTeamA)) && (
+                  <Typography variant="caption" sx={{ display: 'block', mt: 0.75, color: colors.textSecondary }}>
+                    First team is the Featured Team from the Featured Fixture.
+                  </Typography>
+                )}
               </FormControl>
             </Grid>
             <Grid item xs={12} md={6}>
@@ -1257,11 +1275,24 @@ const FixtureFormPage = () => {
                   ) : (
                     (featureType === 'community' ? availableTeams : teams).map((team) => (
                       <MenuItem key={team.id} value={team.id}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%', flexWrap: 'wrap' }}>
                           {(team.isFeatured || featureType === 'community') && (
                             <Star sx={{ fontSize: 16, color: colors.brandRed }} />
                           )}
                           <Typography sx={{ flex: 1 }}>{team.name}</Typography>
+                          {featureType === 'community' && team.isTeamA && (
+                            <Chip
+                              label="Featured Team"
+                              size="small"
+                              sx={{
+                                backgroundColor: `${colors.brandRed}22`,
+                                color: colors.brandRed,
+                                fontWeight: 700,
+                                fontSize: 10,
+                                height: 20,
+                              }}
+                            />
+                          )}
                           {(team.isFeatured || featureType === 'community') && (
                             <Chip
                               label={featureType === 'community' ? 'Featured Fixture' : 'Featured'}

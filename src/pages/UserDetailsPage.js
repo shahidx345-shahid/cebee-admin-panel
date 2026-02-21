@@ -38,7 +38,7 @@ import SearchBar from '../components/common/SearchBar';
 
 import { format } from 'date-fns';
 import { VerifiedUser, Security, Edit, Gavel, TimerOff, AssignmentInd } from '@mui/icons-material';
-import { getUserDetails, requestKYC, verifyKYC, rejectKYC, expireKYC, flagUser } from '../services/usersService';
+import { getUserDetails, requestKYC, verifyKYC, rejectKYC, expireKYC, flagUser, updateKycNotes } from '../services/usersService';
 
 const UserDetailsPage = () => {
   const navigate = useNavigate();
@@ -189,8 +189,10 @@ const UserDetailsPage = () => {
   const handleKycUpdate = async (updates) => {
     try {
       let result;
-      
-      if (updates.status === 'pending' || updates.status === 'under_review') {
+
+      if (updates.notes !== undefined) {
+        result = await updateKycNotes(id, updates.notes);
+      } else if (updates.status === 'pending' || updates.status === 'under_review') {
         result = await requestKYC(id);
       } else if (updates.status === 'verified') {
         result = await verifyKYC(id, updates.riskLevel || 'none');
@@ -201,14 +203,12 @@ const UserDetailsPage = () => {
       }
 
       if (result && result.success) {
-        // Update local state
-    setKycData((prev) => ({
-      ...prev,
+        setKycData((prev) => ({
+          ...prev,
           ...updates,
           ...(result.data?.kyc || {}),
+          ...(updates.notes !== undefined ? { notes: updates.notes } : {}),
         }));
-        
-        // Reload user data to get latest
         await loadUserData();
       } else if (result) {
         console.error('Failed to update KYC:', result.error);

@@ -42,6 +42,7 @@ import {
 import { colors, constants } from '../config/theme';
 import { format } from 'date-fns';
 import { getRewardById, updateRewardStatus, updateRewardNotes, markRewardAsFulfilled, cancelReward } from '../services/rewardsService';
+import { getUserDetails } from '../services/usersService';
 
 const RewardDetailsPage = () => {
     const navigate = useNavigate();
@@ -55,6 +56,7 @@ const RewardDetailsPage = () => {
     const [declineDialogOpen, setDeclineDialogOpen] = useState(false);
     const [declineReason, setDeclineReason] = useState('');
     const [confirmPaidDialogOpen, setConfirmPaidDialogOpen] = useState(false);
+    const [fulfillGiftCardCode, setFulfillGiftCardCode] = useState('');
 
     useEffect(() => {
         loadReward();
@@ -123,30 +125,45 @@ const RewardDetailsPage = () => {
                 // The service already extracts the reward, so response.data is the reward object
                 const data = response.data;
                 
-                // Map backend API response to frontend format
-                // Backend returns reward object with populated userId (user object with username, email, fullName)
+                // Map backend API response to frontend format (all from database/API)
+                // Backend may return reward with populated userId (user object); KYC can be on reward or on user
+                const rawUser = data.userId || data.user;
+                const user = (rawUser && typeof rawUser === 'object' && !Array.isArray(rawUser)) ? rawUser : {};
+                const userKyc = user.kyc || {};
+                const kycOnReward = {
+                    status: data.kycStatus ?? data.kyc_status ?? user.kycStatus ?? userKyc.status ?? 'not_submitted',
+                    verified: data.kycVerified ?? data.kyc_verified ?? user.kycVerified ?? userKyc.verified ?? false,
+                    verifiedAt: parseDate(data.kycVerifiedAt ?? data.kyc_verified_at ?? user.kycVerifiedAt ?? userKyc.verifiedAt),
+                    verifiedBy: data.kycVerifiedBy ?? data.kyc_verified_by ?? user.kycVerifiedBy ?? userKyc.verifiedBy ?? null,
+                    submittedAt: parseDate(data.kycSubmittedAt ?? data.kyc_submitted_at ?? user.kycSubmittedAt ?? userKyc.submittedAt),
+                };
+                // Normalize kycStatus: backend may send 'verified' or true for kycVerified
+                const kycStatusNormalized = (kycOnReward.verified === true || (typeof kycOnReward.status === 'string' && kycOnReward.status.toLowerCase() === 'verified'))
+                    ? 'verified'
+                    : (typeof kycOnReward.status === 'string' ? kycOnReward.status.toLowerCase() : 'not_submitted');
+
                 const rewardData = {
-                    // Core fields
+                    // Core fields (from database)
                     id: data._id || data.id || id,
-                    userId: data.userId?._id || data.userId || data.user_id || null,
-                    rank: data.rank || 0,
-                    // User data from populated userId object
-                    username: data.userId?.username || data.username || 'N/A',
-                    userEmail: data.userId?.email || data.userEmail || data.email || 'N/A',
-                    userFullName: data.userId?.fullName || data.userFullName || null,
-                    spTotal: data.spTotal || 0,
-                    usdAmount: data.usdAmount || 0,
+                    userId: user._id || user.id || data.userId || data.user_id || null,
+                    rank: data.rank ?? data.rank_achieved ?? 0,
+                    // User data from populated userId/user
+                    username: user.username || data.username || 'N/A',
+                    userEmail: user.email || data.userEmail || data.email || 'N/A',
+                    userFullName: user.fullName || data.userFullName || null,
+                    spTotal: data.spTotal ?? data.sp_total ?? 0,
+                    usdAmount: data.usdAmount ?? data.usd_amount ?? 0,
                     rewardType: data.rewardType || data.payoutMethod || 'Gift Card',
-                    payoutMethod: data.payoutMethod || data.rewardType || 'Gift Card', // Backward compatibility
+                    payoutMethod: data.payoutMethod || data.rewardType || 'Gift Card',
                     status: data.status || 'unclaimed',
-                    rewardMonth: data.rewardMonth || '',
+                    rewardMonth: (data.rewardMonth || data.month || data.month_year || data.monthYear || '').toString().trim() || '',
                     
-                    // KYC fields
-                    kycStatus: data.kycStatus || 'not_submitted',
-                    kycVerified: data.kycVerified || false,
-                    kycVerifiedAt: parseDate(data.kycVerifiedAt),
-                    kycVerifiedBy: data.kycVerifiedBy || null,
-                    kycSubmittedAt: parseDate(data.kycSubmittedAt),
+                    // KYC fields (from reward or populated user - database)
+                    kycStatus: kycStatusNormalized,
+                    kycVerified: kycOnReward.verified === true || kycStatusNormalized === 'verified',
+                    kycVerifiedAt: kycOnReward.verifiedAt,
+                    kycVerifiedBy: kycOnReward.verifiedBy,
+                    kycSubmittedAt: kycOnReward.submittedAt,
                     
                     // Risk fields
                     risk: data.risk || false,
@@ -154,19 +171,19 @@ const RewardDetailsPage = () => {
                     riskBadges: data.riskBadges || [],
                     riskReason: data.riskReason || null,
                     
-                    // Claim fields
-                    claimDeadline: parseDate(data.claimDeadline),
-                    claimSubmittedAt: parseDate(data.claimSubmittedAt),
+                    // Claim fields (from API, support snake_case)
+                    claimDeadline: parseDate(data.claimDeadline ?? data.claim_deadline),
+                    claimSubmittedAt: parseDate(data.claimSubmittedAt ?? data.claim_submitted_at),
                     
-                    // Consent fields
-                    consentOptIn: data.consentOptIn || false,
-                    consentTimestamp: parseDate(data.consentTimestamp),
-                    consentSource: data.consentSource || null,
+                    // Consent fields (from API)
+                    consentOptIn: data.consentOptIn ?? data.consent_opt_in ?? false,
+                    consentTimestamp: parseDate(data.consentTimestamp ?? data.consent_timestamp),
+                    consentSource: data.consentSource ?? data.consent_source ?? null,
                     
-                    // Gift Card fields
-                    giftCardPlatform: data.giftCardPlatform || null,
-                    giftCardRegion: data.giftCardRegion || null,
-                    giftCardCode: data.giftCardCode || null,
+                    // Gift Card fields (from API)
+                    giftCardPlatform: data.giftCardPlatform ?? data.gift_card_platform ?? null,
+                    giftCardRegion: data.giftCardRegion ?? data.gift_card_region ?? null,
+                    giftCardCode: data.giftCardCode ?? data.gift_card_code ?? null,
                     
                     // Alternative Reward fields
                     alternativeRewardType: data.alternativeRewardType || null,
@@ -177,34 +194,62 @@ const RewardDetailsPage = () => {
                     screenshot: data.screenshot || null,
                     videoConsentStatus: data.videoConsentStatus || null,
                     
-                    // Processing fields
-                    processedAt: parseDate(data.processedAt),
+                    // Processing fields (from database)
+                    processedAt: parseDate(data.processedAt ?? data.processed_at),
                     
-                    // Fulfillment fields (for display)
-                    fulfilledAt: parseDate(data.processedAt), // Use processedAt for fulfilled rewards
-                    fulfilledBy: data.kycVerifiedBy || null, // Use KYC verified by as fulfilled by
+                    // Fulfillment fields (from database)
+                    fulfillmentStatus: data.fulfillmentStatus ?? data.fulfillment_status ?? (
+                        (data.status === 'fulfilled' || data.status === 'paid') ? 'Fulfilled' :
+                        (data.status === 'cancelled' || data.status === 'declined') ? 'Cancelled' : 'Pending'
+                    ),
+                    fulfilledAt: parseDate(data.fulfilledAt ?? data.fulfilled_at ?? data.processedAt ?? data.processed_at),
+                    fulfilledBy: data.fulfilledBy ?? data.fulfilled_by ?? data.processedBy ?? data.processed_by ?? kycOnReward.verifiedBy ?? null,
                     
-                    // User profile data (from populated userId)
-                    userCountry: data.userId?.country || null,
-                    accountStatus: data.userId?.status || 'Active',
-                    registrationDate: parseDate(data.userId?.createdAt),
-                    lastLoginDate: parseDate(data.userId?.lastLogin),
+                    // User profile data (from populated userId/user)
+                    userCountry: user.country || data.userCountry || null,
+                    accountStatus: user.isBlocked ? 'Blocked' : (user.isActive !== false ? 'Active' : 'Inactive'),
+                    registrationDate: parseDate(user.createdAt ?? user.created_at),
+                    lastLoginDate: parseDate(user.lastLogin ?? user.last_login),
                     
-                    // Events
-                    events: (data.events || []).map(e => ({
-                        id: e.id || Date.now(),
-                        action: e.action || 'Unknown',
-                        timestamp: parseDate(e.timestamp) || new Date(),
-                        triggeredBy: e.triggeredBy || 'System'
+                    // Events / Activity timeline (from API, support snake_case)
+                    events: (data.events ?? data.activity_log ?? data.audit_log ?? []).map((e, i) => ({
+                        id: e.id ?? e._id ?? i,
+                        action: e.action ?? e.event ?? e.type ?? 'Unknown',
+                        timestamp: parseDate(e.timestamp ?? e.created_at ?? e.date) || new Date(),
+                        triggeredBy: e.triggeredBy ?? e.triggered_by ?? e.actor ?? e.user ?? 'System'
                     })),
                     
-                    // Admin fields
-                    adminNotes: data.adminNotes || '',
-                    declineReason: data.declineReason || null,
+                    // Admin fields (from API)
+                    adminNotes: data.adminNotes ?? data.admin_notes ?? '',
+                    declineReason: data.declineReason ?? data.decline_reason ?? null,
                     
                     // Lock status
                     isLocked: data.isLocked || false,
                 };
+
+                // If KYC not verified from reward/populated user, fetch user details (source of truth for KYC)
+                const userIdStr = typeof rewardData.userId === 'string' ? rewardData.userId : (rewardData.userId?._id || rewardData.userId?.id || null);
+                if (rewardData.kycStatus !== 'verified' && userIdStr) {
+                    try {
+                        const userRes = await getUserDetails(userIdStr);
+                        if (userRes.success && userRes.data) {
+                            const d = userRes.data;
+                            const kyc = d.kyc || d.profile?.kyc || d.user?.kyc || {};
+                            const userKycStatus = (kyc.status || '').toLowerCase();
+                            const userKycVerified = userKycStatus === 'verified' || kyc.verified === true;
+                            if (userKycVerified) {
+                                rewardData.kycStatus = 'verified';
+                                rewardData.kycVerified = true;
+                                rewardData.kycVerifiedAt = rewardData.kycVerifiedAt || parseDate(kyc.verifiedAt);
+                                rewardData.kycVerifiedBy = rewardData.kycVerifiedBy || kyc.verifiedBy || null;
+                                rewardData.kycSubmittedAt = rewardData.kycSubmittedAt || parseDate(kyc.submittedAt);
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('Could not fetch user KYC for reward:', e);
+                    }
+                }
+
                 setReward(rewardData);
                 setNotes(rewardData.adminNotes || '');
             } else {
@@ -244,9 +289,8 @@ const RewardDetailsPage = () => {
             const response = await cancelReward(id, declineReason);
             
             if (response.success) {
-                // Reload reward to get updated data from backend
                 await loadReward();
-        setDeclineDialogOpen(false);
+                setDeclineDialogOpen(false);
                 setDeclineReason('');
             } else {
                 alert(`Failed to decline reward: ${response.error}`);
@@ -258,17 +302,27 @@ const RewardDetailsPage = () => {
     };
 
     const handleMarkFulfilled = async () => {
+        const isGiftCard = reward?.rewardType === 'Gift Card' || reward?.payoutMethod === 'Gift Card';
+        if (isGiftCard && (!fulfillGiftCardCode || !String(fulfillGiftCardCode).trim())) {
+            alert('Gift Card Code is required for gift card rewards. Please enter the code.');
+            return;
+        }
         try {
-            const response = await markRewardAsFulfilled(id);
-            
+            const response = await markRewardAsFulfilled(id, {
+                ...(isGiftCard && { giftCardCode: String(fulfillGiftCardCode).trim() }),
+                videoConsentStatus: reward?.videoConsentStatus ?? (reward?.consentOptIn ? 'granted' : 'not_granted'),
+                consentOptIn: reward?.consentOptIn ?? false,
+            });
             if (response.success) {
-                // Reload reward to get updated data from backend
                 await loadReward();
                 setConfirmPaidDialogOpen(false);
+                setFulfillGiftCardCode('');
             } else {
+                setConfirmPaidDialogOpen(false);
                 alert(`Failed to mark reward as fulfilled: ${response.error}`);
             }
         } catch (error) {
+            setConfirmPaidDialogOpen(false);
             console.error("Failed to mark reward as fulfilled", error);
             alert(`Failed to mark reward as fulfilled: ${error.message}`);
         }
@@ -318,13 +372,16 @@ const RewardDetailsPage = () => {
     };
 
     const getKycStatusChip = (status) => {
+        const normalized = (status || '').toLowerCase().replace(/\s/g, '_');
         const configs = {
             'not_submitted': { label: 'Not Submitted', color: 'default' },
+            'pending': { label: 'Pending', color: 'warning' },
             'under_review': { label: 'Under Review', color: 'warning' },
             'verified': { label: 'Verified', color: 'success' },
             'rejected': { label: 'Rejected', color: 'error' },
+            'expired': { label: 'Expired', color: 'default' },
         };
-        const config = configs[status] || configs['not_submitted'];
+        const config = configs[normalized] || configs[status] || configs['not_submitted'];
         return <Chip label={config.label} size="small" color={config.color} sx={{ fontWeight: 700 }} />;
     };
 
@@ -493,7 +550,13 @@ const RewardDetailsPage = () => {
                                 </Grid>
                                 <Grid item xs={12} sm={6} md={4}>
                                     <Typography variant="caption" sx={{ color: colors.textSecondary, textTransform: 'uppercase', fontWeight: 600 }}>Reward Month</Typography>
-                                    <Typography variant="h6" sx={{ fontWeight: 700, mt: 0.5 }}>{reward.rewardMonth || '-'}</Typography>
+                                    <Typography variant="h6" sx={{ fontWeight: 700, mt: 0.5 }}>
+                                        {reward.rewardMonth
+                                            ? (/^\d{4}-\d{2}$/.test(reward.rewardMonth)
+                                                ? format(new Date(reward.rewardMonth + '-01'), 'MMMM yyyy')
+                                                : reward.rewardMonth)
+                                            : '-'}
+                                    </Typography>
                                 </Grid>
                                 <Grid item xs={12} sm={6} md={4}>
                                     <Typography variant="caption" sx={{ color: colors.textSecondary, textTransform: 'uppercase', fontWeight: 600 }}>Reward Type</Typography>
@@ -757,9 +820,9 @@ const RewardDetailsPage = () => {
                                     <Typography variant="caption" sx={{ color: colors.textSecondary, textTransform: 'uppercase', fontWeight: 600 }}>Risk Level</Typography>
                                     <Box sx={{ mt: 0.5 }}>
                                         <Chip 
-                                            label={reward.riskLevel.toUpperCase()} 
+                                            label={(reward.riskLevel || 'none').toUpperCase()} 
                                             size="small" 
-                                            color={reward.riskLevel === 'high' ? 'error' : reward.riskLevel === 'medium' ? 'warning' : 'success'}
+                                            color={(reward.riskLevel || 'none') === 'high' ? 'error' : (reward.riskLevel || 'none') === 'medium' ? 'warning' : 'success'}
                                             sx={{ fontWeight: 700 }}
                                         />
                                     </Box>
@@ -985,13 +1048,13 @@ const RewardDetailsPage = () => {
                                     <Grid item xs={12} sm={6}>
                                         <Typography variant="caption" sx={{ color: colors.textSecondary, textTransform: 'uppercase', fontWeight: 600 }}>Gift Card Platform</Typography>
                                         <Typography variant="h6" sx={{ fontWeight: 700, mt: 0.5 }}>
-                                            {reward.giftCardPlatform || 'Amazon'}
+                                            {reward.giftCardPlatform || '-'}
                                         </Typography>
                                     </Grid>
                                     <Grid item xs={12} sm={6}>
                                         <Typography variant="caption" sx={{ color: colors.textSecondary, textTransform: 'uppercase', fontWeight: 600 }}>Region</Typography>
                                         <Typography variant="h6" sx={{ fontWeight: 700, mt: 0.5 }}>
-                                            {reward.giftCardRegion || 'US'}
+                                            {reward.giftCardRegion || '-'}
                                         </Typography>
                                     </Grid>
                                     <Grid item xs={12}>
@@ -1339,14 +1402,14 @@ const RewardDetailsPage = () => {
                         </Box>
                         <CardContent sx={{ p: 3 }}>
                             <Box sx={{ position: 'relative' }}>
-                                {reward.events.map((event, index) => (
+                                {(reward.events || []).map((event, index) => (
                                     <Box 
                                         key={index} 
                                         sx={{ 
                                             display: 'flex', 
                                             mb: 3,
-                                            pb: index !== reward.events.length - 1 ? 3 : 0,
-                                            borderLeft: index !== reward.events.length - 1 ? `2px solid ${colors.divider}` : 'none',
+                                            pb: index !== (reward.events || []).length - 1 ? 3 : 0,
+                                            borderLeft: index !== (reward.events || []).length - 1 ? `2px solid ${colors.divider}` : 'none',
                                             pl: 2,
                                             ml: 1.5,
                                             position: 'relative'
@@ -1403,13 +1466,25 @@ const RewardDetailsPage = () => {
                 </DialogActions>
             </Dialog>
 
-            <Dialog open={confirmPaidDialogOpen} onClose={() => setConfirmPaidDialogOpen(false)}>
+            <Dialog open={confirmPaidDialogOpen} onClose={() => { setConfirmPaidDialogOpen(false); setFulfillGiftCardCode(''); }}>
                 <DialogContent>
                     <Typography variant="h6" sx={{ mb: 2 }}>Confirm Fulfillment</Typography>
-                    <Typography>Are you sure you want to mark this reward as FULFILLED? This action cannot be undone.</Typography>
+                    <Typography sx={{ mb: 2 }}>Are you sure you want to mark this reward as FULFILLED? This action cannot be undone.</Typography>
+                    {(reward?.rewardType === 'Gift Card' || reward?.payoutMethod === 'Gift Card') && (
+                        <TextField
+                            fullWidth
+                            required
+                            label="Gift Card Code"
+                            placeholder="Enter the gift card code"
+                            value={fulfillGiftCardCode}
+                            onChange={(e) => setFulfillGiftCardCode(e.target.value)}
+                            sx={{ mt: 1 }}
+                            helperText="Required for gift card rewards. Enter the code you will send to the user."
+                        />
+                    )}
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setConfirmPaidDialogOpen(false)}>Cancel</Button>
+                    <Button onClick={() => { setConfirmPaidDialogOpen(false); setFulfillGiftCardCode(''); }}>Cancel</Button>
                     <Button variant="contained" color="success" onClick={handleMarkFulfilled}>Confirm Fulfilled</Button>
                 </DialogActions>
             </Dialog>

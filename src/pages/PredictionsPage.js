@@ -93,29 +93,65 @@ const PredictionsPage = () => {
   const loadPredictions = async () => {
     try {
       setLoading(true);
-      
+
+      // Use only matchday id (no names). Resolve "current" to id before building params.
+      const toId = (x) => (x == null ? null : String(x._id ?? x.id ?? x));
+      let resolvedCmdId = null;
+      if (selectedCmd && selectedCmd !== 'all' && selectedCmd !== 'current') {
+        resolvedCmdId = toId(selectedCmd);
+      } else if (selectedCmd === 'current') {
+        if (currentCmd) {
+          resolvedCmdId = toId(currentCmd.id ?? currentCmd._id ?? currentCmd);
+        } else {
+          const current = cmds.find(c => c.status === 'current');
+          if (current) resolvedCmdId = toId(current.id ?? current._id ?? current);
+        }
+      }
+
+      // Load CMds first when needed (so resolvedCmdId is set for "current" in one run)
+      if (cmds.length === 0) {
+        const cmdsResult = await getCmds();
+        if (cmdsResult.success && cmdsResult.data) {
+          const formattedCmds = cmdsResult.data.map(cmd => ({
+            id: cmd.id || cmd._id,
+            name: cmd.name,
+            status: cmd.status,
+            fixtureCount: cmd.fixtureCount || 0,
+          }));
+          setCmds(formattedCmds);
+          const current = formattedCmds.find(c => c.status === 'current');
+          if (current) {
+            setCurrentCmd(current);
+            if (selectedCmd === 'current') resolvedCmdId = toId(current.id ?? current._id ?? current);
+          } else {
+            const currentCmdResult = await getCurrentCmd();
+            if (currentCmdResult.success && currentCmdResult.data) {
+              const c = currentCmdResult.data;
+              const currentData = { id: c.id || c._id, name: c.name, status: c.status, fixtureCount: c.fixtureCount || 0 };
+              setCurrentCmd(currentData);
+              if (selectedCmd === 'current') resolvedCmdId = toId(currentData.id ?? currentData._id);
+            }
+          }
+        }
+      }
+
       // Build query parameters
       const params = {
-        page: page + 1, // Backend uses 1-based pagination
+        page: page + 1,
         limit: rowsPerPage,
         sort: selectedSort === 'dateNewest' ? 'newest' : selectedSort === 'dateOldest' ? 'oldest' : 'newest',
       };
-
-      // Add filters
       if (searchQuery) params.search = searchQuery;
       if (selectedStatus !== 'all') params.status = selectedStatus;
-      if (selectedCmd && selectedCmd !== 'all' && selectedCmd !== 'current') {
-        params.cmd = selectedCmd;
-      } else if (selectedCmd === 'current' && currentCmd) {
-        params.cmd = currentCmd.name;
-      }
-
-      // Remove undefined params
+      if (resolvedCmdId) params.cmdId = resolvedCmdId;
+      // Ongoing + CMD: show all fixtures for that CMD (including 0-prediction fixtures)
+      if (selectedStatus === 'ongoing' && resolvedCmdId) params.includeAvailableFixtures = true;
       Object.keys(params).forEach(key => params[key] === undefined && delete params[key]);
 
-      // Load statistics from API (only once, not on every filter change)
-      if (page === 0 && !searchQuery && selectedStatus === 'ongoing' && selectedCmd === 'current') {
-        const statsResult = await getPredictionStatistics();
+      // Load statistics from API (scoped to selected CMD when filter is set, so card matches list)
+      if (page === 0 && !searchQuery) {
+        const statsParams = resolvedCmdId ? { cmdId: resolvedCmdId } : {};
+        const statsResult = await getPredictionStatistics(statsParams);
         if (statsResult.success && statsResult.data) {
           setStatistics({
             totalPredictions: statsResult.data.totalPredictions || 0,
@@ -125,72 +161,53 @@ const PredictionsPage = () => {
           });
         }
       }
-      
-      // Load CMds from API (only once)
-      if (cmds.length === 0) {
-        const cmdsResult = await getCmds();
-        
-        if (cmdsResult.success && cmdsResult.data) {
-          const formattedCmds = cmdsResult.data.map(cmd => ({
-            id: cmd.id || cmd._id,
-            name: cmd.name,
-            status: cmd.status,
-            fixtureCount: cmd.fixtureCount || 0,
-          }));
-          setCmds(formattedCmds);
-          
-          // Set current CMd
-          const current = formattedCmds.find(cmd => cmd.status === 'current');
-          if (current) {
-            setCurrentCmd(current);
-          } else {
-            const currentCmdResult = await getCurrentCmd();
-            if (currentCmdResult.success && currentCmdResult.data) {
-              const currentCmd = {
-                id: currentCmdResult.data.id || currentCmdResult.data._id,
-                name: currentCmdResult.data.name,
-                status: currentCmdResult.data.status,
-                fixtureCount: currentCmdResult.data.fixtureCount || 0,
-              };
-              setCurrentCmd(currentCmd);
-            }
-          }
-        }
-      }
-      
-      // Load predictions from API with proper pagination
+
+      // Single predictions request with correct params (no second request to overwrite)
       const predictionsResult = await getPredictions(params);
       
       if (predictionsResult.success && predictionsResult.data) {
         const predictionsArray = predictionsResult.data.predictions || [];
-        
-        if (predictionsArray.length > 0) {
-          const formattedPredictions = formatPredictions(predictionsArray);
-          
-          if (formattedPredictions.length > 0) {
-            setPredictions(formattedPredictions);
-            
-            // Group predictions by user + match combination
-            const grouped = groupPredictionsByUserMatch(formattedPredictions);
-            setFilteredPredictions(grouped);
-            
-            // Update pagination from API response
-            if (predictionsResult.data.pagination) {
-              setPagination({
-                page: (predictionsResult.data.pagination.page || 1) - 1, // Convert to 0-based
-                limit: predictionsResult.data.pagination.limit || rowsPerPage,
-                total: predictionsResult.data.pagination.total || 0,
-                pages: predictionsResult.data.pagination.pages || 0,
-              });
-            }
-          } else {
-            setPredictions([]);
-            setFilteredPredictions([]);
-            setPagination(prev => ({ ...prev, total: 0, pages: 0 }));
-          }
+        const availableFixtures = predictionsResult.data.availableFixtures || [];
+        const paginationData = predictionsResult.data.pagination;
+
+        const formatted = predictionsArray.length > 0
+          ? formatPredictions(predictionsArray).filter(Boolean)
+          : [];
+        const grouped = groupPredictionsByUserMatch(formatted);
+
+        // Ongoing + CMD: add all fixtures for that CMD (including 0-prediction) so admin sees every fixture
+        const availableRows = availableFixtures.map((f) => ({
+          id: `fixture_${f.fixture?._id || f.fixture?.matchId || 'unknown'}`,
+          userId: null,
+          username: '—',
+          userEmail: '',
+          matchId: f.fixture?.matchId || '',
+          matchName: f.fixture?.matchName || `${f.fixture?.homeTeam || 'TBD'} vs ${f.fixture?.awayTeam || 'TBD'}`,
+          homeTeam: f.fixture?.homeTeam || 'TBD',
+          awayTeam: f.fixture?.awayTeam || 'TBD',
+          fixtureId: f.fixture?._id || '',
+          predictions: [],
+          totalPredictions: 0,
+          status: 'ongoing',
+          cmdId: f.fixture?.cmdId?._id ?? f.fixture?.cmdId,
+          cmdName: f.fixture?.cmdId?.name || '',
+        }));
+
+        const merged = [...availableRows, ...grouped];
+        setPredictions(formatted);
+        setFilteredPredictions(merged);
+
+        if (paginationData) {
+          const total = (paginationData.total ?? formatted.length) + availableRows.length;
+          setPagination({
+            page: (paginationData.page || 1) - 1,
+            limit: paginationData.limit || rowsPerPage,
+            total,
+            pages: Math.max(1, Math.ceil(total / (paginationData.limit || rowsPerPage))),
+          });
+        } else if (merged.length > 0) {
+          setPagination(prev => ({ ...prev, total: merged.length, pages: 1 }));
         } else {
-          setPredictions([]);
-          setFilteredPredictions([]);
           setPagination(prev => ({ ...prev, total: 0, pages: 0 }));
         }
       } else {
@@ -234,6 +251,8 @@ const PredictionsPage = () => {
           status: pred.status || pred.predictionStatus || 'ongoing',
           cmdId: pred.cmdId,
           cmdName: pred.cmdName,
+          isCommunityFeatured: pred.isCommunityFeatured || false,
+          hot: pred.hot || false,
         });
       }
 
@@ -279,25 +298,17 @@ const PredictionsPage = () => {
       );
     }
 
-    // CMd filter
+    // CMd filter (API already filtered by cmdId; compare as strings so we don't clear the list)
     if (selectedCmd && selectedCmd !== 'all') {
-      if (selectedCmd === 'current') {
-        // Filter by current CMd
-        if (currentCmd) {
-          filtered = filtered.filter((group) => {
-            const groupCmdId = group.cmdId || group.predictions?.[0]?.cmdId;
-            return groupCmdId === currentCmd.id;
-          });
-        } else {
-          filtered = [];
-        }
-      } else {
-        // Filter by specific CMd ID
+      const targetCmdId = selectedCmd === 'current' ? (currentCmd?.id ?? currentCmd?._id) : selectedCmd;
+      if (targetCmdId) {
         filtered = filtered.filter((group) => {
-          const groupCmdId = group.cmdId || group.predictions?.[0]?.cmdId;
-          return groupCmdId === selectedCmd;
+          const raw = group.cmdId ?? group.predictions?.[0]?.cmdId;
+          const groupCmdId = raw != null && typeof raw === 'object' ? (raw._id ?? raw.id) : raw;
+          return String(groupCmdId) === String(targetCmdId);
         });
       }
+      // When "current" but currentCmd not set yet, keep all (API already returned correct cmd)
     }
 
     if (selectedStatus === 'ongoing') {
@@ -496,7 +507,17 @@ const PredictionsPage = () => {
       label: 'Match',
       render: (_, row) => (
         <Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+          {(row.hot || row.isCommunityFeatured) && (
+            <Box sx={{ display: 'flex', gap: 0.5, mb: 0.5, flexWrap: 'wrap' }}>
+              {row.isCommunityFeatured && (
+                <Chip label="Featured Team" size="small" sx={{ backgroundColor: `${colors.brandRed}22`, color: colors.brandRed, fontWeight: 700, fontSize: 9, height: 18 }} />
+              )}
+              {row.hot && (
+                <Chip label="Featured Fixture" size="small" sx={{ backgroundColor: `${colors.brandRed}15`, color: colors.brandRed, fontWeight: 600, fontSize: 9, height: 18 }} />
+              )}
+            </Box>
+          )}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5, flexWrap: 'wrap' }}>
             <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack }}>
               {row.matchName || `${row.homeTeam || 'TBD'} vs ${row.awayTeam || 'TBD'}`}
             </Typography>
@@ -850,21 +871,25 @@ const PredictionsPage = () => {
             {currentCmd ? currentCmd.name : 'Current CMd'}
           </Button>
           {cmds
-            .filter(cmd => cmd.status === 'completed')
+            .filter((cmd) => {
+              const cmdId = cmd.id ?? cmd._id;
+              const currentId = currentCmd?.id ?? currentCmd?._id;
+              return !currentId || String(cmdId) !== String(currentId);
+            })
             .map((cmd) => (
               <Button
-                key={cmd.id}
-                variant={selectedCmd === cmd.id ? 'contained' : 'outlined'}
-                onClick={() => setSelectedCmd(cmd.id)}
+                key={cmd.id ?? cmd._id}
+                variant={selectedCmd === (cmd.id ?? cmd._id) ? 'contained' : 'outlined'}
+                onClick={() => setSelectedCmd(cmd.id ?? cmd._id)}
                 sx={{
-                  backgroundColor: selectedCmd === cmd.id ? colors.textSecondary : 'transparent',
-                  color: selectedCmd === cmd.id ? colors.brandWhite : colors.brandBlack,
+                  backgroundColor: selectedCmd === (cmd.id ?? cmd._id) ? colors.textSecondary : 'transparent',
+                  color: selectedCmd === (cmd.id ?? cmd._id) ? colors.brandWhite : colors.brandBlack,
                   borderColor: colors.textSecondary,
                   textTransform: 'none',
                   fontWeight: 600,
                   borderRadius: '8px',
                   '&:hover': {
-                    backgroundColor: selectedCmd === cmd.id ? colors.textSecondary : `${colors.textSecondary}0A`,
+                    backgroundColor: selectedCmd === (cmd.id ?? cmd._id) ? colors.textSecondary : `${colors.textSecondary}0A`,
                   },
                 }}
               >

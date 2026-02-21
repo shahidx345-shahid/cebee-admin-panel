@@ -56,7 +56,7 @@ import DataTable from '../components/common/DataTable';
 import { db } from '../config/firebase';
 import { format } from 'date-fns';
 import { getCmds, getCurrentCmd } from '../services/cmdsService';
-import { getFixtures } from '../services/fixturesService';
+import { getFixtures, getFixtureStatistics } from '../services/fixturesService';
 
 const FixturesPage = () => {
   const navigate = useNavigate();
@@ -83,6 +83,8 @@ const FixturesPage = () => {
   });
   const [actionMenuAnchor, setActionMenuAnchor] = useState(null);
   const [menuFixture, setMenuFixture] = useState(null);
+  const [stats, setStats] = useState({ scheduled: 0, published: 0, live: 0, resultPending: 0, completed: 0 }); // from GET /fixtures/statistics
+  const fixtureStatistics = stats; // alias so stat cards can use either name (avoids stale refs from HMR)
 
   const getSampleFixtures = () => {
     return [
@@ -141,69 +143,30 @@ const FixturesPage = () => {
     ];
   };
 
-  const loadFixtures = async () => {
-    setLoading(true);
+  // Refs for filter/display
+  const cmdsRef = React.useRef(null);
+  const currentCmdRef = React.useRef(null);
+  const loadFixturesRef = React.useRef(null);
+
+  const loadFixtures = React.useCallback(async (options = {}) => {
+    const { showLoading = true } = options;
+    if (showLoading) setLoading(true);
     try {
-      // Load CMds from API first (needed for filtering and displaying cmd names)
-      let formattedCmds = [];
-      let currentCmdData = null;
-      
-      const cmdsResult = await getCmds();
-      if (cmdsResult.success && cmdsResult.data) {
-        formattedCmds = cmdsResult.data.map(cmd => ({
-          id: cmd.id || cmd._id,
-          name: cmd.name,
-          status: cmd.status,
-          fixtureCount: cmd.fixtureCount || 0,
-        }));
-        setCmds(formattedCmds);
-        
-        // Set current CMd
-        const current = formattedCmds.find(cmd => cmd.status === 'current');
-    if (current) {
-          currentCmdData = current;
-      setCurrentCmd(current);
-        } else {
-          // Try to get current CMd if not found in list
-          const currentCmdResult = await getCurrentCmd();
-          if (currentCmdResult.success && currentCmdResult.data) {
-            currentCmdData = {
-              id: currentCmdResult.data.id || currentCmdResult.data._id,
-              name: currentCmdResult.data.name,
-              status: currentCmdResult.data.status,
-              fixtureCount: currentCmdResult.data.fixtureCount || 0,
-            };
-            setCurrentCmd(currentCmdData);
-          }
-        }
-      }
-      
-      // Fetch fixtures from API
-      const queryParams = {
-        limit: 1000, // Get enough fixtures
-      };
-      
-      // Add CMd filter - use currentCmdData from this function scope
-      const currentCmdForFilter = currentCmdData || (formattedCmds.find(cmd => cmd.status === 'current'));
+      const queryParams = { limit: 1000 };
+      const currentCmdForFilter = currentCmdRef.current || currentCmd;
+      const formattedCmds = cmdsRef.current || cmds;
       if (selectedCmd === 'current' && currentCmdForFilter) {
         queryParams.cmdId = currentCmdForFilter.id;
       } else if (selectedCmd && selectedCmd !== 'all' && selectedCmd !== 'current') {
         queryParams.cmdId = selectedCmd;
       }
-      
-      // Add status filter
       if (selectedStatus && selectedStatus !== 'all') {
         queryParams.status = selectedStatus;
       }
-      
       const fixturesResult = await getFixtures(queryParams);
-      
       if (fixturesResult.success && fixturesResult.data) {
-        // Format fixtures to match expected structure
-        // Backend returns { fixtures: [...], pagination: {...} } or just array
         const fixturesArray = fixturesResult.data.fixtures || fixturesResult.data || [];
         const formattedFixtures = fixturesArray.map(fixture => {
-          // Handle populated cmdId (could be object with _id and name)
           let cmdId = '';
           let cmdName = '';
           if (fixture.cmdId) {
@@ -212,13 +175,10 @@ const FixturesPage = () => {
               cmdName = fixture.cmdId.name || '';
             } else {
               cmdId = fixture.cmdId.toString();
-              // Find CMd name from formattedCmds array
               const cmd = formattedCmds.find(c => (c.id || c._id)?.toString() === cmdId);
               cmdName = cmd ? cmd.name : '';
             }
           }
-          
-          // Handle populated leagueId (could be object)
           let league = '';
           if (fixture.leagueId) {
             if (typeof fixture.leagueId === 'object' && fixture.leagueId.league_name) {
@@ -229,7 +189,6 @@ const FixturesPage = () => {
           } else {
             league = fixture.league || fixture.leagueName || fixture.league_name || '';
           }
-          
           return {
             id: fixture._id || fixture.id,
             matchId: fixture.matchId || fixture.match_id || fixture._id || fixture.id,
@@ -240,7 +199,8 @@ const FixturesPage = () => {
             status: fixture.status || fixture.matchStatus || 'scheduled',
             matchStatus: fixture.matchStatus || fixture.status || 'scheduled',
             predictions: fixture.predictionCount || fixture.prediction_count || 0,
-            hot: fixture.isFeatured || fixture.isCeBeFeatured || fixture.isCeBeFeatured || false,
+            hot: fixture.isFeatured || fixture.isCeBeFeatured || fixture.isCommunityFeatured || false,
+            isCommunityFeatured: fixture.isCommunityFeatured || false,
             cmdId: cmdId,
             cmdName: cmdName,
             venue: fixture.venue || '',
@@ -248,11 +208,9 @@ const FixturesPage = () => {
             awayScore: fixture.awayScore || fixture.away_score || null,
           };
         });
-        
         setFixtures(formattedFixtures);
         setFilteredFixtures(formattedFixtures);
       } else {
-        // Fallback to empty array if API fails
         console.error('Failed to load fixtures:', fixturesResult.error);
         setFixtures([]);
         setFilteredFixtures([]);
@@ -260,22 +218,103 @@ const FixturesPage = () => {
     } catch (error) {
       console.error('Error loading fixtures:', error);
     } finally {
-    setLoading(false);
+      if (showLoading) setLoading(false);
     }
-  };
+  }, [selectedCmd, selectedStatus]);
 
-  useEffect(() => {
-    loadFixtures();
-  }, [selectedCmd, selectedStatus]); // Reload when filters change
+  loadFixturesRef.current = loadFixtures;
 
-  // Reload fixtures when navigating back from form page
+  // Mount: load CMds, then fixtures (stats loaded by separate effect below)
   useEffect(() => {
-    if (location.state?.refresh) {
-      loadFixtures();
-      // Clear the refresh flag
-      navigate(location.pathname, { replace: true, state: {} });
+    let cancelled = false;
+    (async () => {
+      const cmdsResult = await getCmds();
+      if (cancelled) return;
+      if (cmdsResult.success && cmdsResult.data) {
+        const formattedCmds = cmdsResult.data.map(cmd => ({
+          id: cmd.id || cmd._id,
+          name: cmd.name,
+          status: cmd.status,
+          fixtureCount: cmd.fixtureCount || 0,
+        }));
+        setCmds(formattedCmds);
+        cmdsRef.current = formattedCmds;
+        const current = formattedCmds.find(cmd => cmd.status === 'current');
+        if (current) {
+          setCurrentCmd(current);
+          currentCmdRef.current = current;
+        } else {
+          const currentCmdResult = await getCurrentCmd();
+          if (cancelled) return;
+          if (currentCmdResult.success && currentCmdResult.data) {
+            const currentCmdData = {
+              id: currentCmdResult.data.id || currentCmdResult.data._id,
+              name: currentCmdResult.data.name,
+              status: currentCmdResult.data.status,
+              fixtureCount: currentCmdResult.data.fixtureCount || 0,
+            };
+            setCurrentCmd(currentCmdData);
+            currentCmdRef.current = currentCmdData;
+          }
+        }
+        if (!cancelled) loadFixturesRef.current?.();
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Stats: fetch inline when CMd filter changes (no callback = no TDZ)
+  useEffect(() => {
+    let cancelled = false;
+    const cmd = currentCmdRef.current || currentCmd;
+    const params = {};
+    if (selectedCmd === 'current' && cmd?.id) params.cmdId = cmd.id;
+    else if (selectedCmd && selectedCmd !== 'all' && selectedCmd !== 'current') params.cmdId = selectedCmd;
+    getFixtureStatistics(params).then((result) => {
+      if (cancelled) return;
+      if (result.success && result.data?.statistics) {
+        const s = result.data.statistics;
+        setStats({
+          scheduled: s.scheduled ?? 0,
+          published: s.published ?? 0,
+          live: s.live ?? 0,
+          resultPending: s.resultPending ?? 0,
+          completed: s.completed ?? 0,
+        });
+      } else {
+        setStats({ scheduled: 0, published: 0, live: 0, resultPending: 0, completed: 0 });
+      }
+    }).catch(() => {
+      if (!cancelled) setStats({ scheduled: 0, published: 0, live: 0, resultPending: 0, completed: 0 });
+    });
+    return () => { cancelled = true; };
+  }, [selectedCmd, currentCmd]);
+
+  const isInitialMount = React.useRef(true);
+  useEffect(() => {
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return; // Initial load is done by mount effect (after cmds)
     }
-  }, [location.state, navigate]);
+    loadFixturesRef.current?.({ showLoading: false }); // Filter change: refetch list without full-page loading
+  }, [selectedCmd, selectedStatus]); // One fixtures API call per filter change only (not on mount)
+
+  // Reload fixtures and stats when navigating back from form page
+  useEffect(() => {
+    if (!location.state?.refresh) return;
+    loadFixturesRef.current?.();
+    const cmd = currentCmdRef.current || currentCmd;
+    const params = {};
+    if (selectedCmd === 'current' && cmd?.id) params.cmdId = cmd.id;
+    else if (selectedCmd && selectedCmd !== 'all' && selectedCmd !== 'current') params.cmdId = selectedCmd;
+    getFixtureStatistics(params).then((result) => {
+      if (result.success && result.data?.statistics) {
+        const s = result.data.statistics;
+        setStats({ scheduled: s.scheduled ?? 0, published: s.published ?? 0, live: s.live ?? 0, resultPending: s.resultPending ?? 0, completed: s.completed ?? 0 });
+      }
+    }).catch(() => {});
+    navigate(location.pathname, { replace: true, state: {} });
+  }, [location.state, navigate, selectedCmd, currentCmd]);
 
   useEffect(() => {
     const filterAndSortFixtures = () => {
@@ -333,8 +372,8 @@ const FixturesPage = () => {
             return matchStatus === 'predictionLock' || matchStatus === 'predictionLocked' || fixtureStatus === 'locked';
           }
           if (selectedStatus === 'resultsProcessing') {
-            // Result Pending includes both resultsProcessing and pending statuses
-            return fixtureStatus === 'resultPending' || fixtureStatus === 'resultsProcessing' || fixtureStatus === 'pending' || fixtureStatus === 'fullTimeProcessing';
+            // Result Processing includes resultsProcessing, resultPending (backward compat), and pending statuses
+            return fixtureStatus === 'resultsProcessing' || fixtureStatus === 'resultPending' || fixtureStatus === 'pending' || fixtureStatus === 'fullTimeProcessing';
           }
           // For other statuses, check both fixture status and match status
           return fixtureStatus === selectedStatus || matchStatus === selectedStatus;
@@ -674,11 +713,28 @@ const FixturesPage = () => {
     {
       id: 'teams',
       label: 'Teams',
-      render: (_, row) => (
-        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-          {row.homeTeam || 'TBD'} vs {row.awayTeam || 'TBD'}
-        </Typography>
-      ),
+      render: (_, row) => {
+        const isClosed = row.status === 'completed';
+        const showFeaturedFixture = row.hot && isClosed;
+        const showFeaturedTeam = row.isCommunityFeatured && isClosed;
+        return (
+          <Box>
+            {showFeaturedFixture && (
+              <Box sx={{ display: 'flex', gap: 0.5, mb: 0.5, flexWrap: 'wrap' }}>
+                <Chip label="Featured Fixture" size="small" sx={{ backgroundColor: `${colors.brandRed}15`, color: colors.brandRed, fontWeight: 600, fontSize: 10, height: 20 }} />
+              </Box>
+            )}
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              {row.homeTeam || 'TBD'}
+              {showFeaturedTeam && (
+                <Chip label="Featured Team" size="small" component="span" sx={{ display: 'inline-flex', verticalAlign: 'middle', ml: 0.5, backgroundColor: `${colors.brandRed}22`, color: colors.brandRed, fontWeight: 700, fontSize: 9, height: 18 }} />
+              )}
+              {' vs '}
+              {row.awayTeam || 'TBD'}
+            </Typography>
+          </Box>
+        );
+      },
     },
     {
       id: 'league',
@@ -857,14 +913,11 @@ const FixturesPage = () => {
 
       {/* Stats Cards - Dashboard Style */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
-        {/* Top Row - 4 Cards */}
+        {/* Top Row - 4 Cards - from API GET /fixtures/statistics (stable when switching status tab) */}
         <Grid item xs={6} md={3}>
           <StatCard
             title="Scheduled"
-            value={fixtures.filter((f) => {
-              const status = f.matchStatus || f.status;
-              return status === 'scheduled' || status === 'draft';
-            }).length.toString()}
+            value={String(stats.scheduled)}
             subtitle="Draft"
             icon={AccessTime}
             color="#9E9E9E"
@@ -875,13 +928,7 @@ const FixturesPage = () => {
         <Grid item xs={6} md={3}>
           <StatCard
             title="Published"
-            value={fixtures.filter((f) => {
-              const fixtureStatus = f.status;
-              const matchStatus = f.matchStatus;
-              // Published fixtures include both predictionOpen and predictionLock
-              return (fixtureStatus === 'published' && (matchStatus === 'predictionOpen' || matchStatus === 'predictionLock' || !matchStatus)) ||
-                     fixtureStatus === 'predictionOpen';
-            }).length.toString()}
+            value={String(stats.published)}
             subtitle="Predictions Open"
             icon={Visibility}
             color="#1976d2"
@@ -892,7 +939,7 @@ const FixturesPage = () => {
         <Grid item xs={6} md={3}>
           <StatCard
             title="Live Matches"
-            value={fixtures.filter((f) => (f.matchStatus || f.status) === 'live').length.toString()}
+            value={String(stats.live)}
             subtitle="Now"
             icon={PlayArrow}
             color={colors.brandRed}
@@ -903,7 +950,7 @@ const FixturesPage = () => {
         <Grid item xs={6} md={3}>
           <StatCard
             title="Result Pending"
-            value={fixtures.filter((f) => (f.matchStatus || f.status) === 'resultsProcessing' || (f.matchStatus || f.status) === 'pending').length.toString()}
+            value={String(stats.resultPending)}
             subtitle="Action Required"
             icon={Edit}
             color="#FF9800"
@@ -915,7 +962,7 @@ const FixturesPage = () => {
         <Grid item xs={6} md={3}>
           <StatCard
             title="Completed"
-            value={fixtures.filter((f) => (f.matchStatus || f.status) === 'completed').length.toString()}
+            value={String(stats.completed)}
             subtitle="SP Distributed"
             icon={CheckCircle}
             color={colors.success}
@@ -1569,42 +1616,6 @@ const FixturesPage = () => {
             <Visibility sx={{ fontSize: 18, color: '#1976D2' }} />
           </Box>
           <Typography sx={{ flex: 1, fontWeight: 600, color: colors.brandBlack }}>View Details</Typography>
-          <KeyboardArrowRight sx={{ fontSize: 18, color: colors.textSecondary }} />
-        </MenuItem>
-        <MenuItem
-          onClick={() => {
-            if (menuFixture) {
-              navigate(`/fixtures/edit/${menuFixture.id}`);
-            }
-            setActionMenuAnchor(null);
-            setMenuFixture(null);
-          }}
-          sx={{
-            px: 2,
-            py: 1.5,
-            borderRadius: '8px',
-            display: 'flex',
-            alignItems: 'center',
-            '&:hover': {
-              backgroundColor: `${colors.warning}0D`,
-            },
-          }}
-        >
-          <Box
-            sx={{
-              width: 32,
-              height: 32,
-              borderRadius: '8px',
-              backgroundColor: '#FFF3E0',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              mr: 1.5,
-            }}
-          >
-            <Edit sx={{ fontSize: 18, color: '#FF9800' }} />
-          </Box>
-          <Typography sx={{ flex: 1, fontWeight: 600, color: colors.brandBlack }}>Edit Fixture</Typography>
           <KeyboardArrowRight sx={{ fontSize: 18, color: colors.textSecondary }} />
         </MenuItem>
       </Menu>

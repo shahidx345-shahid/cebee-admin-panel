@@ -872,6 +872,10 @@ const PollsPage = () => {
                             border: `1px solid ${colors.divider}`,
                             backgroundColor: colors.brandWhite
                           }}>
+                            <Box sx={{ display: 'flex', gap: 0.5, mb: 0.5, flexWrap: 'wrap' }}>
+                              <Chip label="Featured Fixture" size="small" sx={{ backgroundColor: `${colors.brandRed}15`, color: colors.brandRed, fontWeight: 600, fontSize: 9, height: 18 }} />
+                              <Chip label="Featured Team" size="small" sx={{ backgroundColor: `${colors.brandRed}22`, color: colors.brandRed, fontWeight: 700, fontSize: 9, height: 18 }} />
+                            </Box>
                             <Typography variant="subtitle1" sx={{ fontWeight: 700, color: colors.brandBlack, lineHeight: 1.2, mb: 0.5 }}>
                               {match.homeTeam}
                             </Typography>
@@ -1128,7 +1132,7 @@ const PollsPage = () => {
             >
               <VerifiedUser sx={{ color: '#10B981', fontSize: 20 }} />
               <Typography variant="body2" sx={{ color: '#065F46', fontWeight: 600, fontSize: 14 }}>
-                Featured Match: Real Madrid vs Barcelona
+                Featured Fixture: Real Madrid (Featured Team) vs Barcelona
               </Typography>
             </Box>
 
