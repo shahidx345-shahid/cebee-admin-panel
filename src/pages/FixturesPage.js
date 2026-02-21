@@ -455,7 +455,6 @@ const FixturesPage = () => {
       // Here you would update the fixture in Firebase
       // await updateDoc(doc(db, 'fixtures', selectedFixture.id), { ... });
 
-      console.log('Updating results:', resultsForm);
       handleCloseResultsModal();
       // Reload fixtures
       loadFixtures();

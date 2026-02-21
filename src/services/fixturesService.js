@@ -156,17 +156,8 @@ export const createFixture = async (fixtureData) => {
       requestBody.status = fixtureData.status;
     }
 
-    console.log('Creating fixture - fixtureData received:', fixtureData);
-    console.log('Creating fixture - requestBody being sent:', JSON.stringify(requestBody, null, 2));
     
     const response = await apiPost('/fixtures', requestBody);
-    
-    console.log('Creating fixture - API response:', {
-      success: response.success,
-      status: response.status,
-      error: response.error,
-      data: response.data,
-    });
     
     if (response.success) {
       return {
@@ -263,9 +254,6 @@ export const updateFixture = async (fixtureId, fixtureData) => {
       requestBody.matchStatus = fixtureData.matchStatus;
     }
 
-    console.log('Updating fixture - fixtureData received:', fixtureData);
-    console.log('Updating fixture - requestBody being sent:', requestBody);
-    
     const response = await apiPut(`/fixtures/${fixtureId}`, requestBody);
     
     if (response.success) {
@@ -377,9 +365,6 @@ export const updateFixtureResults = async (fixtureId, resultsData) => {
       requestBody.firstGoalMinute = parseInt(resultsData.firstGoalMinute, 10);
     }
 
-    console.log('Updating fixture results - resultsData received:', resultsData);
-    console.log('Updating fixture results - requestBody being sent:', requestBody);
-    
     // Backend uses PUT /fixtures/:id/results
     const response = await apiPut(`/fixtures/${fixtureId}/results`, requestBody);
     

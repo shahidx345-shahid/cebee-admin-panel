@@ -130,7 +130,6 @@ const ReferralsPage = () => {
       }
 
       const response = await getReferrals(params);
-      console.log('Referrals API response:', response);
       
       if (response.success) {
         // Backend may return referrals array or paginated response
@@ -186,7 +185,6 @@ const ReferralsPage = () => {
           };
         });
         
-        console.log('Normalized referrals data:', referralsData);
         
         setReferrals(referralsData);
         // Note: filteredReferrals will be set by the filterAndSortReferrals effect

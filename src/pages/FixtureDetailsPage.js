@@ -165,15 +165,12 @@ const FixtureDetailsPage = () => {
         }
 
         // Fetch fixture from API
-        console.log('Loading fixture with ID:', id);
         const fixtureResult = await getFixture(id);
-        console.log('Fixture API response:', fixtureResult);
         
         if (fixtureResult.success && fixtureResult.data) {
           // Backend returns { success: true, data: { fixture: {...} } }
           // The fixture object is nested in data.fixture
           const fixtureData = fixtureResult.data.fixture || fixtureResult.data;
-          console.log('Fixture data extracted:', fixtureData);
           
           // Check if fixtureData is actually an object
           if (!fixtureData || typeof fixtureData !== 'object' || Array.isArray(fixtureData)) {
@@ -183,7 +180,6 @@ const FixtureDetailsPage = () => {
             return;
           }
           
-          console.log('Processing fixture data, homeTeam:', fixtureData.homeTeam || fixtureData.home_team);
           
           // Format fixture data to match expected structure
           let formattedFixture;

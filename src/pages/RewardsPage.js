@@ -182,8 +182,7 @@ const RewardsPage = () => {
       }
 
       const response = await getRewards(params);
-      console.log('Rewards API response:', response);
-      
+
       if (response.success) {
         // Service returns normalized { rewards, pagination }; rewards are already camelCase with id, month, etc.
         const { rewards: rewardsData = [], pagination: paginationData = {} } = response.data || {};
@@ -1339,7 +1338,6 @@ const RewardsPage = () => {
             }}
             onRowClick={(row) => {
               const rewardId = row.id || row._id || row.reward_id || row.rewardId;
-              console.log('Navigating to reward details with ID:', rewardId, 'Full row:', row);
               if (rewardId) {
                 navigate(`/rewards/details/${rewardId}`);
               } else {
@@ -1371,7 +1369,6 @@ const RewardsPage = () => {
             <MenuItem
               onClick={() => {
                 const rewardId = selectedReward?.id || selectedReward?._id || selectedReward?.reward_id || selectedReward?.rewardId;
-                console.log('Navigating to reward details from menu with ID:', rewardId, 'Full reward:', selectedReward);
                 if (rewardId) {
                   navigate(`/rewards/details/${rewardId}`);
                 } else {
