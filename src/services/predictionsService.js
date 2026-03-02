@@ -415,8 +415,6 @@ export const formatPrediction = (prediction) => {
     correctness: prediction.correctness || 'pending',
     cmdId: prediction.cmdId || '',
     cmdName: prediction.cmdName || '',
-    isCommunityFeatured: prediction.isCommunityFeatured || false,
-    hot: prediction.hot || prediction.isFeatured || false,
     createdAt: prediction.createdAt ? new Date(prediction.createdAt) : new Date(),
     updatedAt: prediction.updatedAt ? new Date(prediction.updatedAt) : new Date(),
     totalPredictions: prediction.totalPredictions || 0,
