@@ -3,8 +3,8 @@
  * Common functions for all API calls including error handling, token management, and request handling
  */
 
-// Backend: api.cebeepredict.com. In development we use relative /api so the dev server proxy (see package.json) forwards to the API and avoids CORS.
-const API_BASE_URL = process.env.REACT_APP_API_URL || (typeof window !== 'undefined' && window.location?.hostname === 'localhost' ? '' : 'https://api.cebeepredict.com') + '/api';
+// Live backend. For local dev set REACT_APP_API_URL=http://localhost:3001 in .env
+const API_BASE_URL = (process.env.REACT_APP_API_URL || 'https://api.cebeepredict.com') + '/api';
 
 /**
  * Get authentication token from localStorage

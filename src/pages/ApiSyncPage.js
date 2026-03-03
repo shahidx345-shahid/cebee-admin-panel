@@ -22,21 +22,20 @@ import Sync from '@mui/icons-material/Sync';
 import Refresh from '@mui/icons-material/Refresh';
 import {
   getApiLeagues,
-  getApiFixtures,
   getApiTeams,
   getApiPlayers,
-  getApiEvents,
   manualSync,
   forceRefresh,
   refetchMatchData,
 } from '../services/apiSyncService';
 
 const TAB_LEAGUES = 0;
-const TAB_FIXTURES = 1;
-const TAB_TEAMS = 2;
-const TAB_PLAYERS = 3;
+const TAB_TEAMS = 1;
+const TAB_PLAYERS = 2;
+// Fixtures & Match Events tabs hidden from UI; constants kept to avoid ReferenceError from cached bundle
+const TAB_FIXTURES = 3;
 const TAB_MATCH_EVENTS = 4;
-const tabLabels = ['Leagues', 'Fixtures', 'Teams', 'Players', 'Match Events'];
+const tabLabels = ['Leagues', 'Teams', 'Players'];
 
 const ApiSyncPage = () => {
   const [tab, setTab] = useState(0);
@@ -46,17 +45,12 @@ const ApiSyncPage = () => {
   const [error, setError] = useState(null);
 
   const [leagues, setLeagues] = useState([]);
-  const [fixtures, setFixtures] = useState([]);
   const [teams, setTeams] = useState([]);
   const [players, setPlayers] = useState([]);
-  const [events, setEvents] = useState([]);
 
   const [leagueId, setLeagueId] = useState('');
   const [season, setSeason] = useState('');
-  const [date, setDate] = useState('');
-  const [status, setStatus] = useState('');
   const [teamId, setTeamId] = useState('');
-  const [fixtureId, setFixtureId] = useState('');
   const [refetchFixtureId, setRefetchFixtureId] = useState('');
 
   const clearMsg = () => {
@@ -114,24 +108,6 @@ const ApiSyncPage = () => {
     else setError(res.error || 'Failed to load leagues');
   };
 
-  const loadFixtures = async () => {
-    if (!leagueId.trim() || !season.trim()) {
-      setError('League ID and Season are required');
-      return;
-    }
-    setLoading(true);
-    clearMsg();
-    const res = await getApiFixtures({
-      league: leagueId.trim(),
-      season: season.trim(),
-      date: date.trim() || undefined,
-      status: status.trim() || undefined,
-    });
-    setLoading(false);
-    if (res.success) setFixtures(res.data || []);
-    else setError(res.error || 'Failed to load fixtures');
-  };
-
   const loadTeams = async () => {
     if (!leagueId.trim() || !season.trim()) {
       setError('League ID and Season are required');
@@ -160,19 +136,6 @@ const ApiSyncPage = () => {
     } else {
       setError(res.error || 'Failed to load players');
     }
-  };
-
-  const loadEvents = async () => {
-    if (!fixtureId.trim()) {
-      setError('API Fixture ID is required');
-      return;
-    }
-    setLoading(true);
-    clearMsg();
-    const res = await getApiEvents(fixtureId.trim());
-    setLoading(false);
-    if (res.success) setEvents(res.data || []);
-    else setError(res.error || 'Failed to load match events');
   };
 
   const renderTable = (rows, columns) => (
@@ -271,26 +234,6 @@ const ApiSyncPage = () => {
             </Box>
           )}
 
-          {tab === TAB_FIXTURES && (
-            <Box>
-              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center', mb: 2 }}>
-                <TextField size="small" label="League ID" value={leagueId} onChange={(e) => setLeagueId(e.target.value)} placeholder="e.g. 39" sx={{ width: 110 }} />
-                <TextField size="small" label="Season" value={season} onChange={(e) => setSeason(e.target.value)} placeholder="2024" sx={{ width: 90 }} />
-                <TextField size="small" label="Date (YYYY-MM-DD)" value={date} onChange={(e) => setDate(e.target.value)} sx={{ width: 140 }} />
-                <TextField size="small" label="Status" value={status} onChange={(e) => setStatus(e.target.value)} placeholder="NS, FT, 1H" sx={{ width: 80 }} />
-                <Button variant="contained" onClick={loadFixtures} disabled={loading}>Load Fixtures</Button>
-              </Box>
-              {renderTable(fixtures, [
-                { key: 'id', label: 'Fixture ID', render: (r) => r.fixture?.id ?? '-' },
-                { key: 'date', label: 'Date', render: (r) => r.fixture?.date ?? '-' },
-                { key: 'status', label: 'Status', render: (r) => r.fixture?.status?.short ?? r.fixture?.status ?? '-' },
-                { key: 'home', label: 'Home', render: (r) => r.teams?.home?.name ?? '-' },
-                { key: 'away', label: 'Away', render: (r) => r.teams?.away?.name ?? '-' },
-                { key: 'score', label: 'Score', render: (r) => (r.goals?.home != null && r.goals?.away != null) ? `${r.goals.home} - ${r.goals.away}` : '-' },
-              ])}
-            </Box>
-          )}
-
           {tab === TAB_TEAMS && (
             <Box>
               <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center', mb: 2 }}>
@@ -315,21 +258,6 @@ const ApiSyncPage = () => {
                 { key: 'name', label: 'Name', render: (r) => r.name ?? '-' },
                 { key: 'position', label: 'Position', render: (r) => r.position ?? '-' },
                 { key: 'number', label: 'Number', render: (r) => r.number ?? '-' },
-              ])}
-            </Box>
-          )}
-
-          {tab === TAB_MATCH_EVENTS && (
-            <Box>
-              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap', alignItems: 'center', mb: 2 }}>
-                <TextField size="small" label="API Fixture ID" value={fixtureId} onChange={(e) => setFixtureId(e.target.value)} placeholder="e.g. 1234567" sx={{ width: 150 }} />
-                <Button variant="contained" onClick={loadEvents} disabled={loading}>Load Match Events</Button>
-              </Box>
-              {renderTable(events, [
-                { key: 'min', label: 'Min', render: (r) => r.time?.elapsed ?? '-' },
-                { key: 'type', label: 'Type', render: (r) => r.type ?? '-' },
-                { key: 'detail', label: 'Detail', render: (r) => r.detail ?? '-' },
-                { key: 'player', label: 'Player', render: (r) => r.player?.name ?? '-' },
               ])}
             </Box>
           )}

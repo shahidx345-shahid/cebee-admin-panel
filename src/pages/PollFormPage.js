@@ -93,9 +93,9 @@ const PollFormPage = () => {
           id: league.apiLeagueId != null ? String(league.apiLeagueId) : (league._id ?? league.league_id),
           name: league.league_name ?? league.name,
           country: league.country ?? null,
-          isActive: league.status === 'Active',
-        }));
-        setLeagues(formattedLeagues);
+            isActive: league.status === 'Active',
+          }));
+          setLeagues(formattedLeagues);
         const pag = result.data.pagination || {};
         setLeaguesTotal(pag.total ?? formattedLeagues.length);
         setLeaguesPage(1);
@@ -336,9 +336,9 @@ const PollFormPage = () => {
   };
 
   const handleTeamSelect = (matchNum, teamType, teamId) => {
-    setSelectedFixtures(prev =>
-      prev.map(fixture =>
-        fixture.matchNum === matchNum
+    setSelectedFixtures(prev => 
+      prev.map(fixture => 
+        fixture.matchNum === matchNum 
           ? { ...fixture, [teamType]: teamId }
           : fixture
       )
@@ -408,17 +408,17 @@ const PollFormPage = () => {
       return;
     }
 
-    const startTime = formData.startTime instanceof Date ? formData.startTime : new Date(formData.startTime);
-    let closeTime = formData.closeTime instanceof Date ? formData.closeTime : new Date(formData.closeTime);
-    if (closeTime <= startTime) {
-      alert('Close time must be after start time. Please adjust the dates.');
-      return;
-    }
-    const minCloseTime = new Date(startTime.getTime() + 24 * 60 * 60 * 1000);
-    if (closeTime < minCloseTime) {
-      alert('Poll duration must be at least 24 hours. Close time will be adjusted to 24 hours after start time.');
-      closeTime = minCloseTime;
-    }
+      const startTime = formData.startTime instanceof Date ? formData.startTime : new Date(formData.startTime);
+      let closeTime = formData.closeTime instanceof Date ? formData.closeTime : new Date(formData.closeTime);
+      if (closeTime <= startTime) {
+        alert('Close time must be after start time. Please adjust the dates.');
+        return;
+      }
+      const minCloseTime = new Date(startTime.getTime() + 24 * 60 * 60 * 1000);
+      if (closeTime < minCloseTime) {
+        alert('Poll duration must be at least 24 hours. Close time will be adjusted to 24 hours after start time.');
+        closeTime = minCloseTime;
+      }
 
     if (isEditMode) {
       if (!validateFixtures()) {
@@ -427,15 +427,15 @@ const PollFormPage = () => {
       }
       try {
         setSaving(true);
-        const pollData = {
-          leagueId: formData.leagueId,
+      const pollData = {
+        leagueId: formData.leagueId,
           startTime,
           closeTime,
           fixtures: selectedFixtures.map((f) => ({
-            matchNum: f.matchNum,
-            teamAId: f.teamA,
+          matchNum: f.matchNum,
+          teamAId: f.teamA,
             teamAName: availableTeams.find((t) => t.id === f.teamA)?.name,
-            teamBId: f.teamB,
+          teamBId: f.teamB,
             teamBName: availableTeams.find((t) => t.id === f.teamB)?.name,
           })),
         };
@@ -443,7 +443,7 @@ const PollFormPage = () => {
         if (result.success) {
           alert(result.message || 'Poll updated successfully!');
           navigate(constants.routes.polls);
-        } else {
+      } else {
           alert(result.error || result.data?.error?.message || 'Failed to update poll');
         }
       } catch (error) {
@@ -650,10 +650,10 @@ const PollFormPage = () => {
                       {...params}
                       label="Select League"
                       placeholder="Search leagues..."
-                      sx={{
-                        '& .MuiOutlinedInput-root': {
-                          borderRadius: '14px',
-                          backgroundColor: `${colors.backgroundLight}80`,
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: '14px',
+                      backgroundColor: `${colors.backgroundLight}80`,
                           '& fieldset': { borderColor: `${colors.divider}66` },
                           '&:hover fieldset': { borderColor: colors.brandRed },
                           '&.Mui-focused fieldset': { borderColor: colors.brandRed },
@@ -814,7 +814,7 @@ const PollFormPage = () => {
                           }}
                         >
                           <InputLabel>Fixture {slotIndex + 1}</InputLabel>
-                          <Select
+                  <Select
                             value={selectedApiFixtureIds[slotIndex] ?? ''}
                             onChange={(e) => handleApiFixtureSelect(slotIndex, e.target.value)}
                             label={`Fixture ${slotIndex + 1}`}
@@ -859,7 +859,7 @@ const PollFormPage = () => {
                           >
                             <MenuItem value="">
                               <em>Select a match</em>
-                            </MenuItem>
+                      </MenuItem>
                             {leagueFixtures.map((f) => {
                               const alreadyUsed =
                                 selectedApiFixtureIds.some((id, i) => i !== slotIndex && id === f.apiFixtureId);
@@ -871,8 +871,8 @@ const PollFormPage = () => {
                                 </MenuItem>
                               );
                             })}
-                          </Select>
-                        </FormControl>
+                  </Select>
+                </FormControl>
                       ))}
                       {fixturesTotal > 0 && (
                         <Box
@@ -927,8 +927,8 @@ const PollFormPage = () => {
                       )}
                     </Box>
                   ) : null}
-                </Box>
-              </Grid>
+              </Box>
+            </Grid>
             )}
 
             {/* Teams/Matches Display (edit mode only) */}

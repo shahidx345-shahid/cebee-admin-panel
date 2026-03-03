@@ -723,15 +723,15 @@ const FixtureFormPage = () => {
           fixtureData.isCeBeFeatured = true;
         } else {
           // CeBee manual or Regular: requires home_team_id and away_team_id
-          if (!formData.homeTeam || !formData.awayTeam) {
-            alert('Please select both home and away teams');
-            setSaving(false);
-            return;
-          }
-          fixtureData.home_team_id = formData.homeTeam;
-          fixtureData.away_team_id = formData.awayTeam;
-          if (featureType === 'cebee') {
-            fixtureData.isCeBeFeatured = true;
+        if (!formData.homeTeam || !formData.awayTeam) {
+          alert('Please select both home and away teams');
+          setSaving(false);
+          return;
+        }
+        fixtureData.home_team_id = formData.homeTeam;
+        fixtureData.away_team_id = formData.awayTeam;
+        if (featureType === 'cebee') {
+          fixtureData.isCeBeFeatured = true;
           }
         }
       }
@@ -1462,7 +1462,7 @@ const FixtureFormPage = () => {
             {featureType === 'cebee' && selectedApiFixture ? (
               <Grid item xs={12}>
                 <Box
-                  sx={{
+                sx={{
                     p: 2.5,
                     borderRadius: '12px',
                     backgroundColor: `${colors.success}0C`,
@@ -1474,10 +1474,10 @@ const FixtureFormPage = () => {
                     <Typography variant="subtitle2" sx={{ fontWeight: 700, color: colors.success }}>
                       Auto-filled from selected fixture
                     </Typography>
-                    <Chip
-                      size="small"
+                            <Chip
+                              size="small"
                       label="From API"
-                      sx={{
+                              sx={{
                         ml: 1,
                         borderRadius: '8px',
                         fontWeight: 600,
@@ -1510,7 +1510,7 @@ const FixtureFormPage = () => {
                         <Box sx={{ mt: 0.5 }}>
                           <Autocomplete
                             fullWidth
-                            size="small"
+                              size="small"
                             value={apiVenues.find((v) => v.name === formData.venue) || null}
                             onChange={(_, newVal) => handleChange('venue', newVal?.name || '')}
                             options={apiVenues}
@@ -1587,11 +1587,11 @@ const FixtureFormPage = () => {
                   {featureType === 'community' ? 'No featured fixtures for this league' : 'No teams for this league'}
                 </Typography>
               )}
-              {featureType === 'community' && (teams.some(t => t.isTeamA) || availableTeams.some(t => t.isTeamA)) && (
-                <Typography variant="caption" sx={{ display: 'block', mt: 0.75, color: colors.textSecondary }}>
-                  First team is the Featured Team from the Featured Fixture.
-                </Typography>
-              )}
+                {featureType === 'community' && (teams.some(t => t.isTeamA) || availableTeams.some(t => t.isTeamA)) && (
+                  <Typography variant="caption" sx={{ display: 'block', mt: 0.75, color: colors.textSecondary }}>
+                    First team is the Featured Team from the Featured Fixture.
+                  </Typography>
+                )}
             </Grid>
             <Grid item xs={12} md={6}>
               <Autocomplete
@@ -1608,7 +1608,7 @@ const FixtureFormPage = () => {
                 renderInput={(params) => (
                   <TextField
                     {...params}
-                    label="Away Team *"
+                  label="Away Team *"
                     placeholder="Search teams..."
                     required
                     sx={{ '& .MuiOutlinedInput-root': { borderRadius: '12px' } }}
@@ -1618,13 +1618,13 @@ const FixtureFormPage = () => {
                   <Box component="li" {...props} sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                     {(team.isFeatured || featureType === 'community') && <Star sx={{ fontSize: 16, color: colors.brandRed }} />}
                     <Typography sx={{ flex: 1 }}>{team.name || team.team_name}</Typography>
-                    {featureType === 'community' && team.isTeamA && (
+                          {featureType === 'community' && team.isTeamA && (
                       <Chip label="Featured Team" size="small" sx={{ backgroundColor: `${colors.brandRed}22`, color: colors.brandRed, fontWeight: 700, fontSize: 10, height: 20 }} />
-                    )}
-                    {(team.isFeatured || featureType === 'community') && (
+                          )}
+                          {(team.isFeatured || featureType === 'community') && (
                       <Chip label={featureType === 'community' ? 'Featured Fixture' : 'Featured'} size="small" sx={{ backgroundColor: `${colors.brandRed}15`, color: colors.brandRed, fontWeight: 600, fontSize: 10, height: 20 }} />
-                    )}
-                  </Box>
+                          )}
+                        </Box>
                 )}
                 slotProps={{ paper: { sx: { borderRadius: '12px', mt: 1, boxShadow: '0 4px 16px rgba(0,0,0,0.15)' } } }}
               />
@@ -1669,7 +1669,7 @@ const FixtureFormPage = () => {
                 renderInput={(params) => (
                   <TextField
                     {...params}
-                    label="Match Ground / Stadium *"
+                  label="Match Ground / Stadium *"
                     placeholder="Search stadium..."
                     required
                     sx={{ '& .MuiOutlinedInput-root': { borderRadius: '12px' } }}
@@ -1679,7 +1679,7 @@ const FixtureFormPage = () => {
                   <Box component="li" {...props} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     {o.value === 'other' && <Send sx={{ fontSize: 18, color: colors.brandRed }} />}
                     {o.label}
-                  </Box>
+                    </Box>
                 )}
                 slotProps={{ paper: { sx: { borderRadius: '12px', mt: 1 } } }}
               />
@@ -1696,7 +1696,7 @@ const FixtureFormPage = () => {
                 renderInput={(params) => (
                   <TextField
                     {...params}
-                    label="League *"
+                  label="League *"
                     placeholder="Search leagues..."
                     required
                     sx={{ '& .MuiOutlinedInput-root': { borderRadius: '12px' } }}
@@ -1726,7 +1726,7 @@ const FixtureFormPage = () => {
                       <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack }}>
                         {leagues.length.toLocaleString()} / {leaguesTotal.toLocaleString()} leagues
                       </Typography>
-                    </Box>
+                      </Box>
                     {leaguesTotal > 0 && (
                       <Box sx={{ width: 80, height: 6, borderRadius: 3, backgroundColor: '#E5E7EB', overflow: 'hidden' }}>
                         <Box

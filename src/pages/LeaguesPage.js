@@ -78,6 +78,7 @@ const LeaguesPage = () => {
         search: searchQuery || undefined,
         type: typeFilter !== 'all' ? typeFilter : undefined,
         ...(selectedSort && { sort: mapSortToBackend(selectedSort) }),
+        includeInactive: true, // League Management: show all leagues so admin can activate/deactivate
       };
 
       // Remove undefined values
