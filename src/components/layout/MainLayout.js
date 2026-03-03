@@ -129,8 +129,9 @@ const MainLayout = ({ children }) => {
           <TopBar onMenuClick={handleDrawerToggle} isMobile={!isDesktop} />
         </Box>
 
-        {/* Page Content */}
+        {/* Page Content - scrollable area; id used so child pages can lock scroll (e.g. fixture dropdown) */}
         <Box
+          id="main-content-scroll"
           sx={{
             flex: 1,
             width: '100%',

@@ -38,9 +38,13 @@ const DataTable = ({
           border: `1.5px solid ${colors.divider}26`,
           borderTop: 'none',
           boxShadow: 'none',
-          overflow: 'hidden',
+          overflowX: 'auto',
+          overflowY: 'hidden',
           width: '100%',
           maxWidth: '100%',
+          WebkitOverflowScrolling: 'touch',
+          '&::-webkit-scrollbar': { height: 8 },
+          '&::-webkit-scrollbar-thumb': { borderRadius: 4, backgroundColor: 'rgba(0,0,0,0.2)' },
         }}
       >
         {loading ? (
@@ -56,7 +60,7 @@ const DataTable = ({
           </Box>
         ) : (
           <>
-            <Table>
+            <Table sx={{ minWidth: 'max-content', tableLayout: 'auto' }}>
               <TableHead>
                 <TableRow
                   sx={{
@@ -73,6 +77,9 @@ const DataTable = ({
                         color: colors.brandBlack,
                         padding: '18px 20px',
                         borderBottom: 'none',
+                        whiteSpace: 'nowrap',
+                        minWidth: column.minWidth ?? undefined,
+                        width: column.width ?? undefined,
                       }}
                     >
                       {column.label}
@@ -122,6 +129,9 @@ const DataTable = ({
                             fontSize: 14,
                             color: colors.textPrimary,
                             borderBottom: 'none',
+                            whiteSpace: 'nowrap',
+                            minWidth: column.minWidth ?? undefined,
+                            width: column.width ?? undefined,
                           }}
                         >
                           {column.render

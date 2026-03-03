@@ -213,6 +213,94 @@ export const updatePoll = async (pollId, pollData) => {
 };
 
 /**
+ * Get upcoming fixtures from Football API for a league/season (for poll creation). Supports pagination.
+ * @param {string} leagueId - League ID (CeBee DB _id or Football API league id)
+ * @param {number|string} season - Season year (e.g. 2025)
+ * @param {object} options - Optional { page: 1, limit: 20 }
+ * @returns {Promise<{success: boolean, data?: { fixtures: Array, pagination?: object }, error?: string}>}
+ */
+export const getUpcomingFixtures = async (leagueId, season, options = {}) => {
+  try {
+    if (!leagueId || season == null) {
+      return {
+        success: false,
+        error: 'League and season are required',
+        data: { fixtures: [], pagination: {} },
+      };
+    }
+    const params = {
+      leagueId,
+      season: String(season),
+      ...(options.page != null && { page: options.page }),
+      ...(options.limit != null && { limit: options.limit }),
+    };
+    const response = await apiGet('/polls/upcoming-fixtures', params);
+    if (response.success && response.data) {
+      return {
+        success: true,
+        data: {
+          fixtures: response.data.fixtures || [],
+          pagination: response.data.pagination || {},
+        },
+      };
+    }
+    return {
+      success: false,
+      error: response.error || 'Failed to load upcoming fixtures',
+      data: { fixtures: response.data?.fixtures || [], pagination: response.data?.pagination || {} },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message || 'Failed to fetch upcoming fixtures',
+      data: { fixtures: [], pagination: {} },
+    };
+  }
+};
+
+/**
+ * Create poll from 5 Football API fixture IDs (new flow: league → select 5 fixtures → create).
+ * @param {object} params - { leagueId, season, apiFixtureIds: number[], startTime, closeTime, status? }
+ * @returns {Promise<{success: boolean, data?: object, error?: string, message?: string}>}
+ */
+export const createPollFromApi = async (params) => {
+  try {
+    const { leagueId, season, apiFixtureIds, startTime, closeTime, status } = params;
+    if (!leagueId || season == null || !Array.isArray(apiFixtureIds) || apiFixtureIds.length !== 5) {
+      return {
+        success: false,
+        error: 'leagueId, season, and exactly 5 apiFixtureIds are required',
+      };
+    }
+    const body = {
+      leagueId,
+      season: typeof season === 'number' ? season : parseInt(String(season), 10),
+      apiFixtureIds: apiFixtureIds.map((id) => parseInt(id, 10)).filter((n) => !Number.isNaN(n)),
+      startTime: startTime instanceof Date ? startTime.toISOString() : startTime,
+      closeTime: closeTime instanceof Date ? closeTime.toISOString() : closeTime,
+    };
+    if (status) body.status = status;
+    const response = await apiPost('/polls/from-api', body);
+    if (response.success) {
+      return {
+        success: true,
+        data: response.data,
+        message: response.message || 'Poll created from API fixtures',
+      };
+    }
+    return {
+      success: false,
+      error: response.error || response.message || 'Failed to create poll from API',
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message || 'An unexpected error occurred',
+    };
+  }
+};
+
+/**
  * Close poll manually
  * @param {string} pollId - Poll ID
  * @returns {Promise<{success: boolean, data?: object, error?: string, message?: string}>}

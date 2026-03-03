@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   Box,
@@ -63,6 +63,11 @@ const PlayersPage = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [playersTotalCount, setPlayersTotalCount] = useState(0);
+  const [playersActiveTotal, setPlayersActiveTotal] = useState(0);
+  const [playersInactiveTempTotal, setPlayersInactiveTempTotal] = useState(0);
+  const [playersInactivePermTotal, setPlayersInactivePermTotal] = useState(0);
+  const [playersFromFootballApi, setPlayersFromFootballApi] = useState(false);
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [error, setError] = useState('');
@@ -86,27 +91,41 @@ const PlayersPage = () => {
     inactive_until: '',
   });
 
-  useEffect(() => {
-    loadTeamAndPlayers();
-  }, [teamId]);
-
-  useEffect(() => {
-    filterPlayers();
-  }, [players, searchQuery, statusFilter]);
-
-  const loadTeamAndPlayers = async () => {
-    setLoading(true);
+  const loadTeamAndPlayers = useCallback(async () => {
+    if (!teamId) {
+      setError('Team ID is required');
+      setTeam(null);
+      setPlayers([]);
+      setFilteredPlayers([]);
+      setLoading(false);
+      return;
+    }
     setError('');
+    setLoading(true);
     try {
-      if (!teamId) {
-        setError('Team ID is required');
-        setLoading(false);
-        return;
-      }
-
-      // Load team data
-      const teamResult = await getTeam(teamId);
-      if (teamResult.success && teamResult.data?.team) {
+      const params = {
+        page: page + 1,
+        limit: rowsPerPage,
+        ...(searchQuery.trim() && { search: searchQuery.trim() }),
+        ...(statusFilter !== 'all' && { status: statusFilter }),
+      };
+      const [teamResult, playersResult] = await Promise.all([
+        getTeam(teamId),
+        getPlayersByTeam(teamId, params),
+      ]);
+      const fromApi = playersResult.data?.source === 'football_api';
+      setPlayersFromFootballApi(!!fromApi);
+      if (fromApi && playersResult.data?.team) {
+        const t = playersResult.data.team;
+        setTeam({
+          team_id: t.team_id || teamId,
+          team_name: t.team_name || `Team ${teamId}`,
+          league_id: null,
+          league_name: '—',
+          status: t.status || 'Active',
+          season_tag: '—',
+        });
+      } else if (teamResult.success && teamResult.data?.team) {
         const teamData = teamResult.data.team;
         setTeam({
           team_id: teamData.team_id || teamData._id,
@@ -117,28 +136,23 @@ const PlayersPage = () => {
           season_tag: teamData.season_tag || '2025-26',
         });
       } else {
-        // Fallback to mock data if API fails
         setTeam({
           team_id: teamId,
-          team_name: 'Loading...',
-          league_id: 'LEAGUE_001',
-          league_name: 'Premier League',
-          status: 'Active',
-          season_tag: '2025-26',
+          team_name: 'Unknown',
+          league_id: null,
+          league_name: '—',
+          status: '—',
+          season_tag: '—',
         });
       }
-
-      // Load players for this team
-      const playersResult = await getPlayersByTeam(teamId);
       if (playersResult.success && playersResult.data?.players) {
-        // Format players to match existing structure
         const formattedPlayers = playersResult.data.players.map((player) => ({
           player_id: player.player_id || player._id,
           team_id: player.team_id?._id || player.team_id,
           player_name: player.player_name,
           position: player.position,
           shirt_number: player.shirt_number,
-          status: player.status,
+          status: player.status || 'active',
           inactive_reason: player.inactive_reason,
           inactive_note: player.inactive_note,
           inactive_from: player.inactive_from ? new Date(player.inactive_from) : null,
@@ -146,51 +160,48 @@ const PlayersPage = () => {
           created_by_admin: player.created_by_admin?._id || player.created_by_admin,
           created_at: player.created_at ? new Date(player.created_at) : new Date(),
           updated_at: player.updated_at ? new Date(player.updated_at) : new Date(),
+          apiPlayerId: player.apiPlayerId,
         }));
-
         setPlayers(formattedPlayers);
         setFilteredPlayers(formattedPlayers);
+        const pag = playersResult.data.pagination || {};
+        setPlayersTotalCount(pag.total ?? formattedPlayers.length);
+        setPlayersActiveTotal(pag.total_active ?? 0);
+        setPlayersInactiveTempTotal(pag.total_inactive_temporary ?? 0);
+        setPlayersInactivePermTotal(pag.total_inactive_permanent ?? 0);
       } else {
-        // If no players found or API error, set empty array
         setPlayers([]);
         setFilteredPlayers([]);
-        if (playersResult.error) {
-          console.warn('Error loading players:', playersResult.error);
-        }
+        setPlayersTotalCount(0);
+        setPlayersActiveTotal(0);
+        setPlayersInactiveTempTotal(0);
+        setPlayersInactivePermTotal(0);
+        setPlayersFromFootballApi(false);
+        if (playersResult.error) console.warn('Error loading players:', playersResult.error);
       }
-    } catch (error) {
-      console.error('Error loading team and players:', error);
+    } catch (err) {
+      console.error('Error loading team and players:', err);
       setError('Failed to load team and players. Please try again.');
-      // Set empty state on error
+      setTeam(null);
       setPlayers([]);
       setFilteredPlayers([]);
+      setPlayersTotalCount(0);
+      setPlayersActiveTotal(0);
+      setPlayersInactiveTempTotal(0);
+      setPlayersInactivePermTotal(0);
+      setPlayersFromFootballApi(false);
     } finally {
       setLoading(false);
     }
-  };
+  }, [teamId, page, rowsPerPage, searchQuery, statusFilter]);
 
-  const filterPlayers = () => {
-    let filtered = [...players];
+  useEffect(() => {
+    if (teamId) loadTeamAndPlayers();
+  }, [teamId, loadTeamAndPlayers]);
 
-    // Search filter
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (player) =>
-          player.player_name?.toLowerCase().includes(query) ||
-          player.position?.toLowerCase().includes(query) ||
-          player.shirt_number?.toString().includes(query) ||
-          player.player_id?.toLowerCase().includes(query)
-      );
-    }
-
-    // Status filter
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter((player) => player.status === statusFilter);
-    }
-
-    setFilteredPlayers(filtered);
-  };
+  useEffect(() => {
+    setPage(0);
+  }, [searchQuery, statusFilter]);
 
   const handleMenuOpen = (event, player) => {
     setAnchorEl(event.currentTarget);
@@ -595,14 +606,7 @@ const PlayersPage = () => {
     },
   ];
 
-  const paginatedPlayers = filteredPlayers.slice(
-    page * rowsPerPage,
-    page * rowsPerPage + rowsPerPage
-  );
-
-  const activeCount = players.filter((p) => p.status === 'active').length;
-  const inactiveTempCount = players.filter((p) => p.status === 'inactive_temporary').length;
-  const inactivePermCount = players.filter((p) => p.status === 'inactive_permanent').length;
+  const paginatedPlayers = filteredPlayers;
 
   if (loading) {
     return (
@@ -717,56 +721,64 @@ const PlayersPage = () => {
                   {team.team_name}
                 </Typography>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
-                  <Chip
-                    label={team.league_name}
-                    size="small"
-                    sx={{
-                      backgroundColor: '#FEE2E2',
-                      color: colors.brandRed,
-                      fontWeight: 600,
-                      fontSize: 11,
-                    }}
-                  />
-                  <Chip
-                    label={team.season_tag}
-                    size="small"
-                    sx={{
-                      backgroundColor: '#DBEAFE',
-                      color: '#3B82F6',
-                      fontWeight: 600,
-                      fontSize: 11,
-                    }}
-                  />
-                  <Chip
-                    label={team.status}
-                    size="small"
-                    sx={{
-                      backgroundColor: '#10B981',
-                      color: colors.brandWhite,
-                      fontWeight: 600,
-                      fontSize: 11,
-                    }}
-                  />
+                  {team.league_name && team.league_name !== '—' && (
+                    <Chip
+                      label={team.league_name}
+                      size="small"
+                      sx={{
+                        backgroundColor: '#FEE2E2',
+                        color: colors.brandRed,
+                        fontWeight: 600,
+                        fontSize: 11,
+                      }}
+                    />
+                  )}
+                  {team.season_tag && team.season_tag !== '—' && (
+                    <Chip
+                      label={team.season_tag}
+                      size="small"
+                      sx={{
+                        backgroundColor: '#DBEAFE',
+                        color: '#3B82F6',
+                        fontWeight: 600,
+                        fontSize: 11,
+                      }}
+                    />
+                  )}
+                  {!playersFromFootballApi && team.status && (
+                    <Chip
+                      label={team.status}
+                      size="small"
+                      sx={{
+                        backgroundColor: '#10B981',
+                        color: colors.brandWhite,
+                        fontWeight: 600,
+                        fontSize: 11,
+                      }}
+                    />
+                  )}
                 </Box>
               </Box>
             </Box>
           </Grid>
-          <Grid item xs={12} md={6}>
-            <Box sx={{ display: 'flex', justifyContent: { xs: 'flex-start', md: 'flex-end' }, gap: 1.5 }}>
-              <Button
-                variant="outlined"
-                startIcon={<Groups />}
-                onClick={() => navigate(`/teams/history/${team.team_id}`)}
-                sx={{
-                  textTransform: 'none',
-                  fontWeight: 600,
-                  borderRadius: '12px',
-                }}
-              >
-                View History
-              </Button>
-            </Box>
-          </Grid>
+          {!playersFromFootballApi && (
+            <Grid item xs={12} md={6}>
+              <Box sx={{ display: 'flex', justifyContent: { xs: 'flex-start', md: 'flex-end' }, gap: 1.5 }}>
+                <Button
+                  variant="outlined"
+                  startIcon={<Groups />}
+                  onClick={() => navigate(`/teams/history/${team.team_id}`)}
+                  sx={{
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    borderRadius: '12px',
+                  }}
+                >
+                  View History
+                </Button>
+              </Box>
+            </Grid>
+          )}
         </Grid>
       </Card>
 
@@ -785,7 +797,7 @@ const PlayersPage = () => {
           >
             <Person sx={{ fontSize: 28, color: '#10B981', mb: 1 }} />
             <Typography variant="h3" sx={{ fontWeight: 500, color: colors.brandBlack, mb: 0.5, fontSize: 32 }}>
-              {players.length}
+              {playersTotalCount}
             </Typography>
             <Typography variant="body2" sx={{ color: '#6B7280', fontSize: 15 }}>
               Total Players
@@ -805,7 +817,7 @@ const PlayersPage = () => {
           >
             <CheckCircle sx={{ fontSize: 28, color: '#10B981', mb: 1 }} />
             <Typography variant="h3" sx={{ fontWeight: 500, color: colors.brandBlack, mb: 0.5, fontSize: 32 }}>
-              {activeCount}
+              {playersActiveTotal}
             </Typography>
             <Typography variant="body2" sx={{ color: '#6B7280', fontSize: 15 }}>
               Active Players
@@ -825,7 +837,7 @@ const PlayersPage = () => {
           >
             <CalendarToday sx={{ fontSize: 28, color: '#F59E0B', mb: 1 }} />
             <Typography variant="h3" sx={{ fontWeight: 500, color: colors.brandBlack, mb: 0.5, fontSize: 32 }}>
-              {inactiveTempCount}
+              {playersInactiveTempTotal}
             </Typography>
             <Typography variant="body2" sx={{ color: '#6B7280', fontSize: 15 }}>
               Temp Inactive
@@ -845,7 +857,7 @@ const PlayersPage = () => {
           >
             <Block sx={{ fontSize: 28, color: '#6B7280', mb: 1 }} />
             <Typography variant="h3" sx={{ fontWeight: 500, color: colors.brandBlack, mb: 0.5, fontSize: 32 }}>
-              {inactivePermCount}
+              {playersInactivePermTotal}
             </Typography>
             <Typography variant="body2" sx={{ color: '#6B7280', fontSize: 15 }}>
               Perm Inactive
@@ -892,24 +904,26 @@ const PlayersPage = () => {
             <MenuItem value="inactive_permanent">Permanent Inactive</MenuItem>
           </Select>
         </FormControl>
-        <Button
-          variant="contained"
-          startIcon={<Add />}
-          onClick={() => {
-            resetForm();
-            setAddDialogOpen(true);
-          }}
-          sx={{
-            background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
-            borderRadius: '12px',
-            textTransform: 'none',
-            fontWeight: 600,
-            px: 2.5,
-            py: 1.25,
-          }}
-        >
-          Add Player
-        </Button>
+        {!playersFromFootballApi && (
+          <Button
+            variant="contained"
+            startIcon={<Add />}
+            onClick={() => {
+              resetForm();
+              setAddDialogOpen(true);
+            }}
+            sx={{
+              background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
+              borderRadius: '12px',
+              textTransform: 'none',
+              fontWeight: 600,
+              px: 2.5,
+              py: 1.25,
+            }}
+          >
+            Add Player
+          </Button>
+        )}
       </Card>
 
       {/* Filter Chips */}
@@ -1037,8 +1051,33 @@ const PlayersPage = () => {
             ml: 1,
           }}
         >
-          {filteredPlayers.length} players found
+          {playersTotalCount > 0 ? `${playersTotalCount.toLocaleString()} players found` : 'No players found'}
         </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, ml: 'auto' }}>
+          <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13 }}>
+            Rows per page
+          </Typography>
+          <Select
+            size="small"
+            value={rowsPerPage}
+            onChange={(e) => {
+              setRowsPerPage(Number(e.target.value));
+              setPage(0);
+            }}
+            sx={{
+              minWidth: 72,
+              height: 36,
+              borderRadius: '8px',
+              fontSize: 13,
+              '& .MuiSelect-select': { py: 0.75 },
+            }}
+          >
+            <MenuItem value={10}>10</MenuItem>
+            <MenuItem value={25}>25</MenuItem>
+            <MenuItem value={50}>50</MenuItem>
+            <MenuItem value={100}>100</MenuItem>
+          </Select>
+        </Box>
       </Box>
 
       {/* Data Table */}
@@ -1048,7 +1087,7 @@ const PlayersPage = () => {
         loading={loading}
         page={page}
         rowsPerPage={rowsPerPage}
-        totalCount={filteredPlayers.length}
+        totalCount={playersTotalCount}
         onPageChange={(e, newPage) => setPage(newPage)}
         onRowsPerPageChange={(e) => {
           setRowsPerPage(parseInt(e.target.value, 10));
@@ -1071,7 +1110,13 @@ const PlayersPage = () => {
           },
         }}
       >
-        {selectedPlayer?.status === 'active' && (
+        {playersFromFootballApi && (
+          <MenuItem disabled sx={{ py: 1.5, opacity: 0.9 }}>
+            <Info sx={{ fontSize: 18, color: colors.textSecondary, mr: 1.5 }} />
+            <Typography variant="body2" color="textSecondary">Players from Football API (read-only)</Typography>
+          </MenuItem>
+        )}
+        {!playersFromFootballApi && selectedPlayer?.status === 'active' && (
           <>
             <MenuItem
               onClick={openEditDialog}
@@ -1103,7 +1148,7 @@ const PlayersPage = () => {
             </MenuItem>
           </>
         )}
-        {(selectedPlayer?.status === 'inactive_temporary' || selectedPlayer?.status === 'inactive_permanent') && (
+        {!playersFromFootballApi && (selectedPlayer?.status === 'inactive_temporary' || selectedPlayer?.status === 'inactive_permanent') && (
           <>
             <MenuItem
               onClick={openEditDialog}

@@ -50,9 +50,10 @@ const LeaguesPage = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
-  const [selectedSort, setSelectedSort] = useState('dateNewest');
+  const [selectedSort, setSelectedSort] = useState(''); // No sort initially
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [totalLeaguesCount, setTotalLeaguesCount] = useState(0);
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedLeague, setSelectedLeague] = useState(null);
   const [dateFilterAnchor, setDateFilterAnchor] = useState(null);
@@ -70,51 +71,53 @@ const LeaguesPage = () => {
     setError('');
     
     try {
-      // Map frontend filters to backend API parameters
+      // Map frontend filters to backend API parameters (no sort/filter sent when none)
       const apiParams = {
         page: page + 1, // Backend uses 1-based pagination
         limit: rowsPerPage,
         search: searchQuery || undefined,
         type: typeFilter !== 'all' ? typeFilter : undefined,
-        sort: mapSortToBackend(selectedSort),
+        ...(selectedSort && { sort: mapSortToBackend(selectedSort) }),
       };
 
       // Remove undefined values
-      Object.keys(apiParams).forEach(key => 
+      Object.keys(apiParams).forEach(key =>
         apiParams[key] === undefined && delete apiParams[key]
       );
 
       const result = await getLeagues(apiParams);
 
       if (result.success && result.data) {
-        // Format leagues to match existing structure
+        // Map full API response to table shape
         const formattedLeagues = result.data.leagues?.map(league => ({
-          id: league._id || league.league_id,
-          league_id: league._id || league.league_id,
+          id: league.apiLeagueId != null ? String(league.apiLeagueId) : (league._id || league.league_id),
+          league_id: league.apiLeagueId != null ? String(league.apiLeagueId) : (league._id || league.league_id),
           name: league.league_name || league.name,
           league_name: league.league_name || league.name,
-          type: league.type || league.leagueType || 'Domestic',
+          type: league.type || league.leagueType || 'League',
           leagueType: league.leagueType || league.type,
           isActive: league.status === 'Active',
           status: league.status,
           logo: league.logo,
           country: league.country,
-          priority: league.priority || 0,
-          createdAt: league.createdAt ? new Date(league.createdAt) : new Date(),
+          priority: league.priority ?? 0,
+          league_code: league.league_code,
+          apiLeagueId: league.apiLeagueId,
+          createdAt: league.createdAt ? new Date(league.createdAt) : null,
           createdDateFormatted: league.createdDateFormatted,
+          updatedAt: league.updatedAt,
+          ...league,
         })) || [];
 
         setLeagues(formattedLeagues);
         setFilteredLeagues(formattedLeagues);
 
-        // Update statistics
+        const pagination = result.data.pagination || result.data;
+        const total = pagination.total ?? result.data.total ?? formattedLeagues.length;
+        setTotalLeaguesCount(typeof total === 'number' ? total : formattedLeagues.length);
+
         if (result.data.statistics) {
           setStatistics(result.data.statistics);
-        }
-
-        // Update pagination if needed
-        if (result.data.pagination) {
-          // Pagination is handled by backend, so we might need to adjust
         }
       } else {
         setError(result.error || 'Failed to load leagues');
@@ -132,17 +135,23 @@ const LeaguesPage = () => {
     }
   };
 
-  // Map frontend sort to backend sort parameter
+  // Map frontend sort to backend sort parameter (backend uses name-asc, name-desc, type-asc, type-desc)
   const mapSortToBackend = (frontendSort) => {
     const sortMap = {
       'nameAZ': 'name-asc',
       'nameZA': 'name-desc',
       'typeAZ': 'type-asc',
       'typeZA': 'type-desc',
-      'dateNewest': 'newest',
-      'dateOldest': 'oldest',
+      'dateNewest': 'name-desc',
+      'dateOldest': 'name-asc',
     };
-    return sortMap[frontendSort] || 'newest';
+    return sortMap[frontendSort] || 'name-asc';
+  };
+
+  // Leagues from Football API have numeric id (e.g. "39"); Edit/Deactivate require DB and are not supported for API leagues
+  const isLeagueFromApi = (league) => {
+    const id = String(league?.id ?? league?.league_id ?? '');
+    return /^\d+$/.test(id);
   };
 
   useEffect(() => {
@@ -202,18 +211,7 @@ const LeaguesPage = () => {
         )
       );
       
-      // Make the API call
-      console.log('Toggling league status:', {
-        leagueId: league.id,
-        leagueName: league.name,
-        currentStatus: league.status,
-        newStatus: newStatus,
-        isActivating: newIsActive
-      });
-      
       const result = await updateLeague(league.id, { status: newStatus });
-      
-      console.log('Update league API response:', result);
 
       if (!result.success) {
         console.error('Failed to update league status:', result.error);
@@ -244,11 +242,6 @@ const LeaguesPage = () => {
         
         alert(result.error || 'Failed to update league status');
       } else {
-        console.log('League status updated successfully:', {
-          leagueId: league.id,
-          newStatus: newStatus,
-          responseData: result.data
-        });
         // If successful, optimistic update remains - no need to do anything
       }
     } catch (error) {
@@ -298,7 +291,8 @@ const LeaguesPage = () => {
     {
       id: 'logo',
       label: 'Logo',
-      render: () => (
+      minWidth: 72,
+      render: (_, row) => (
         <Box
           sx={{
             width: 48,
@@ -308,27 +302,48 @@ const LeaguesPage = () => {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            overflow: 'hidden',
           }}
         >
-          <SportsSoccer sx={{ fontSize: 24, color: colors.textSecondary }} />
+          {row.logo ? (
+            <img
+              src={row.logo}
+              alt={row.name || row.league_name || 'League'}
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
+          ) : (
+            <SportsSoccer sx={{ fontSize: 24, color: colors.textSecondary }} />
+          )}
         </Box>
       ),
     },
     {
       id: 'name',
       label: 'Name',
+      minWidth: 120,
       render: (value, row) => (
         <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack }}>
-          {row.name || 'N/A'}
+          {row.name || row.league_name || 'N/A'}
+        </Typography>
+      ),
+    },
+    {
+      id: 'league_id',
+      label: 'ID',
+      minWidth: 56,
+      render: (_, row) => (
+        <Typography variant="caption" sx={{ color: colors.textSecondary, fontFamily: 'monospace' }}>
+          {row.league_id || row._id || '—'}
         </Typography>
       ),
     },
     {
       id: 'type',
       label: 'Type',
+      minWidth: 90,
       render: (value, row) => (
         <Chip
-          label={row.type || 'N/A'}
+          label={row.type || row.leagueType || 'N/A'}
           size="small"
           sx={{
             backgroundColor: '#ed6c02',
@@ -341,8 +356,39 @@ const LeaguesPage = () => {
       ),
     },
     {
+      id: 'country',
+      label: 'Country',
+      minWidth: 90,
+      render: (_, row) => (
+        <Typography variant="body2" sx={{ color: colors.brandBlack }}>
+          {row.country || '—'}
+        </Typography>
+      ),
+    },
+    {
+      id: 'league_code',
+      label: 'Code',
+      minWidth: 56,
+      render: (_, row) => (
+        <Typography variant="body2" sx={{ fontWeight: 500, color: colors.textSecondary }}>
+          {row.league_code || '—'}
+        </Typography>
+      ),
+    },
+    {
+      id: 'priority',
+      label: 'Priority',
+      minWidth: 72,
+      render: (_, row) => (
+        <Typography variant="body2" sx={{ fontWeight: 500 }}>
+          {row.priority ?? '—'}
+        </Typography>
+      ),
+    },
+    {
       id: 'status',
       label: 'Status',
+      minWidth: 100,
       render: (_, row) => (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Switch
@@ -366,15 +412,30 @@ const LeaguesPage = () => {
     {
       id: 'createdAt',
       label: 'Created Date',
-      render: (value) => {
-        if (!value) return 'N/A';
+      minWidth: 110,
+      render: (value, row) => {
+        const raw = row.createdDateFormatted || value;
+        if (raw && typeof raw === 'string') return raw;
+        if (!value) return '—';
         const date = value?.toDate ? value.toDate() : new Date(value);
+        return format(date, 'MMM dd, yyyy');
+      },
+    },
+    {
+      id: 'updatedAt',
+      label: 'Updated Date',
+      minWidth: 110,
+      render: (value, row) => {
+        const raw = row.updatedAt;
+        if (!raw) return '—';
+        const date = raw?.toDate ? raw.toDate() : new Date(raw);
         return format(date, 'MMM dd, yyyy');
       },
     },
     {
       id: 'actions',
       label: 'Actions',
+      minWidth: 72,
       render: (_, row) => (
         <IconButton
           size="small"
@@ -513,7 +574,7 @@ const LeaguesPage = () => {
               selectedSort === 'typeAZ' ? 'Type: A-Z' :
                 selectedSort === 'typeZA' ? 'Type: Z-A' :
                   selectedSort === 'dateNewest' ? 'Date: Newest' :
-                    selectedSort === 'dateOldest' ? 'Date: Oldest' : 'Date: Newest'}
+                    selectedSort === 'dateOldest' ? 'Date: Oldest' : 'Sort'}
         </Button>
         <Menu
           anchorEl={dateFilterAnchor}
@@ -528,6 +589,22 @@ const LeaguesPage = () => {
             },
           }}
         >
+          <MenuItem
+            onClick={() => { setSelectedSort(''); setDateFilterAnchor(null); }}
+            sx={{
+              backgroundColor: !selectedSort ? `${colors.brandRed}14` : 'transparent',
+              '&:hover': { backgroundColor: `${colors.brandRed}08` },
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, width: '100%' }}>
+              <Typography sx={{ flex: 1, fontWeight: !selectedSort ? 600 : 500 }}>
+                No sort
+              </Typography>
+              {!selectedSort && (
+                <CheckCircle sx={{ fontSize: 18, color: colors.brandRed }} />
+              )}
+            </Box>
+          </MenuItem>
           <MenuItem
             onClick={() => { setSelectedSort('nameAZ'); setDateFilterAnchor(null); }}
             sx={{
@@ -755,7 +832,7 @@ const LeaguesPage = () => {
             ml: 1,
           }}
         >
-          {filteredLeagues.length} leagues found
+          {totalLeaguesCount > 0 ? totalLeaguesCount : filteredLeagues.length} leagues found
         </Typography>
       </Box>
 
@@ -766,7 +843,7 @@ const LeaguesPage = () => {
         loading={loading}
         page={page}
         rowsPerPage={rowsPerPage}
-        totalCount={filteredLeagues.length}
+        totalCount={totalLeaguesCount || filteredLeagues.length}
         onPageChange={(e, newPage) => setPage(newPage)}
         onRowsPerPageChange={(e) => {
           setRowsPerPage(parseInt(e.target.value, 10));
@@ -792,8 +869,9 @@ const LeaguesPage = () => {
         anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
       >
         <MenuItem
+          disabled={selectedLeague && isLeagueFromApi(selectedLeague)}
           onClick={() => {
-            if (selectedLeague) {
+            if (selectedLeague && !isLeagueFromApi(selectedLeague)) {
               navigate(`/leagues/edit/${selectedLeague.id}`);
             }
             handleMenuClose();
@@ -808,6 +886,7 @@ const LeaguesPage = () => {
               backgroundColor: `${colors.warning}0D`,
             },
           }}
+          title={selectedLeague && isLeagueFromApi(selectedLeague) ? 'Read-only (Football API)' : ''}
         >
           <Box
             sx={{
@@ -823,12 +902,16 @@ const LeaguesPage = () => {
           >
             <Edit sx={{ fontSize: 18, color: '#FF9800' }} />
           </Box>
-          <Typography sx={{ flex: 1, fontWeight: 600, color: colors.brandBlack }}>Edit League</Typography>
+          <Typography sx={{ flex: 1, fontWeight: 600, color: colors.brandBlack }}>
+            Edit League {selectedLeague && isLeagueFromApi(selectedLeague) ? '(read-only)' : ''}
+          </Typography>
           <KeyboardArrowRight sx={{ fontSize: 18, color: colors.textSecondary }} />
         </MenuItem>
         <MenuItem
+          disabled={selectedLeague && isLeagueFromApi(selectedLeague)}
           onClick={async () => {
             handleMenuClose();
+            if (selectedLeague && isLeagueFromApi(selectedLeague)) return;
             if (window.confirm(`Are you sure you want to deactivate "${selectedLeague?.name}"? This will also deactivate all teams in this league.`)) {
               try {
                 const result = await deactivateLeague(selectedLeague?.id);
@@ -854,6 +937,7 @@ const LeaguesPage = () => {
               backgroundColor: `${colors.error}0D`,
             },
           }}
+          title={selectedLeague && isLeagueFromApi(selectedLeague) ? 'Read-only (Football API)' : ''}
         >
           <Box
             sx={{

@@ -19,6 +19,8 @@ import {
   Alert,
   Chip,
   Divider,
+  Autocomplete,
+  TextField,
 } from '@mui/material';
 import {
   ArrowBack,
@@ -32,12 +34,13 @@ import {
   CheckCircle,
   RadioButtonUnchecked,
   SportsSoccer,
+  ExpandMore,
 } from '@mui/icons-material';
 import { colors, constants } from '../config/theme';
 import { DateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { format, differenceInHours, differenceInDays } from 'date-fns';
-import { getPolls, getPoll, createPoll, updatePoll } from '../services/pollsService';
+import { getPolls, getPoll, createPoll, updatePoll, getUpcomingFixtures, createPollFromApi } from '../services/pollsService';
 import { getLeagues } from '../services/leaguesService';
 import { getTeams } from '../services/teamsService';
 
@@ -48,11 +51,22 @@ const PollFormPage = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [leagues, setLeagues] = useState([]);
+  const [leaguesPage, setLeaguesPage] = useState(1);
+  const [leaguesTotal, setLeaguesTotal] = useState(0);
+  const [leaguesTotalPages, setLeaguesTotalPages] = useState(0);
+  const [leaguesLoadingMore, setLeaguesLoadingMore] = useState(false);
   const [leagueFixtures, setLeagueFixtures] = useState([]);
+  const [fixturesPage, setFixturesPage] = useState(1);
+  const [fixturesTotal, setFixturesTotal] = useState(0);
+  const [fixturesTotalPages, setFixturesTotalPages] = useState(0);
+  const [fixturesLoadingMore, setFixturesLoadingMore] = useState(false);
   const [polls, setPolls] = useState([]);
   const [availableTeams, setAvailableTeams] = useState([]);
   const [loadingTeams, setLoadingTeams] = useState(false);
   const [teamsError, setTeamsError] = useState('');
+  const [loadingFixtures, setLoadingFixtures] = useState(false);
+  const [fixturesError, setFixturesError] = useState('');
+  const [selectedApiFixtureIds, setSelectedApiFixtureIds] = useState([null, null, null, null, null]); // exactly 5 slots for new create flow
   const [selectedFixtures, setSelectedFixtures] = useState([
     { matchNum: 1, teamA: '', teamB: '' },
     { matchNum: 2, teamA: '', teamB: '' },
@@ -63,25 +77,71 @@ const PollFormPage = () => {
 
   const [formData, setFormData] = useState({
     leagueId: '',
+    season: new Date().getFullYear(),
     startTime: new Date(),
     closeTime: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), // 2 days default
   });
+
+  const LEAGUES_PAGE_SIZE = 50;
+
+  const loadLeagues = async () => {
+    try {
+      const result = await getLeagues({ page: 1, limit: LEAGUES_PAGE_SIZE });
+      if (result.success && result.data) {
+        const formattedLeagues = (result.data.leagues || []).map(league => ({
+          // Prefer Football API league id so backend receives API id (resolveLeague accepts it)
+          id: league.apiLeagueId != null ? String(league.apiLeagueId) : (league._id ?? league.league_id),
+          name: league.league_name ?? league.name,
+          country: league.country ?? null,
+          isActive: league.status === 'Active',
+        }));
+        setLeagues(formattedLeagues);
+        const pag = result.data.pagination || {};
+        setLeaguesTotal(pag.total ?? formattedLeagues.length);
+        setLeaguesPage(1);
+        setLeaguesTotalPages(pag.pages ?? 1);
+      } else {
+        setLeagues([]);
+        setLeaguesTotal(0);
+        setLeaguesTotalPages(0);
+      }
+    } catch (err) {
+      console.error('Error loading leagues:', err);
+      setLeagues([]);
+      setLeaguesTotal(0);
+      setLeaguesTotalPages(0);
+    }
+  };
+
+  const loadMoreLeagues = async () => {
+    if (leaguesLoadingMore || leaguesPage >= leaguesTotalPages) return;
+    setLeaguesLoadingMore(true);
+    try {
+      const nextPage = leaguesPage + 1;
+      const result = await getLeagues({ page: nextPage, limit: LEAGUES_PAGE_SIZE });
+      if (result.success && result.data?.leagues?.length) {
+        const formatted = (result.data.leagues || []).map(league => ({
+          id: league.apiLeagueId != null ? String(league.apiLeagueId) : (league._id ?? league.league_id),
+          name: league.league_name ?? league.name,
+          country: league.country ?? null,
+          isActive: league.status === 'Active',
+        }));
+        setLeagues(prev => [...prev, ...formatted]);
+        setLeaguesPage(nextPage);
+      }
+    } catch (err) {
+      console.error('Error loading more leagues:', err);
+    } finally {
+      setLeaguesLoadingMore(false);
+    }
+  };
 
   useEffect(() => {
     const loadData = async () => {
       try {
         setLoading(true);
 
-        // Fetch leagues
-        const leaguesResult = await getLeagues({ status: 'Active' });
-        if (leaguesResult.success && leaguesResult.data?.leagues) {
-          const formattedLeagues = leaguesResult.data.leagues.map(league => ({
-            id: league._id || league.league_id,
-            name: league.league_name || league.name,
-            isActive: league.status === 'Active',
-          }));
-          setLeagues(formattedLeagues);
-        }
+        await loadLeagues();
 
         // Fetch all polls to check rules
         const pollsResult = await getPolls();
@@ -180,6 +240,71 @@ const PollFormPage = () => {
     }
   }, [formData.leagueId]);
 
+  const FIXTURES_PAGE_SIZE = 20;
+
+  // Create flow: load first page of upcoming fixtures from Football API when league + season selected
+  useEffect(() => {
+    if (isEditMode || !formData.leagueId || !formData.season) {
+      setLeagueFixtures([]);
+      setFixturesError('');
+      setFixturesPage(1);
+      setFixturesTotal(0);
+      setFixturesTotalPages(0);
+      setLoadingFixtures(false);
+      return;
+    }
+    let cancelled = false;
+    setFixturesError('');
+    setLoadingFixtures(true);
+    setLeagueFixtures([]);
+    setSelectedApiFixtureIds([null, null, null, null, null]);
+    setFixturesPage(1);
+    setFixturesTotal(0);
+    setFixturesTotalPages(0);
+    getUpcomingFixtures(formData.leagueId, formData.season, { page: 1, limit: FIXTURES_PAGE_SIZE })
+      .then((res) => {
+        if (cancelled) return;
+        setLoadingFixtures(false);
+        if (res.success && res.data) {
+          setLeagueFixtures(res.data.fixtures || []);
+          const pag = res.data.pagination || {};
+          setFixturesTotal(pag.total ?? 0);
+          setFixturesPage(1);
+          setFixturesTotalPages(pag.total_pages ?? 1);
+          if (!(res.data.fixtures || []).length) setFixturesError('No upcoming fixtures for this league/season.');
+        } else {
+          setFixturesError(res.error || 'Failed to load upcoming fixtures.');
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setLoadingFixtures(false);
+          setFixturesError(err.message || 'Failed to load upcoming fixtures.');
+        }
+      });
+    return () => { cancelled = true; };
+  }, [formData.leagueId, formData.season, isEditMode]);
+
+  const loadMoreFixtures = async () => {
+    if (fixturesLoadingMore || fixturesPage >= fixturesTotalPages) return;
+    setFixturesLoadingMore(true);
+    try {
+      const nextPage = fixturesPage + 1;
+      const res = await getUpcomingFixtures(formData.leagueId, formData.season, {
+        page: nextPage,
+        limit: FIXTURES_PAGE_SIZE,
+      });
+      if (res.success && res.data?.fixtures?.length) {
+        setLeagueFixtures((prev) => [...prev, ...(res.data.fixtures || [])]);
+        setFixturesPage(nextPage);
+      }
+    } catch (err) {
+      console.error('Error loading more fixtures:', err);
+    } finally {
+      setFixturesLoadingMore(false);
+    }
+  };
+
   const handleChange = (field, value) => {
     console.log('handleChange called:', { field, value, currentFormData: formData });
     
@@ -211,13 +336,21 @@ const PollFormPage = () => {
   };
 
   const handleTeamSelect = (matchNum, teamType, teamId) => {
-    setSelectedFixtures(prev => 
-      prev.map(fixture => 
-        fixture.matchNum === matchNum 
+    setSelectedFixtures(prev =>
+      prev.map(fixture =>
+        fixture.matchNum === matchNum
           ? { ...fixture, [teamType]: teamId }
           : fixture
       )
     );
+  };
+
+  const handleApiFixtureSelect = (slotIndex, apiFixtureId) => {
+    setSelectedApiFixtureIds((prev) => {
+      const next = [...prev];
+      next[slotIndex] = apiFixtureId === '' ? null : Number(apiFixtureId);
+      return next;
+    });
   };
 
   // Get all teams that are already selected across all fixtures
@@ -270,74 +403,88 @@ const PollFormPage = () => {
   };
 
   const handleSave = async () => {
-    // Validate league is selected
     if (!formData.leagueId || !formData.leagueId.trim()) {
       alert('Please select a league before saving.');
       return;
     }
 
-    // Validate fixtures first
-    if (!validateFixtures()) {
-      alert('Please select both teams for all 5 matches before saving.');
+    const startTime = formData.startTime instanceof Date ? formData.startTime : new Date(formData.startTime);
+    let closeTime = formData.closeTime instanceof Date ? formData.closeTime : new Date(formData.closeTime);
+    if (closeTime <= startTime) {
+      alert('Close time must be after start time. Please adjust the dates.');
+      return;
+    }
+    const minCloseTime = new Date(startTime.getTime() + 24 * 60 * 60 * 1000);
+    if (closeTime < minCloseTime) {
+      alert('Poll duration must be at least 24 hours. Close time will be adjusted to 24 hours after start time.');
+      closeTime = minCloseTime;
+    }
+
+    if (isEditMode) {
+      if (!validateFixtures()) {
+        alert('Please select both teams for all 5 matches before saving.');
+        return;
+      }
+      try {
+        setSaving(true);
+        const pollData = {
+          leagueId: formData.leagueId,
+          startTime,
+          closeTime,
+          fixtures: selectedFixtures.map((f) => ({
+            matchNum: f.matchNum,
+            teamAId: f.teamA,
+            teamAName: availableTeams.find((t) => t.id === f.teamA)?.name,
+            teamBId: f.teamB,
+            teamBName: availableTeams.find((t) => t.id === f.teamB)?.name,
+          })),
+        };
+        const result = await updatePoll(id, pollData);
+        if (result.success) {
+          alert(result.message || 'Poll updated successfully!');
+          navigate(constants.routes.polls);
+        } else {
+          alert(result.error || result.data?.error?.message || 'Failed to update poll');
+        }
+      } catch (error) {
+        console.error('Error updating poll:', error);
+        alert('Failed to save poll: ' + (error.message || 'Unknown error'));
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+
+    // Create flow: require 5 API fixtures selected
+    const apiIds = selectedApiFixtureIds.filter((id) => id != null && !Number.isNaN(id));
+    if (apiIds.length !== 5) {
+      alert('Please select exactly 5 fixtures from the upcoming fixtures list.');
+      return;
+    }
+    const uniqueIds = [...new Set(apiIds)];
+    if (uniqueIds.length !== 5) {
+      alert('Each fixture can only be selected once. Please choose 5 different fixtures.');
       return;
     }
 
     try {
       setSaving(true);
-
-      // Ensure dates are valid Date objects and closeTime is after startTime
-      const startTime = formData.startTime instanceof Date ? formData.startTime : new Date(formData.startTime);
-      let closeTime = formData.closeTime instanceof Date ? formData.closeTime : new Date(formData.closeTime);
-      
-      // Validate closeTime is after startTime (minimum 1 hour difference)
-      if (closeTime <= startTime) {
-        alert('Close time must be after start time. Please adjust the dates.');
-        setSaving(false);
-        return;
-      }
-      
-      // Ensure minimum 24 hours duration
-      const minCloseTime = new Date(startTime.getTime() + 24 * 60 * 60 * 1000);
-      if (closeTime < minCloseTime) {
-        alert('Poll duration must be at least 24 hours. Close time will be adjusted to 24 hours after start time.');
-        closeTime = minCloseTime;
-      }
-
-      const pollData = {
+      const result = await createPollFromApi({
         leagueId: formData.leagueId,
-        startTime: startTime,
-        closeTime: closeTime,
-        fixtures: selectedFixtures.map(f => ({
-          matchNum: f.matchNum,
-          teamAId: f.teamA,
-          teamAName: availableTeams.find(t => t.id === f.teamA)?.name,
-          teamBId: f.teamB,
-          teamBName: availableTeams.find(t => t.id === f.teamB)?.name,
-        }))
-      };
-
-      console.log('Poll data being sent:', pollData); // Debug log
-      console.log('Start time:', startTime.toISOString());
-      console.log('Close time:', closeTime.toISOString());
-
-      let result;
-      if (isEditMode) {
-        result = await updatePoll(id, pollData);
-      } else {
-        result = await createPoll(pollData);
-      }
-
+        season: formData.season,
+        apiFixtureIds: selectedApiFixtureIds,
+        startTime,
+        closeTime,
+      });
       if (result.success) {
-        alert(result.message || (isEditMode ? 'Poll updated successfully!' : 'Poll created successfully!'));
+        alert(result.message || 'Poll created successfully!');
         navigate(constants.routes.polls);
       } else {
-        const errorMessage = result.error || result.data?.error?.message || result.data?.message || 'Failed to save poll';
-        console.error('Poll save error:', { result, pollData });
-        alert(errorMessage);
+        alert(result.error || 'Failed to create poll');
       }
     } catch (error) {
-      console.error('Error saving poll:', error);
-      alert('Failed to save poll: ' + (error.message || 'Unknown error'));
+      console.error('Error creating poll:', error);
+      alert('Failed to create poll: ' + (error.message || 'Unknown error'));
     } finally {
       setSaving(false);
     }
@@ -491,46 +638,301 @@ const PollFormPage = () => {
                     </Typography>
                   </Typography>
                 </Box>
-                <FormControl
+                <Autocomplete
                   fullWidth
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      borderRadius: '14px',
-                      backgroundColor: `${colors.backgroundLight}80`,
-                      '& fieldset': {
-                        borderColor: `${colors.divider}66`,
-                      },
-                      '&:hover fieldset': {
-                        borderColor: colors.brandRed,
-                      },
-                      '&.Mui-focused fieldset': {
-                        borderColor: colors.brandRed,
-                      },
-                    },
-                  }}
-                >
-                  <Select
-                    value={formData.leagueId}
-                    onChange={(e) => handleChange('leagueId', e.target.value)}
-                    displayEmpty
-                    renderValue={(value) => {
-                      if (!value) return 'Choose a league';
-                      const league = leagues.find((l) => l.id === value);
-                      return league?.name || 'Choose a league';
+                  options={leagues}
+                  getOptionLabel={(opt) => (opt.country ? `${opt.name} (${opt.country})` : opt.name || '')}
+                  value={leagues.find((l) => String(l.id) === String(formData.leagueId)) || null}
+                  onChange={(_, newValue) => handleChange('leagueId', newValue?.id ?? '')}
+                  isOptionEqualToValue={(opt, val) => opt && val && String(opt.id) === String(val.id)}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Select League"
+                      placeholder="Search leagues..."
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          borderRadius: '14px',
+                          backgroundColor: `${colors.backgroundLight}80`,
+                          '& fieldset': { borderColor: `${colors.divider}66` },
+                          '&:hover fieldset': { borderColor: colors.brandRed },
+                          '&.Mui-focused fieldset': { borderColor: colors.brandRed },
+                        },
+                      }}
+                    />
+                  )}
+                />
+                {leaguesTotal > 0 && (
+                  <Box
+                    sx={{
+                      mt: 2,
+                      pt: 2,
+                      borderTop: '1px solid rgba(0,0,0,0.06)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 2,
+                      flexWrap: 'wrap',
                     }}
                   >
-                    {leagues.map((league) => (
-                      <MenuItem key={league.id} value={league.id}>
-                        {league.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      <Box
+                        sx={{
+                          px: 1.5,
+                          py: 0.5,
+                          borderRadius: '10px',
+                          backgroundColor: '#F5F5F5',
+                        }}
+                      >
+                        <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack }}>
+                          {leagues.length.toLocaleString()} / {leaguesTotal.toLocaleString()} leagues
+                        </Typography>
+                      </Box>
+                      {leaguesTotal > 0 && (
+                        <Box
+                          sx={{
+                            width: 80,
+                            height: 6,
+                            borderRadius: 3,
+                            backgroundColor: '#E5E7EB',
+                            overflow: 'hidden',
+                          }}
+                        >
+                          <Box
+                            sx={{
+                              width: `${Math.min(100, (leagues.length / leaguesTotal) * 100)}%`,
+                              height: '100%',
+                              borderRadius: 3,
+                              background: `linear-gradient(90deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
+                              transition: 'width 0.25s ease',
+                            }}
+                          />
+                        </Box>
+                      )}
+                    </Box>
+                    {leaguesPage < leaguesTotalPages && (
+                      <Button
+                        size="small"
+                        variant="text"
+                        endIcon={leaguesLoadingMore ? null : <ExpandMore />}
+                        onClick={loadMoreLeagues}
+                        disabled={leaguesLoadingMore}
+                        sx={{
+                          textTransform: 'none',
+                          fontWeight: 600,
+                          color: colors.brandRed,
+                          '&:hover': {
+                            backgroundColor: `${colors.brandRed}0C`,
+                          },
+                        }}
+                      >
+                        {leaguesLoadingMore ? 'Loading…' : 'Load more leagues'}
+                      </Button>
+                    )}
+                  </Box>
+                )}
               </Box>
             </Grid>
 
-            {/* Teams/Matches Display */}
-            {formData.leagueId && (
+            {/* Season (create flow: required for loading API fixtures) */}
+            {!isEditMode && (
+              <Grid item xs={12} sm={6}>
+                <Box>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                    <CalendarToday sx={{ fontSize: 18, color: colors.brandRed }} />
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack, fontSize: 14 }}>
+                      Season (year)
+                    </Typography>
+                    <Typography component="span" sx={{ color: colors.brandRed, ml: 0.5 }}>*</Typography>
+                  </Box>
+                  <TextField
+                    fullWidth
+                    type="number"
+                    value={formData.season ?? ''}
+                    onChange={(e) => {
+                      const v = e.target.value ? parseInt(e.target.value, 10) : new Date().getFullYear();
+                      handleChange('season', Number.isNaN(v) ? new Date().getFullYear() : v);
+                    }}
+                    inputProps={{ min: 2020, max: 2030 }}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '14px',
+                        backgroundColor: `${colors.backgroundLight}80`,
+                        '& fieldset': { borderColor: `${colors.divider}66` },
+                      },
+                    }}
+                  />
+                </Box>
+              </Grid>
+            )}
+
+            {/* Create flow: Upcoming fixtures from API + select 5 */}
+            {!isEditMode && formData.leagueId && formData.season && (
+              <Grid item xs={12}>
+                <Box
+                  sx={{
+                    padding: 2,
+                    borderRadius: '12px',
+                    backgroundColor: `${colors.info}0D`,
+                    border: `1px solid ${colors.info}26`,
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                    <SportsSoccer sx={{ fontSize: 18, color: colors.info }} />
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack }}>
+                      Upcoming fixtures (Football API) – select exactly 5
+                    </Typography>
+                  </Box>
+                  {loadingFixtures ? (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, py: 3 }}>
+                      <CircularProgress size={28} sx={{ color: colors.brandRed }} />
+                      <Typography variant="body2" color="textSecondary">Loading upcoming fixtures...</Typography>
+                    </Box>
+                  ) : fixturesError ? (
+                    <Alert severity="warning">
+                      <Typography variant="body2" sx={{ fontWeight: 600, fontSize: 13 }}>
+                        {fixturesError}
+                      </Typography>
+                      <Typography variant="caption" sx={{ fontSize: 12 }}>
+                        Ensure the league is linked to the Football API (apiLeagueId set in Leagues).
+                      </Typography>
+                    </Alert>
+                  ) : leagueFixtures.length > 0 ? (
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <Typography variant="caption" color="textSecondary" sx={{ mb: 0.5 }}>
+                        Choose one fixture per slot. No duplicate fixtures.
+                      </Typography>
+                      <Typography variant="caption" sx={{ mb: 0.5, color: colors.textSecondary, fontStyle: 'italic' }}>
+                        {leagueFixtures.length} fixtures loaded in each dropdown — scroll inside the list to see all. Use &quot;Load more fixtures&quot; below to load more (e.g. 100+).
+                      </Typography>
+                      {[0, 1, 2, 3, 4].map((slotIndex) => (
+                        <FormControl
+                          key={slotIndex}
+                          fullWidth
+                          size="small"
+                          sx={{
+                            '& .MuiOutlinedInput-root': { borderRadius: '10px', bgcolor: `${colors.backgroundLight}80` },
+                          }}
+                        >
+                          <InputLabel>Fixture {slotIndex + 1}</InputLabel>
+                          <Select
+                            value={selectedApiFixtureIds[slotIndex] ?? ''}
+                            onChange={(e) => handleApiFixtureSelect(slotIndex, e.target.value)}
+                            label={`Fixture ${slotIndex + 1}`}
+                            MenuProps={{
+                              disableScrollLock: true,
+                              PaperProps: {
+                                sx: {
+                                  maxHeight: 440,
+                                  overflow: 'hidden',
+                                },
+                                onWheel: (e) => e.stopPropagation(),
+                              },
+                              MenuListProps: {
+                                sx: {
+                                  maxHeight: 400,
+                                  overflowY: 'auto',
+                                  overflowX: 'hidden',
+                                  display: 'block',
+                                  WebkitOverflowScrolling: 'touch',
+                                  // Force scrollbar to show so list is clearly scrollable
+                                  '&::-webkit-scrollbar': { width: 8 },
+                                  '&::-webkit-scrollbar-track': { background: '#f0f0f0', borderRadius: 4 },
+                                  '&::-webkit-scrollbar-thumb': { background: '#bbb', borderRadius: 4 },
+                                },
+                              },
+                              onClose: () => {
+                                document.body.style.overflow = '';
+                                const main = document.getElementById('main-content-scroll');
+                                if (main) main.style.overflowY = 'auto';
+                              },
+                              onEntered: () => {
+                                document.body.style.overflow = 'hidden';
+                                const main = document.getElementById('main-content-scroll');
+                                if (main) main.style.overflowY = 'hidden';
+                              },
+                              onExited: () => {
+                                document.body.style.overflow = '';
+                                const main = document.getElementById('main-content-scroll');
+                                if (main) main.style.overflowY = 'auto';
+                              },
+                            }}
+                          >
+                            <MenuItem value="">
+                              <em>Select a match</em>
+                            </MenuItem>
+                            {leagueFixtures.map((f) => {
+                              const alreadyUsed =
+                                selectedApiFixtureIds.some((id, i) => i !== slotIndex && id === f.apiFixtureId);
+                              const label = `${f.homeTeamName} vs ${f.awayTeamName}${f.kickoff ? ' – ' + format(new Date(f.kickoff), 'PPp') : ''}`;
+                              return (
+                                <MenuItem key={f.apiFixtureId} value={f.apiFixtureId} disabled={alreadyUsed}>
+                                  {label}
+                                  {alreadyUsed && <Typography component="span" variant="caption" sx={{ ml: 1, color: 'text.secondary' }}>(selected)</Typography>}
+                                </MenuItem>
+                              );
+                            })}
+                          </Select>
+                        </FormControl>
+                      ))}
+                      {fixturesTotal > 0 && (
+                        <Box
+                          sx={{
+                            mt: 2,
+                            pt: 2,
+                            borderTop: '1px solid rgba(0,0,0,0.08)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 2,
+                            flexWrap: 'wrap',
+                          }}
+                        >
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                            <Box sx={{ px: 1.5, py: 0.5, borderRadius: '10px', backgroundColor: '#F5F5F5' }}>
+                              <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack }}>
+                                {leagueFixtures.length.toLocaleString()} / {fixturesTotal.toLocaleString()} fixtures
+                              </Typography>
+                            </Box>
+                            {fixturesTotal > 0 && (
+                              <Box sx={{ width: 80, height: 6, borderRadius: 3, backgroundColor: '#E5E7EB', overflow: 'hidden' }}>
+                                <Box
+                                  sx={{
+                                    width: `${Math.min(100, (leagueFixtures.length / fixturesTotal) * 100)}%`,
+                                    height: '100%',
+                                    borderRadius: 3,
+                                    background: `linear-gradient(90deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
+                                    transition: 'width 0.25s ease',
+                                  }}
+                                />
+                              </Box>
+                            )}
+                          </Box>
+                          {fixturesPage < fixturesTotalPages && (
+                            <Button
+                              size="small"
+                              variant="text"
+                              endIcon={fixturesLoadingMore ? null : <ExpandMore />}
+                              onClick={loadMoreFixtures}
+                              disabled={fixturesLoadingMore}
+                              sx={{
+                                textTransform: 'none',
+                                fontWeight: 600,
+                                color: colors.brandRed,
+                                '&:hover': { backgroundColor: `${colors.brandRed}0C` },
+                              }}
+                            >
+                              {fixturesLoadingMore ? 'Loading…' : 'Load more fixtures'}
+                            </Button>
+                          )}
+                        </Box>
+                      )}
+                    </Box>
+                  ) : null}
+                </Box>
+              </Grid>
+            )}
+
+            {/* Teams/Matches Display (edit mode only) */}
+            {isEditMode && formData.leagueId && (
               <Grid item xs={12}>
                 <Box
                   sx={{
@@ -1040,7 +1442,15 @@ const PollFormPage = () => {
             variant="contained"
             startIcon={<Add />}
             onClick={handleSave}
-            disabled={saving || !formData.leagueId || !rules.onePollPerLeague || !rules.maxFiveActive || !rules.closeAfterStart || !rules.durationValid || !validateFixtures()}
+            disabled={
+              saving ||
+              !formData.leagueId ||
+              !rules.onePollPerLeague ||
+              !rules.maxFiveActive ||
+              !rules.closeAfterStart ||
+              !rules.durationValid ||
+              (isEditMode ? !validateFixtures() : selectedApiFixtureIds.filter((id) => id != null).length !== 5)
+            }
             sx={{
               background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
               borderRadius: '20px',

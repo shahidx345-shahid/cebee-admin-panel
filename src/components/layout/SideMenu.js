@@ -27,6 +27,7 @@ import {
   Settings,
   Logout,
   CheckCircle,
+  Sync,
 } from '@mui/icons-material';
 import { useAuth } from '../../contexts/AuthContext';
 import { constants, colors } from '../../config/theme';
@@ -48,6 +49,7 @@ const menuItems = [
   { title: 'Referral Management', icon: Group, route: constants.routes.referrals },
   { title: 'Notifications Center', icon: Notifications, route: constants.routes.notifications },
   { title: 'Content / App Updates', icon: EditNote, route: constants.routes.content },
+  { title: 'API Data & Sync Center', icon: Sync, route: constants.routes.apiSync },
   { title: 'System Logs', icon: Description, route: constants.routes.logs },
   { title: 'Settings', icon: Settings, route: constants.routes.settings },
 ];

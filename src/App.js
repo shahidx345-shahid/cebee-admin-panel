@@ -32,6 +32,7 @@ import PlaceholderPage from './pages/PlaceholderPage';
 import PredictionDetailsPage from './pages/PredictionDetailsPage';
 import LeaderboardDetailsPage from './pages/LeaderboardDetailsPage';
 import RewardDetailsPage from './pages/RewardDetailsPage';
+import ApiSyncPage from './pages/ApiSyncPage';
 
 // Protected Route component
 const ProtectedRoute = ({ children }) => {
@@ -115,6 +116,7 @@ function App() {
                 <Route path={constants.routes.referrals} element={<ReferralsPage />} />
                 <Route path="/referrals/details/:id" element={<PlaceholderPage title="Referral Details" />} />
                 <Route path={constants.routes.logs} element={<SystemLogsPage />} />
+                <Route path={constants.routes.apiSync} element={<ApiSyncPage />} />
                 <Route path={constants.routes.settings} element={<SettingsPage />} />
                 <Route path="*" element={<Navigate to={constants.routes.dashboard} />} />
               </Routes>

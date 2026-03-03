@@ -619,6 +619,7 @@ export const constants = {
     referrals: '/referrals',
     logs: '/logs',
     settings: '/settings',
+    apiSync: '/api-data-sync',
   },
   // Side Menu Width
   sideMenuWidth: 300,

@@ -78,9 +78,11 @@ const PollsPage = () => {
             startTime: poll.start_time ? new Date(poll.start_time) : poll.startTime ? new Date(poll.startTime) : new Date(),
             closeTime: poll.close_time ? new Date(poll.close_time) : poll.closeTime ? new Date(poll.closeTime) : new Date(),
             createdAt: poll.created_at ? new Date(poll.created_at) : new Date(),
-            matches: poll.fixtures ? poll.fixtures.map(f => ({
+            poll_winner_fixture_id: poll.poll_winner_fixture_id ?? poll.pollWinnerFixtureId ?? null,
+            matches: poll.fixtures ? poll.fixtures.map((f, i) => ({
               homeTeam: f.team_a_name || f.teamAName || 'Team A',
               awayTeam: f.team_b_name || f.teamBName || 'Team B',
+              matchNum: f.matchNum ?? i + 1,
             })) : [],
           }));
 
@@ -865,25 +867,36 @@ const PollsPage = () => {
 
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                       {pollDetails.matches && pollDetails.matches.length > 0 ? (
-                        pollDetails.matches.map((match, index) => (
+                        pollDetails.matches.map((match, index) => {
+                          const matchNum = match.matchNum ?? index + 1;
+                          const isWinner = pollDetails.status === 'closed' && pollDetails.poll_winner_fixture_id != null && matchNum === pollDetails.poll_winner_fixture_id;
+                          return (
                           <Card key={index} elevation={0} sx={{
                             p: 2,
                             borderRadius: '12px',
                             border: `1px solid ${colors.divider}`,
                             backgroundColor: colors.brandWhite
                           }}>
-                            <Box sx={{ display: 'flex', gap: 0.5, mb: 0.5, flexWrap: 'wrap' }}>
-                              <Chip label="Featured Fixture" size="small" sx={{ backgroundColor: `${colors.brandRed}15`, color: colors.brandRed, fontWeight: 600, fontSize: 9, height: 18 }} />
-                              <Chip label="Featured Team" size="small" sx={{ backgroundColor: `${colors.brandRed}22`, color: colors.brandRed, fontWeight: 700, fontSize: 9, height: 18 }} />
-                            </Box>
+                            {isWinner && (
+                              <Box sx={{ display: 'flex', gap: 0.5, mb: 0.5, flexWrap: 'wrap' }}>
+                                <Chip label="Featured Fixture" size="small" sx={{ backgroundColor: `${colors.brandRed}15`, color: colors.brandRed, fontWeight: 600, fontSize: 9, height: 18 }} />
+                                <Chip label="Featured Team" size="small" sx={{ backgroundColor: `${colors.brandRed}22`, color: colors.brandRed, fontWeight: 700, fontSize: 9, height: 18 }} />
+                              </Box>
+                            )}
                             <Typography variant="subtitle1" sx={{ fontWeight: 700, color: colors.brandBlack, lineHeight: 1.2, mb: 0.5 }}>
                               {match.homeTeam}
                             </Typography>
                             <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13 }}>
                               vs {match.awayTeam}
                             </Typography>
+                            {pollDetails.status === 'closed' && (
+                              <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: colors.textSecondary }}>
+                                {isWinner ? 'Winner (most votes)' : '—'}
+                              </Typography>
+                            )}
                           </Card>
-                        ))
+                          );
+                        })
                       ) : (
                         <Box sx={{ p: 2, borderRadius: '8px', bgcolor: '#F9FAFB', border: '1px dashed #D1D5DB', textAlign: 'center' }}>
                           <Typography variant="body2" sx={{ color: colors.textSecondary }}>No specific matches listed.</Typography>

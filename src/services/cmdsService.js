@@ -132,6 +132,56 @@ export const createCmd = async (cmdData) => {
 };
 
 /**
+ * Get seasons (sessions) from Football API for use as CMd
+ * @returns {Promise<{success: boolean, data?: { seasons: array }, error?: string}>}
+ */
+export const getApiSeasons = async () => {
+  try {
+    const response = await apiGet('/cmds/api-seasons');
+    if (response.success && response.data) {
+      return {
+        success: true,
+        data: response.data.seasons || [],
+      };
+    }
+    return { success: false, error: response.error, data: [] };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message || 'Failed to fetch seasons from Football API',
+      data: [],
+    };
+  }
+};
+
+/**
+ * Set a Football API season as the active CMd (creates/updates CMd and sets current)
+ * @param {number} year - Season year (e.g. 2026)
+ * @returns {Promise<{success: boolean, data?: object, error?: string, message?: string}>}
+ */
+export const setActiveFromApiSeason = async (year) => {
+  try {
+    const response = await apiPost('/cmds/set-active-from-api', { year });
+    if (response.success) {
+      return {
+        success: true,
+        data: response.data,
+        message: response.message || 'Season set as active CMd',
+      };
+    }
+    return {
+      success: false,
+      error: response.error || 'Failed to set active',
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message || 'Failed to set active CMd from API season',
+    };
+  }
+};
+
+/**
  * Update CMd status
  * @param {string} cmdId - CMd ID
  * @param {string} status - New status ("current" | "completed")

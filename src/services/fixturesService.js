@@ -207,6 +207,81 @@ export const createFixture = async (fixtureData) => {
 };
 
 /**
+ * Get upcoming fixtures from Football API for a league/season (for CeBee Featured – select fixture then auto-fill).
+ * @param {string} leagueId - League ID (Football API id or CeBee league _id)
+ * @param {number|string} season - Season year (e.g. 2026)
+ * @returns {Promise<{success: boolean, data?: { fixtures: array }, error?: string}>}
+ */
+export const getUpcomingFixturesByLeague = async (leagueId, season) => {
+  try {
+    if (!leagueId || season == null) {
+      return { success: false, error: 'leagueId and season are required', data: { fixtures: [] } };
+    }
+    const response = await apiGet('/fixtures/upcoming-by-league', { leagueId, season });
+    if (response.success && response.data) {
+      return {
+        success: true,
+        data: { fixtures: response.data.fixtures || [] },
+      };
+    }
+    return {
+      success: false,
+      error: response.error || 'Failed to fetch upcoming fixtures',
+      data: { fixtures: [] },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message || 'Failed to fetch upcoming fixtures',
+      data: { fixtures: [] },
+    };
+  }
+};
+
+/**
+ * Create CeBee Featured fixture from one Football API fixture (teams, kickoff, venue from API).
+ * @param {object} params - { apiFixtureId, leagueId, publishDateTime, venue? }
+ * @returns {Promise<{success: boolean, data?: object, error?: string, message?: string}>}
+ */
+export const createFixtureFromApi = async (params) => {
+  try {
+    const { apiFixtureId, leagueId, publishDateTime } = params;
+    if (!apiFixtureId || !leagueId) {
+      return { success: false, error: 'apiFixtureId and leagueId are required' };
+    }
+    const body = {
+      apiFixtureId: Number(apiFixtureId),
+      leagueId,
+    };
+    if (params.venue && String(params.venue).trim()) {
+      body.venue = String(params.venue).trim();
+    }
+    if (publishDateTime) {
+      body.publishDateTime = publishDateTime instanceof Date
+        ? publishDateTime.toISOString()
+        : publishDateTime;
+    }
+    const response = await apiPost('/fixtures/from-api', body);
+    if (response.success) {
+      return {
+        success: true,
+        data: response.data,
+        message: response.message || 'CeBee Featured fixture created from API',
+      };
+    }
+    return {
+      success: false,
+      error: response.error || 'Failed to create fixture from API',
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message || 'Failed to create fixture from API',
+    };
+  }
+};
+
+/**
  * Update fixture
  * @param {string} fixtureId - Fixture ID
  * @param {object} fixtureData - Updated fixture data

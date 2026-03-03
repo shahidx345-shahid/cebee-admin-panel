@@ -20,6 +20,7 @@ import {
   TextField,
   Alert,
   Divider,
+  Autocomplete,
 } from '@mui/material';
 import {
   Add,
@@ -37,6 +38,7 @@ import {
   Person,
   Info,
   People,
+  ExpandMore,
 } from '@mui/icons-material';
 import { colors } from '../config/theme';
 import SearchBar from '../components/common/SearchBar';
@@ -59,16 +61,24 @@ const TeamsPage = () => {
   const [filteredTeams, setFilteredTeams] = useState([]);
   const [leagues, setLeagues] = useState([]);
   const [selectedLeague, setSelectedLeague] = useState('all');
+  const [leaguesPage, setLeaguesPage] = useState(1);
+  const [leaguesTotal, setLeaguesTotal] = useState(0);
+  const [leaguesTotalPages, setLeaguesTotalPages] = useState(0);
+  const [leaguesLoadingMore, setLeaguesLoadingMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [teamsTotalCount, setTeamsTotalCount] = useState(0); // total from API for pagination
+  const [teamsActiveTotal, setTeamsActiveTotal] = useState(0); // total active (selected league, no pagination)
+  const [teamsInactiveTotal, setTeamsInactiveTotal] = useState(0); // total inactive (selected league, no pagination)
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedTeam, setSelectedTeam] = useState(null);
   const [dialogTeam, setDialogTeam] = useState(null); // Store team for dialog operations
   const [error, setError] = useState('');
-  
+  const [teamsFromFootballApi, setTeamsFromFootballApi] = useState(false); // When true, team_id is API id; Edit/Activate etc. require DB
+
   // Dialog states
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [activateDialogOpen, setActivateDialogOpen] = useState(false);
@@ -85,25 +95,58 @@ const TeamsPage = () => {
   const [teamCountry, setTeamCountry] = useState('');
   const [teamEntryType, setTeamEntryType] = useState('Original');
 
+  const LEAGUES_PAGE_SIZE = 50;
+
   const loadLeagues = async () => {
     try {
-      const result = await getLeagues({ status: 'Active' });
-      
+      const result = await getLeagues({ page: 1, limit: LEAGUES_PAGE_SIZE });
       if (result.success && result.data) {
         const formattedLeagues = result.data.leagues?.map(league => ({
-          id: league._id || league.league_id,
-          league_id: league._id || league.league_id,
+          id: league.apiLeagueId != null ? String(league.apiLeagueId) : (league._id || league.league_id),
+          league_id: league.apiLeagueId != null ? String(league.apiLeagueId) : (league._id || league.league_id),
           name: league.league_name || league.name,
+          country: league.country || null,
         })) || [];
         setLeagues(formattedLeagues);
+        const pag = result.data.pagination || {};
+        setLeaguesTotal(pag.total ?? formattedLeagues.length);
+        setLeaguesPage(1);
+        setLeaguesTotalPages(pag.pages ?? 1);
       } else {
         setError(result.error || 'Failed to load leagues');
         setLeagues([]);
+        setLeaguesTotal(0);
+        setLeaguesTotalPages(0);
       }
     } catch (error) {
       console.error('Error loading leagues:', error);
       setError('An unexpected error occurred while loading leagues');
       setLeagues([]);
+      setLeaguesTotal(0);
+      setLeaguesTotalPages(0);
+    }
+  };
+
+  const loadMoreLeagues = async () => {
+    if (leaguesLoadingMore || leaguesPage >= leaguesTotalPages) return;
+    setLeaguesLoadingMore(true);
+    try {
+      const nextPage = leaguesPage + 1;
+      const result = await getLeagues({ page: nextPage, limit: LEAGUES_PAGE_SIZE });
+      if (result.success && result.data?.leagues?.length) {
+        const formatted = result.data.leagues.map(league => ({
+          id: league.apiLeagueId != null ? String(league.apiLeagueId) : (league._id || league.league_id),
+          league_id: league.apiLeagueId != null ? String(league.apiLeagueId) : (league._id || league.league_id),
+          name: league.league_name || league.name,
+          country: league.country || null,
+        }));
+        setLeagues(prev => [...prev, ...formatted]);
+        setLeaguesPage(nextPage);
+      }
+    } catch (err) {
+      console.error('Error loading more leagues:', err);
+    } finally {
+      setLeaguesLoadingMore(false);
     }
   };
 
@@ -131,6 +174,8 @@ const TeamsPage = () => {
       const result = await getTeams(apiParams);
 
       if (result.success && result.data) {
+        const fromApi = result.data.source === 'football_api';
+        setTeamsFromFootballApi(!!fromApi);
         // Format teams to match existing structure
         const formattedTeams = result.data.teams?.map(team => ({
           team_id: team._id || team.team_id,
@@ -146,20 +191,39 @@ const TeamsPage = () => {
           status_reason: team.status_reason,
           status_changed_at: team.status_changed_at ? new Date(team.status_changed_at) : null,
           created_at: team.created_at ? new Date(team.created_at) : new Date(),
+          apiTeamId: team.apiTeamId ?? null,
         })) || [];
 
         setTeams(formattedTeams);
         setFilteredTeams(formattedTeams);
+        const pag = result.data.pagination || {};
+        const total = pag.total ?? formattedTeams.length;
+        setTeamsTotalCount(total);
+        if (result.data.source === 'football_api') {
+          setTeamsActiveTotal(total);
+          setTeamsInactiveTotal(0);
+        } else {
+          setTeamsActiveTotal(pag.total_active ?? 0);
+          setTeamsInactiveTotal(pag.total_inactive ?? 0);
+        }
       } else {
+        setTeamsFromFootballApi(false);
         setError(result.error || 'Failed to load teams');
         setTeams([]);
         setFilteredTeams([]);
+        setTeamsTotalCount(0);
+        setTeamsActiveTotal(0);
+        setTeamsInactiveTotal(0);
       }
     } catch (error) {
       console.error('Error loading teams:', error);
+      setTeamsFromFootballApi(false);
       setError('An unexpected error occurred while loading teams');
       setTeams([]);
       setFilteredTeams([]);
+      setTeamsTotalCount(0);
+      setTeamsActiveTotal(0);
+      setTeamsInactiveTotal(0);
     } finally {
       setLoading(false);
     }
@@ -446,11 +510,45 @@ const TeamsPage = () => {
 
   const columns = [
     {
+      id: 'logo',
+      label: 'Logo',
+      minWidth: 72,
+      render: (_, row) => (
+        <Box
+          sx={{
+            width: 40,
+            height: 40,
+            borderRadius: '8px',
+            backgroundColor: colors.backgroundLight,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            overflow: 'hidden',
+          }}
+        >
+          {row.logo ? (
+            <img
+              src={row.logo}
+              alt={row.team_name || 'Team'}
+              style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+            />
+          ) : (
+            <SportsSoccer sx={{ fontSize: 22, color: colors.textSecondary }} />
+          )}
+        </Box>
+      ),
+    },
+    {
       id: 'team_id',
       label: 'Team ID',
       render: (value, row) => (
         <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandRed, fontSize: 13 }}>
           {row.team_id || row.id || 'N/A'}
+          {row.apiTeamId != null && (
+            <Typography component="span" variant="caption" sx={{ display: 'block', color: colors.textSecondary, fontWeight: 400 }}>
+              API: {row.apiTeamId}
+            </Typography>
+          )}
         </Typography>
       ),
     },
@@ -466,18 +564,25 @@ const TeamsPage = () => {
     {
       id: 'league_name',
       label: 'League',
-      render: (value) => (
-        <Chip
-          label={value}
-          size="small"
-          sx={{
-            backgroundColor: '#FEE2E2',
-            color: colors.brandRed,
-            fontWeight: 600,
-            fontSize: 11,
-            height: 24,
-          }}
-        />
+      render: (value, row) => (
+        <Box>
+          <Chip
+            label={value || '—'}
+            size="small"
+            sx={{
+              backgroundColor: '#FEE2E2',
+              color: colors.brandRed,
+              fontWeight: 600,
+              fontSize: 11,
+              height: 24,
+            }}
+          />
+          {row.league_id != null && (
+            <Typography variant="caption" sx={{ display: 'block', color: colors.textSecondary, mt: 0.25 }}>
+              ID: {row.league_id}
+            </Typography>
+          )}
+        </Box>
       ),
     },
     {
@@ -490,7 +595,7 @@ const TeamsPage = () => {
       label: 'Season',
       render: (value) => (
         <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13 }}>
-          {value}
+          {value ?? '—'}
         </Typography>
       ),
     },
@@ -500,10 +605,19 @@ const TeamsPage = () => {
       render: (_, row) => getEntryTypeChip(row.entry_type),
     },
     {
+      id: 'country',
+      label: 'Country',
+      render: (value) => (
+        <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13 }}>
+          {value ?? '—'}
+        </Typography>
+      ),
+    },
+    {
       id: 'created_at',
       label: 'Created',
       render: (value) => {
-        if (!value) return 'N/A';
+        if (!value) return '—';
         const date = value?.toDate ? value.toDate() : new Date(value);
         return format(date, 'MMM dd, yyyy');
       },
@@ -537,8 +651,6 @@ const TeamsPage = () => {
   // Backend handles pagination, so we use filteredTeams directly
   const paginatedTeams = filteredTeams;
 
-  const activeCount = teams.filter((t) => t.status === 'Active').length;
-  const inactiveCount = teams.filter((t) => t.status === 'Inactive').length;
 
   return (
     <Box sx={{ width: '100%', maxWidth: '100%' }}>
@@ -612,7 +724,7 @@ const TeamsPage = () => {
           >
             <Groups sx={{ fontSize: 28, color: '#3B82F6', mb: 1 }} />
             <Typography variant="h3" sx={{ fontWeight: 500, color: colors.brandBlack, mb: 0.5, fontSize: 32 }}>
-              {teams.length}
+              {teamsTotalCount}
             </Typography>
             <Typography variant="body2" sx={{ color: '#6B7280', fontSize: 15 }}>
               Total Teams
@@ -632,7 +744,7 @@ const TeamsPage = () => {
           >
             <CheckCircle sx={{ fontSize: 28, color: '#10B981', mb: 1 }} />
             <Typography variant="h3" sx={{ fontWeight: 500, color: colors.brandBlack, mb: 0.5, fontSize: 32 }}>
-              {activeCount}
+              {teamsActiveTotal}
             </Typography>
             <Typography variant="body2" sx={{ color: '#6B7280', fontSize: 15 }}>
               Active Teams
@@ -652,7 +764,7 @@ const TeamsPage = () => {
           >
             <Cancel sx={{ fontSize: 28, color: '#6B7280', mb: 1 }} />
             <Typography variant="h3" sx={{ fontWeight: 500, color: colors.brandBlack, mb: 0.5, fontSize: 32 }}>
-              {inactiveCount}
+              {teamsInactiveTotal}
             </Typography>
             <Typography variant="body2" sx={{ color: '#6B7280', fontSize: 15 }}>
               Inactive Teams
@@ -684,63 +796,163 @@ const TeamsPage = () => {
       {/* League Selector and Search */}
       <Card
         sx={{
-          padding: 3,
+          padding: 0,
           mb: 3,
-          borderRadius: '24px',
+          borderRadius: '20px',
           backgroundColor: colors.brandWhite,
-          border: 'none',
-          boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
-          display: 'flex',
-          gap: 2.5,
-          flexWrap: 'wrap',
-          alignItems: 'center',
+          border: '1px solid rgba(0,0,0,0.06)',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
+          overflow: 'hidden',
         }}
       >
-        <FormControl sx={{ minWidth: 200 }}>
-          <InputLabel>Select League</InputLabel>
-          <Select
-            value={selectedLeague}
-            onChange={(e) => setSelectedLeague(e.target.value)}
-            label="Select League"
-            sx={{
-              borderRadius: '12px',
-            }}
-          >
-            <MenuItem value="all">All Leagues</MenuItem>
-            {leagues.map((league) => (
-              <MenuItem key={league.id} value={league.id}>
-                {league.name}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-        <Box sx={{ flex: 1, minWidth: { xs: '100%', md: '300px' } }}>
-          <SearchBar
-            value={searchQuery}
-            onChange={setSearchQuery}
-            placeholder="Search teams by name or ID..."
-          />
+        <Box sx={{ p: 3 }}>
+          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
+            {/* League dropdown */}
+            <Box
+              sx={{
+                flex: '1 1 260px',
+                minWidth: 260,
+                maxWidth: 320,
+              }}
+            >
+              <Typography variant="caption" sx={{ color: colors.textSecondary, fontWeight: 600, mb: 0.5, display: 'block' }}>
+                League
+              </Typography>
+              <Autocomplete
+                size="small"
+                options={[{ id: 'all', name: 'All Leagues', country: null }, ...leagues]}
+                getOptionLabel={(opt) => (opt.id === 'all' ? 'All Leagues' : opt.country ? `${opt.name} (${opt.country})` : opt.name || '')}
+                value={selectedLeague === 'all' ? { id: 'all', name: 'All Leagues', country: null } : leagues.find((l) => l.id === selectedLeague) || null}
+                onChange={(_, newValue) => setSelectedLeague(newValue?.id ?? 'all')}
+                isOptionEqualToValue={(opt, val) => opt.id === val?.id}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    placeholder="Search or select league..."
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '12px',
+                        backgroundColor: '#FAFAFA',
+                        '&:hover': { backgroundColor: '#F5F5F5' },
+                        '&.Mui-focused': { backgroundColor: colors.brandWhite },
+                      },
+                    }}
+                  />
+                )}
+              />
+            </Box>
+            {/* Search teams */}
+            <Box sx={{ flex: '2 1 280px', minWidth: 280 }}>
+              <Typography variant="caption" sx={{ color: colors.textSecondary, fontWeight: 600, mb: 0.5, display: 'block' }}>
+                Search teams
+              </Typography>
+              <SearchBar
+                value={searchQuery}
+                onChange={setSearchQuery}
+                placeholder="Search teams by name or ID..."
+              />
+            </Box>
+            {/* Add Team button */}
+            <Box sx={{ alignSelf: 'flex-end' }}>
+              <Button
+                variant="contained"
+                size="medium"
+                startIcon={<Add />}
+                onClick={() => setAddDialogOpen(true)}
+                disabled={selectedLeague === 'all'}
+                sx={{
+                  background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
+                  borderRadius: '12px',
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  px: 2.5,
+                  py: 1.25,
+                  boxShadow: '0 2px 8px rgba(220, 38, 38, 0.25)',
+                  '&:hover': {
+                    boxShadow: '0 4px 12px rgba(220, 38, 38, 0.35)',
+                  },
+                  '&:disabled': {
+                    backgroundColor: '#9CA3AF',
+                    color: colors.brandWhite,
+                    boxShadow: 'none',
+                  },
+                }}
+              >
+                Add Team
+              </Button>
+            </Box>
+          </Box>
+
+          {/* Leagues pagination strip */}
+          {leaguesTotal > 0 && (
+            <Box
+              sx={{
+                mt: 2,
+                pt: 2,
+                borderTop: '1px solid rgba(0,0,0,0.06)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 2,
+                flexWrap: 'wrap',
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                <Box
+                  sx={{
+                    px: 1.5,
+                    py: 0.5,
+                    borderRadius: '10px',
+                    backgroundColor: '#F5F5F5',
+                  }}
+                >
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack }}>
+                    {leagues.length.toLocaleString()} / {leaguesTotal.toLocaleString()} leagues
+                  </Typography>
+                </Box>
+                {leaguesTotal > 0 && (
+                  <Box
+                    sx={{
+                      width: 80,
+                      height: 6,
+                      borderRadius: 3,
+                      backgroundColor: '#E5E7EB',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        width: `${Math.min(100, (leagues.length / leaguesTotal) * 100)}%`,
+                        height: '100%',
+                        borderRadius: 3,
+                        background: `linear-gradient(90deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
+                        transition: 'width 0.25s ease',
+                      }}
+                    />
+                  </Box>
+                )}
+              </Box>
+              {leaguesPage < leaguesTotalPages && (
+                <Button
+                  size="small"
+                  variant="text"
+                  endIcon={leaguesLoadingMore ? null : <ExpandMore />}
+                  onClick={loadMoreLeagues}
+                  disabled={leaguesLoadingMore}
+                  sx={{
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    color: colors.brandRed,
+                    '&:hover': {
+                      backgroundColor: `${colors.brandRed}0C`,
+                    },
+                  }}
+                >
+                  {leaguesLoadingMore ? 'Loading…' : 'Load more leagues'}
+                </Button>
+              )}
+            </Box>
+          )}
         </Box>
-        <Button
-          variant="contained"
-          startIcon={<Add />}
-          onClick={() => setAddDialogOpen(true)}
-          disabled={selectedLeague === 'all'}
-          sx={{
-            background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
-            borderRadius: '12px',
-            textTransform: 'none',
-            fontWeight: 600,
-            px: 2.5,
-            py: 1.25,
-            '&:disabled': {
-              backgroundColor: '#9CA3AF',
-              color: colors.brandWhite,
-            },
-          }}
-        >
-          Add Team
-        </Button>
       </Card>
 
       {/* Filter Chips */}
@@ -845,8 +1057,33 @@ const TeamsPage = () => {
             ml: 1,
           }}
         >
-          {filteredTeams.length} teams found
+          {teamsTotalCount > 0 ? `${teamsTotalCount.toLocaleString()} teams found` : 'No teams found'}
         </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, ml: 'auto' }}>
+          <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13 }}>
+            Rows per page
+          </Typography>
+          <Select
+            size="small"
+            value={rowsPerPage}
+            onChange={(e) => {
+              setRowsPerPage(Number(e.target.value));
+              setPage(0);
+            }}
+            sx={{
+              minWidth: 72,
+              height: 36,
+              borderRadius: '8px',
+              fontSize: 13,
+              '& .MuiSelect-select': { py: 0.75 },
+            }}
+          >
+            <MenuItem value={10}>10</MenuItem>
+            <MenuItem value={25}>25</MenuItem>
+            <MenuItem value={50}>50</MenuItem>
+            <MenuItem value={100}>100</MenuItem>
+          </Select>
+        </Box>
       </Box>
 
       {/* Data Table */}
@@ -856,7 +1093,7 @@ const TeamsPage = () => {
         loading={loading}
         page={page}
         rowsPerPage={rowsPerPage}
-        totalCount={filteredTeams.length}
+        totalCount={teamsTotalCount}
         onPageChange={(e, newPage) => setPage(newPage)}
         onRowsPerPageChange={(e) => {
           setRowsPerPage(parseInt(e.target.value, 10));
@@ -879,7 +1116,13 @@ const TeamsPage = () => {
           },
         }}
       >
-        {selectedTeam?.status === 'Inactive' && (
+        {teamsFromFootballApi && (
+          <MenuItem disabled sx={{ py: 1.5, opacity: 0.9 }}>
+            <Info sx={{ fontSize: 18, color: colors.textSecondary, mr: 1.5 }} />
+            <Typography variant="body2" color="textSecondary">Teams from Football API (read-only)</Typography>
+          </MenuItem>
+        )}
+        {!teamsFromFootballApi && selectedTeam?.status === 'Inactive' && (
           <MenuItem
             onClick={() => {
               setDialogTeam(selectedTeam);
@@ -899,7 +1142,7 @@ const TeamsPage = () => {
             <Typography sx={{ fontWeight: 600 }}>Activate Team</Typography>
           </MenuItem>
         )}
-        {selectedTeam?.status === 'Active' && (
+        {!teamsFromFootballApi && selectedTeam?.status === 'Active' && (
           <MenuItem
             onClick={() => {
               setDialogTeam(selectedTeam);
@@ -919,7 +1162,7 @@ const TeamsPage = () => {
             <Typography sx={{ fontWeight: 600 }}>Inactivate Team</Typography>
           </MenuItem>
         )}
-        {selectedTeam?.entry_type === 'Original' && selectedTeam?.status === 'Active' && (
+        {!teamsFromFootballApi && selectedTeam?.entry_type === 'Original' && selectedTeam?.status === 'Active' && (
           <MenuItem
             onClick={() => {
               setDialogTeam(selectedTeam);
@@ -939,7 +1182,7 @@ const TeamsPage = () => {
             <Typography sx={{ fontWeight: 600 }}>Mark as Promoted</Typography>
           </MenuItem>
         )}
-        {selectedTeam?.status === 'Active' && (
+        {!teamsFromFootballApi && selectedTeam?.status === 'Active' && (
           <MenuItem
             onClick={() => {
               setDialogTeam(selectedTeam);
@@ -976,23 +1219,25 @@ const TeamsPage = () => {
           <People sx={{ fontSize: 18, color: '#3B82F6', mr: 1.5 }} />
           <Typography sx={{ fontWeight: 600 }}>View Players</Typography>
         </MenuItem>
-        <MenuItem
-          onClick={() => {
-            navigate(`/teams/history/${selectedTeam.team_id || selectedTeam.id}`);
-            handleMenuClose();
-          }}
-          sx={{
-            px: 2,
-            py: 1.5,
-            borderRadius: '8px',
-            '&:hover': {
-              backgroundColor: '#F3F4F6',
-            },
-          }}
-        >
-          <History sx={{ fontSize: 18, color: colors.textSecondary, mr: 1.5 }} />
-          <Typography sx={{ fontWeight: 600 }}>View History</Typography>
-        </MenuItem>
+        {!teamsFromFootballApi && (
+          <MenuItem
+            onClick={() => {
+              navigate(`/teams/history/${selectedTeam.team_id || selectedTeam.id}`);
+              handleMenuClose();
+            }}
+            sx={{
+              px: 2,
+              py: 1.5,
+              borderRadius: '8px',
+              '&:hover': {
+                backgroundColor: '#F3F4F6',
+              },
+            }}
+          >
+            <History sx={{ fontSize: 18, color: colors.textSecondary, mr: 1.5 }} />
+            <Typography sx={{ fontWeight: 600 }}>View History</Typography>
+          </MenuItem>
+        )}
       </Menu>
 
       {/* Add Team Dialog */}
@@ -1128,31 +1373,32 @@ const TeamsPage = () => {
                     Selected League
                   </Typography>
                   <Typography variant="body1" sx={{ fontWeight: 700, color: colors.brandBlack, fontSize: 16 }}>
-                    {leagues.find((l) => l.id === selectedLeague)?.name || 'No league selected'}
+                    {(() => {
+                      const L = leagues.find((l) => l.id === selectedLeague);
+                      return L ? (L.country ? `${L.name} (${L.country})` : L.name) : 'No league selected';
+                    })()}
                   </Typography>
                 </Box>
               </Box>
-              <FormControl fullWidth>
-                <InputLabel sx={{ fontSize: 14 }}>Change League (Optional)</InputLabel>
-                <Select
-                  value={selectedLeague}
-                  onChange={(e) => setSelectedLeague(e.target.value)}
-                  label="Change League (Optional)"
-                  sx={{
-                    borderRadius: '12px',
-                    backgroundColor: colors.brandWhite,
-                    '& .MuiOutlinedInput-notchedOutline': {
-                      borderColor: '#E5E7EB',
-                    },
-                  }}
-                >
-                  {leagues.map((league) => (
-                    <MenuItem key={league.id} value={league.id}>
-                      {league.name}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+              <Autocomplete
+                fullWidth
+                options={leagues}
+                getOptionLabel={(opt) => (opt.country ? `${opt.name} (${opt.country})` : opt.name || '')}
+                value={leagues.find((l) => l.id === selectedLeague) || null}
+                onChange={(_, newValue) => newValue && setSelectedLeague(newValue.id)}
+                isOptionEqualToValue={(opt, val) => opt.id === val?.id}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Change League (Optional)"
+                    placeholder="Search leagues..."
+                    sx={{
+                      borderRadius: '12px',
+                      '& .MuiOutlinedInput-root': { borderRadius: '12px' },
+                    }}
+                  />
+                )}
+              />
             </Card>
 
             {/* Team Name Input */}

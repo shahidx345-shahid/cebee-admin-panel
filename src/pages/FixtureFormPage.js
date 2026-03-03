@@ -15,6 +15,7 @@ import {
   CircularProgress,
   Chip,
   InputAdornment,
+  Autocomplete,
 } from '@mui/material';
 import {
   Save,
@@ -31,6 +32,7 @@ import {
   RadioButtonChecked,
   RadioButtonUnchecked,
   Info,
+  ExpandMore,
 } from '@mui/icons-material';
 import { colors, constants } from '../config/theme';
 import { DateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
@@ -39,7 +41,8 @@ import { format } from 'date-fns';
 import { getLeagues } from '../services/leaguesService';
 import { getCmds, getCurrentCmd, createCmd, updateCmdStatus } from '../services/cmdsService';
 import { getTeams } from '../services/teamsService';
-import { getFeaturedFixtures, createFixture, updateFixture } from '../services/fixturesService';
+import { getFeaturedFixtures, createFixture, updateFixture, getUpcomingFixturesByLeague, createFixtureFromApi } from '../services/fixturesService';
+import { getVenues as getVenuesFromApi } from '../services/venuesService';
 
 const FixtureFormPage = () => {
   const navigate = useNavigate();
@@ -47,7 +50,12 @@ const FixtureFormPage = () => {
   const isEditMode = !!id;
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const LEAGUES_PAGE_SIZE = 50;
   const [leagues, setLeagues] = useState([]);
+  const [leaguesPage, setLeaguesPage] = useState(1);
+  const [leaguesTotal, setLeaguesTotal] = useState(0);
+  const [leaguesTotalPages, setLeaguesTotalPages] = useState(1);
+  const [leaguesLoadingMore, setLeaguesLoadingMore] = useState(false);
   const [cmds, setCmds] = useState([]);
   const [currentCmd, setCurrentCmd] = useState(null);
   const [teams, setTeams] = useState([]);
@@ -65,6 +73,12 @@ const FixtureFormPage = () => {
   });
 
   const [featureType, setFeatureType] = useState('cebee'); // 'cebee' or 'community'
+  const [cebeeSeason, setCebeeSeason] = useState(new Date().getFullYear());
+  const [upcomingFixtures, setUpcomingFixtures] = useState([]);
+  const [loadingUpcoming, setLoadingUpcoming] = useState(false);
+  const [selectedApiFixture, setSelectedApiFixture] = useState(null);
+  const [apiVenues, setApiVenues] = useState([]);
+  const [loadingVenues, setLoadingVenues] = useState(false);
   const [formData, setFormData] = useState({
     homeTeam: '',
     awayTeam: '',
@@ -78,26 +92,52 @@ const FixtureFormPage = () => {
   });
   const [dateError, setDateError] = useState('');
 
+  const STADIUM_OPTIONS = [
+    { value: 'other', label: 'Other' },
+    { value: 'wembley', label: 'Wembley Stadium' },
+    { value: 'old_trafford', label: 'Old Trafford' },
+    { value: 'anfield', label: 'Anfield' },
+    { value: 'stamford_bridge', label: 'Stamford Bridge' },
+  ];
+
+  // Map API venue name to form dropdown value for auto-fill
+  const mapApiVenueToFormValue = (apiVenueName) => {
+    if (!apiVenueName || typeof apiVenueName !== 'string') return 'other';
+    const v = apiVenueName.toLowerCase().trim();
+    if (v.includes('wembley')) return 'wembley';
+    if (v.includes('old trafford')) return 'old_trafford';
+    if (v.includes('anfield')) return 'anfield';
+    if (v.includes('stamford bridge')) return 'stamford_bridge';
+    return 'other';
+  };
+
   useEffect(() => {
     const initialize = async () => {
       try {
         setLoading(true);
 
-        // Fetch leagues from database
-        const leaguesResult = await getLeagues({ status: 'Active' });
-        if (leaguesResult.success && leaguesResult.data?.leagues) {
-          const formattedLeagues = leaguesResult.data.leagues.map(league => ({
-            id: league._id || league.league_id,
-            league_id: league._id || league.league_id,
+        // Fetch leagues (paginated – first page only on init)
+        const leaguesResult = await getLeagues({ page: 1, limit: LEAGUES_PAGE_SIZE });
+        if (leaguesResult.success && leaguesResult.data) {
+          const list = leaguesResult.data.leagues || [];
+          const formattedLeagues = list.map(league => ({
+            id: league.apiLeagueId != null ? String(league.apiLeagueId) : (league._id || league.league_id),
+            league_id: league.apiLeagueId != null ? String(league.apiLeagueId) : (league._id || league.league_id),
             name: league.league_name || league.name,
             league_name: league.league_name || league.name,
+            country: league.country || null,
             isActive: league.status === 'Active',
             status: league.status,
           }));
           setLeagues(formattedLeagues);
+          const pag = leaguesResult.data.pagination || {};
+          setLeaguesTotal(pag.total ?? list.length);
+          setLeaguesPage(1);
+          setLeaguesTotalPages(pag.pages ?? 1);
         } else {
-          console.error('Failed to load leagues:', leaguesResult.error);
           setLeagues([]);
+          setLeaguesTotal(0);
+          setLeaguesTotalPages(0);
         }
 
         // Fetch CMds from database
@@ -328,10 +368,67 @@ const FixtureFormPage = () => {
     }
   }, [formData.homeTeam, formData.awayTeam, featureType, teams, featuredFixtures]);
 
+  // CeBee Featured: load upcoming fixtures when league + season are set
+  useEffect(() => {
+    if (featureType !== 'cebee' || !formData.leagueId || !cebeeSeason) {
+      setUpcomingFixtures([]);
+      return;
+    }
+    let cancelled = false;
+    const load = async () => {
+      setLoadingUpcoming(true);
+      setSelectedApiFixture(null);
+      try {
+        const res = await getUpcomingFixturesByLeague(formData.leagueId, cebeeSeason);
+        if (!cancelled && res.success && res.data?.fixtures) {
+          setUpcomingFixtures(res.data.fixtures);
+        } else if (!cancelled) {
+          setUpcomingFixtures([]);
+        }
+      } catch (e) {
+        if (!cancelled) setUpcomingFixtures([]);
+      } finally {
+        if (!cancelled) setLoadingUpcoming(false);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [featureType, formData.leagueId, cebeeSeason]);
+
+  // When fixture is selected but API venue is empty, load venues for admin to select
+  useEffect(() => {
+    if (!selectedApiFixture || (selectedApiFixture.venue && String(selectedApiFixture.venue).trim())) {
+      setApiVenues([]);
+      return;
+    }
+    let cancelled = false;
+    const load = async () => {
+      setLoadingVenues(true);
+      try {
+        const res = await getVenuesFromApi({ country: 'england' });
+        if (!cancelled && res.success && res.data?.venues) {
+          setApiVenues(res.data.venues);
+        } else if (!cancelled) {
+          setApiVenues([]);
+        }
+      } catch (e) {
+        if (!cancelled) setApiVenues([]);
+      } finally {
+        if (!cancelled) setLoadingVenues(false);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [selectedApiFixture]);
+
   const handleChange = (field, value) => {
     // Clear team selections if league changes
     if (field === 'leagueId') {
       setFormData(prev => ({ ...prev, [field]: value, homeTeam: '', awayTeam: '' }));
+      if (featureType === 'cebee') {
+        setSelectedApiFixture(null);
+        setUpcomingFixtures([]);
+      }
     } else if (field === 'homeTeam' || field === 'awayTeam') {
       // Allow both teams to be selected independently
       // Only clear if selecting the same team in the other field (prevent duplicate selection)
@@ -356,6 +453,34 @@ const FixtureFormPage = () => {
     setFormData(prev => ({ ...prev, homeTeam: '', awayTeam: '' }));
     setAvailableTeams([]);
     setFeaturedFixtures([]);
+    setSelectedApiFixture(null);
+    setUpcomingFixtures([]);
+  };
+
+  const loadMoreLeagues = async () => {
+    if (leaguesLoadingMore || leaguesPage >= leaguesTotalPages) return;
+    setLeaguesLoadingMore(true);
+    try {
+      const nextPage = leaguesPage + 1;
+      const result = await getLeagues({ page: nextPage, limit: LEAGUES_PAGE_SIZE });
+      if (result.success && result.data?.leagues?.length) {
+        const formatted = (result.data.leagues || []).map(league => ({
+          id: league.apiLeagueId != null ? String(league.apiLeagueId) : (league._id || league.league_id),
+          league_id: league.apiLeagueId != null ? String(league.apiLeagueId) : (league._id || league.league_id),
+          name: league.league_name || league.name,
+          league_name: league.league_name || league.name,
+          country: league.country || null,
+          isActive: league.status === 'Active',
+          status: league.status,
+        }));
+        setLeagues(prev => [...prev, ...formatted]);
+        setLeaguesPage(nextPage);
+      }
+    } catch (err) {
+      console.error('Error loading more leagues:', err);
+    } finally {
+      setLeaguesLoadingMore(false);
+    }
   };
 
   const handleCreateCmd = async () => {
@@ -542,10 +667,12 @@ const FixtureFormPage = () => {
         alert('Please enter a matchday for Community Featured fixture');
         return;
       }
+    } else if (featureType === 'cebee' && selectedApiFixture) {
+      // CeBee Featured from API: no team selection required
     } else {
-      // CeBe Featured or Regular
+      // CeBee manual or Regular: require both teams
       if (!formData.homeTeam || !formData.awayTeam) {
-        alert('Please select both home and away teams');
+        alert('Please select both home and away teams, or select a fixture from the list above');
         return;
       }
     }
@@ -591,16 +718,21 @@ const FixtureFormPage = () => {
         fixtureData.selected_team_id = selectedTeamId;
         fixtureData.matchday = formData.matchday;
       } else {
-        // CeBe Featured or Regular: requires home_team_id and away_team_id
-        if (!formData.homeTeam || !formData.awayTeam) {
-          alert('Please select both home and away teams');
-          setSaving(false);
-          return;
-        }
-        fixtureData.home_team_id = formData.homeTeam;
-        fixtureData.away_team_id = formData.awayTeam;
-        if (featureType === 'cebee') {
+        // CeBee from API: teams come from API, no form team IDs needed
+        if (featureType === 'cebee' && selectedApiFixture) {
           fixtureData.isCeBeFeatured = true;
+        } else {
+          // CeBee manual or Regular: requires home_team_id and away_team_id
+          if (!formData.homeTeam || !formData.awayTeam) {
+            alert('Please select both home and away teams');
+            setSaving(false);
+            return;
+          }
+          fixtureData.home_team_id = formData.homeTeam;
+          fixtureData.away_team_id = formData.awayTeam;
+          if (featureType === 'cebee') {
+            fixtureData.isCeBeFeatured = true;
+          }
         }
       }
 
@@ -609,6 +741,16 @@ const FixtureFormPage = () => {
       let result;
       if (isEditMode && id) {
         result = await updateFixture(id, fixtureData);
+      } else if (featureType === 'cebee' && selectedApiFixture) {
+        const fromApiPayload = {
+          apiFixtureId: selectedApiFixture.apiFixtureId,
+          leagueId: formData.leagueId,
+          publishDateTime: formData.publishDateTime,
+        };
+        if (!selectedApiFixture.venue && formData.venue && String(formData.venue).trim()) {
+          fromApiPayload.venue = String(formData.venue).trim();
+        }
+        result = await createFixtureFromApi(fromApiPayload);
       } else {
         result = await createFixture(fixtureData);
       }
@@ -1078,6 +1220,213 @@ const FixtureFormPage = () => {
           </Grid>
         </Card>
 
+        {/* CeBee Featured: Competition & Fixture (League → Season → Select fixture) */}
+        {featureType === 'cebee' && (
+          <Card
+            sx={{
+              padding: 3,
+              borderRadius: '16px',
+              mb: 3,
+              border: `1px solid ${colors.divider || '#eee'}`,
+              boxShadow: '0 2px 12px rgba(0,0,0,0.04)',
+              background: `linear-gradient(180deg, ${colors.brandWhite} 0%, ${colors.brandRed ? `${colors.brandRed}04` : '#fafafa'} 100%)`,
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+              <Box
+                sx={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed || colors.brandRed} 100%)`,
+                  color: colors.brandWhite,
+                }}
+              >
+                <EventIcon sx={{ fontSize: 22 }} />
+              </Box>
+              <Box>
+                <Typography variant="h6" sx={{ fontWeight: 700, color: colors.brandBlack, lineHeight: 1.3 }}>
+                  Competition & Fixture
+                </Typography>
+                <Typography variant="body2" sx={{ color: colors.textSecondary, mt: 0.25 }}>
+                  League → Season → Pick a match to auto-fill details
+                </Typography>
+              </Box>
+            </Box>
+            <Grid container spacing={3} sx={{ mt: 0.5 }}>
+              <Grid item xs={12} md={6}>
+                <Typography variant="caption" sx={{ display: 'block', mb: 0.75, color: colors.textSecondary, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Step 1 — League
+                </Typography>
+                <Autocomplete
+                  fullWidth
+                  options={leagues}
+                  getOptionLabel={(opt) => (opt && opt.country ? `${opt.name} (${opt.country})` : (opt?.name || ''))}
+                  value={leagues.find((l) => String(l?.id) === String(formData.leagueId)) || null}
+                  onChange={(_, newValue) => handleChange('leagueId', newValue?.id ?? '')}
+                  isOptionEqualToValue={(opt, val) => opt && val && String(opt.id) === String(val.id)}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="League *"
+                      placeholder="Search leagues..."
+                      required
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          borderRadius: '12px',
+                          backgroundColor: colors.brandWhite,
+                          '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: colors.brandRed },
+                          '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderWidth: 2, borderColor: colors.brandRed },
+                        },
+                      }}
+                    />
+                  )}
+                  renderOption={(props, league) => (
+                    <Box component="li" {...props} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, py: 1.25 }}>
+                      <Stadium sx={{ fontSize: 20, color: colors.brandRed, opacity: 0.9 }} />
+                      <Typography>{league.country ? `${league.name} (${league.country})` : league.name}</Typography>
+                    </Box>
+                  )}
+                />
+                {leaguesTotal > 0 && (
+                  <Box sx={{ mt: 1.5, display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
+                    <Chip
+                      size="small"
+                      label={`${leagues.length} / ${leaguesTotal} leagues`}
+                      sx={{
+                        borderRadius: '8px',
+                        fontWeight: 600,
+                        backgroundColor: `${colors.brandRed}12`,
+                        color: colors.brandRed,
+                      }}
+                    />
+                    {leaguesPage < leaguesTotalPages && (
+                      <Button
+                        size="small"
+                        variant="text"
+                        endIcon={leaguesLoadingMore ? null : <ExpandMore />}
+                        onClick={loadMoreLeagues}
+                        disabled={leaguesLoadingMore}
+                        sx={{ textTransform: 'none', fontWeight: 600, color: colors.brandRed, '&:hover': { backgroundColor: `${colors.brandRed}0C` } }}
+                      >
+                        {leaguesLoadingMore ? 'Loading…' : 'Load more leagues'}
+                      </Button>
+                    )}
+                  </Box>
+                )}
+              </Grid>
+              <Grid item xs={12} md={3}>
+                <Typography variant="caption" sx={{ display: 'block', mb: 0.75, color: colors.textSecondary, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Step 2 — Season
+                </Typography>
+                <Autocomplete
+                  fullWidth
+                  value={cebeeSeason}
+                  onChange={(_, newVal) => { setCebeeSeason(newVal != null ? Number(newVal) : new Date().getFullYear()); setSelectedApiFixture(null); }}
+                  options={[new Date().getFullYear() + 1, new Date().getFullYear(), new Date().getFullYear() - 1, new Date().getFullYear() - 2]}
+                  getOptionLabel={(y) => String(y)}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Season (year)"
+                      placeholder="Search year..."
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          borderRadius: '12px',
+                          backgroundColor: colors.brandWhite,
+                          '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: colors.brandRed },
+                          '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderWidth: 2, borderColor: colors.brandRed },
+                        },
+                      }}
+                    />
+                  )}
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <Typography variant="caption" sx={{ display: 'block', mb: 0.75, color: colors.textSecondary, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Step 3 — Fixture
+                </Typography>
+                <Autocomplete
+                  fullWidth
+                  value={selectedApiFixture}
+                  onChange={(_, newVal) => {
+                    setSelectedApiFixture(newVal || null);
+                    if (newVal) {
+                      const venueValue = mapApiVenueToFormValue(newVal.venue) || 'other';
+                      setFormData(prev => ({
+                        ...prev,
+                        kickoffTime: newVal.kickoff ? new Date(newVal.kickoff) : prev.kickoffTime,
+                        venue: venueValue,
+                      }));
+                    }
+                  }}
+                  options={loadingUpcoming ? [] : upcomingFixtures}
+                  getOptionLabel={(f) => f ? `${f.homeTeamName} vs ${f.awayTeamName} – ${f.kickoff ? format(new Date(f.kickoff), 'EEE d MMM, HH:mm') : ''}` : ''}
+                  isOptionEqualToValue={(opt, val) => opt && val && Number(opt.apiFixtureId) === Number(val.apiFixtureId)}
+                  disabled={loadingUpcoming || !formData.leagueId || !cebeeSeason}
+                  clearable
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Select fixture (optional)"
+                      placeholder="Search fixtures..."
+                      sx={{
+                        '& .MuiOutlinedInput-root': {
+                          borderRadius: '12px',
+                          backgroundColor: colors.brandWhite,
+                          '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: colors.brandRed },
+                          '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderWidth: 2, borderColor: colors.brandRed },
+                        },
+                      }}
+                    />
+                  )}
+                  renderOption={(props, f) => (
+                    <Box component="li" {...props} sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      <CalendarToday sx={{ fontSize: 18, color: colors.textSecondary }} />
+                      <Box>
+                        <Typography sx={{ fontWeight: 600 }}>{f.homeTeamName} vs {f.awayTeamName}</Typography>
+                        <Typography variant="caption" sx={{ color: colors.textSecondary }}>
+                          {f.kickoff ? format(new Date(f.kickoff), 'EEE d MMM · HH:mm') : ''}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  )}
+                  slotProps={{
+                    paper: {
+                      sx: {
+                        maxHeight: 320,
+                        borderRadius: '12px',
+                        boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                        mt: 1.5,
+                        '& .MuiAutocomplete-listbox': { maxHeight: 300, '& .Mui-focused': { backgroundColor: `${colors.brandRed}12` } },
+                      },
+                    },
+                  }}
+                />
+                {loadingUpcoming && (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.75 }}>
+                    <CircularProgress size={18} sx={{ color: colors.brandRed }} />
+                    <Typography variant="caption" sx={{ color: colors.textSecondary }}>Loading fixtures…</Typography>
+                  </Box>
+                )}
+                {!loadingUpcoming && upcomingFixtures.length > 0 && !selectedApiFixture && (
+                  <Typography variant="caption" sx={{ display: 'block', mt: 0.75, color: colors.textSecondary }}>
+                    {upcomingFixtures.length} upcoming fixture{upcomingFixtures.length !== 1 ? 's' : ''} available – search or clear to select manually
+                  </Typography>
+                )}
+                {!loadingUpcoming && upcomingFixtures.length === 0 && formData.leagueId && cebeeSeason && (
+                  <Typography variant="caption" sx={{ display: 'block', mt: 0.75, color: colors.textSecondary }}>
+                    No upcoming fixtures for this league/season
+                  </Typography>
+                )}
+              </Grid>
+            </Grid>
+          </Card>
+        )}
+
         {/* Team Details Section */}
         <Card sx={{ padding: 3, borderRadius: '16px', mb: 3 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
@@ -1102,216 +1451,188 @@ const FixtureFormPage = () => {
           >
             <Typography variant="body2" sx={{ color: colors.success, fontWeight: 600 }}>
               {featureType === 'cebee'
-                ? 'CeBee Featured - Create fixture from scratch with manual team selection'
+                ? (selectedApiFixture
+                  ? 'CeBee Featured – Fixture selected from API; teams, kickoff and venue are auto-filled.'
+                  : 'CeBee Featured – Select a fixture above to auto-fill, or choose teams manually below.')
                 : 'Community Featured - Match voted by community'}
             </Typography>
           </Alert>
 
           <Grid container spacing={3}>
-            <Grid item xs={12} md={6}>
-              <FormControl fullWidth required>
-                <InputLabel>Home Team *</InputLabel>
-                <Select
-                  value={formData.homeTeam || ''}
-                onChange={(e) => handleChange('homeTeam', e.target.value)}
-                  label="Home Team *"
-                  disabled={Boolean(!formData.leagueId || loadingTeams)}
-                  renderValue={(value) => {
-                    if (!value) return '';
-                    // Always look in teams array (not availableTeams) since availableTeams gets filtered
-                    const team = teams.find(t => {
-                      // Handle both string and object ID comparisons
-                      const teamId = String(t.id || t._id || t.team_id);
-                      const valueId = String(value);
-                      return teamId === valueId;
-                    });
-                    return team ? (team.name || team.team_name || '') : '';
-                }}
-                sx={{
+            {featureType === 'cebee' && selectedApiFixture ? (
+              <Grid item xs={12}>
+                <Box
+                  sx={{
+                    p: 2.5,
                     borderRadius: '12px',
-                    '& .MuiOutlinedInput-notchedOutline': {
-                    borderRadius: '12px',
-                  },
-                }}
-                  MenuProps={{
-                    PaperProps: {
-                      sx: {
-                        borderRadius: '12px',
-                        mt: 1,
-                        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.15)',
-                        '& .MuiMenuItem-root': {
-                          px: 2,
-                          py: 1.5,
-                          '&.Mui-selected': {
-                            backgroundColor: `${colors.brandRed}15`,
-                            color: colors.brandRed,
-                            '&:hover': {
-                              backgroundColor: `${colors.brandRed}20`,
-                            },
-                          },
-                        },
-                      },
-                    },
+                    backgroundColor: `${colors.success}0C`,
+                    border: `1px solid ${colors.success}30`,
                   }}
                 >
-                  {loadingTeams ? (
-                    <MenuItem disabled>
-                      <CircularProgress size={20} sx={{ mr: 1 }} />
-                      Loading teams...
-                    </MenuItem>
-                  ) : (featureType === 'community' ? availableTeams : teams).length === 0 ? (
-                    <MenuItem disabled>
-                      {formData.leagueId 
-                        ? (featureType === 'community' 
-                          ? 'No featured fixtures found for this league' 
-                          : 'No teams found for this league')
-                        : 'Please select a league first'}
-                    </MenuItem>
-                  ) : (
-                    (featureType === 'community' ? availableTeams : teams).map((team) => (
-                      <MenuItem key={team.id} value={team.id}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%', flexWrap: 'wrap' }}>
-                          {(team.isFeatured || featureType === 'community') && (
-                            <Star sx={{ fontSize: 16, color: colors.brandRed }} />
-                          )}
-                          <Typography sx={{ flex: 1 }}>{team.name}</Typography>
-                          {featureType === 'community' && team.isTeamA && (
-                            <Chip
-                              label="Featured Team"
-                              size="small"
-                              sx={{
-                                backgroundColor: `${colors.brandRed}22`,
-                                color: colors.brandRed,
-                                fontWeight: 700,
-                                fontSize: 10,
-                                height: 20,
-                              }}
-                            />
-                          )}
-                          {(team.isFeatured || featureType === 'community') && (
-                            <Chip
-                              label={featureType === 'community' ? 'Featured Fixture' : 'Featured'}
-                              size="small"
-                              sx={{
-                                backgroundColor: `${colors.brandRed}15`,
-                                color: colors.brandRed,
-                                fontWeight: 600,
-                                fontSize: 10,
-                                height: 20,
-                              }}
-                            />
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+                    <CheckCircle sx={{ color: colors.success, fontSize: 22 }} />
+                    <Typography variant="subtitle2" sx={{ fontWeight: 700, color: colors.success }}>
+                      Auto-filled from selected fixture
+                    </Typography>
+                    <Chip
+                      size="small"
+                      label="From API"
+                      sx={{
+                        ml: 1,
+                        borderRadius: '8px',
+                        fontWeight: 600,
+                        backgroundColor: colors.brandWhite,
+                        color: colors.textSecondary,
+                        border: `1px solid ${colors.divider || '#eee'}`,
+                      }}
+                    />
+                  </Box>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} sm={6} md={3}>
+                      <Typography variant="caption" sx={{ color: colors.textSecondary, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Home</Typography>
+                      <Typography sx={{ fontWeight: 600, mt: 0.25 }}>{selectedApiFixture.homeTeamName || '–'}</Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={6} md={3}>
+                      <Typography variant="caption" sx={{ color: colors.textSecondary, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Away</Typography>
+                      <Typography sx={{ fontWeight: 600, mt: 0.25 }}>{selectedApiFixture.awayTeamName || '–'}</Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={6} md={3}>
+                      <Typography variant="caption" sx={{ color: colors.textSecondary, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Kickoff</Typography>
+                      <Typography sx={{ fontWeight: 600, mt: 0.25 }}>
+                        {selectedApiFixture.kickoff ? format(new Date(selectedApiFixture.kickoff), 'PPp') : '–'}
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={6} md={3}>
+                      <Typography variant="caption" sx={{ color: colors.textSecondary, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Venue</Typography>
+                      {selectedApiFixture.venue && String(selectedApiFixture.venue).trim() ? (
+                        <Typography sx={{ fontWeight: 600, mt: 0.25 }}>{selectedApiFixture.venue}</Typography>
+                      ) : (
+                        <Box sx={{ mt: 0.5 }}>
+                          <Autocomplete
+                            fullWidth
+                            size="small"
+                            value={apiVenues.find((v) => v.name === formData.venue) || null}
+                            onChange={(_, newVal) => handleChange('venue', newVal?.name || '')}
+                            options={apiVenues}
+                            getOptionLabel={(v) => v ? `${v.name}${v.city ? `, ${v.city}` : ''}` : ''}
+                            isOptionEqualToValue={(a, b) => a && b && a.id === b.id}
+                            disabled={loadingVenues}
+                            clearable
+                            renderInput={(params) => (
+                              <TextField
+                                {...params}
+                                label="Select venue"
+                                placeholder="Search venues..."
+                                sx={{ '& .MuiOutlinedInput-root': { borderRadius: '8px' } }}
+                              />
+                            )}
+                            slotProps={{
+                              paper: { sx: { maxHeight: 280 } },
+                            }}
+                          />
+                          {loadingVenues && (
+                            <Typography variant="caption" sx={{ color: colors.textSecondary, mt: 0.5 }}>Loading venues…</Typography>
                           )}
                         </Box>
-                      </MenuItem>
-                    ))
-                  )}
-                </Select>
-                {featureType === 'community' && (teams.some(t => t.isTeamA) || availableTeams.some(t => t.isTeamA)) && (
-                  <Typography variant="caption" sx={{ display: 'block', mt: 0.75, color: colors.textSecondary }}>
-                    First team is the Featured Team from the Featured Fixture.
-                  </Typography>
+                      )}
+                    </Grid>
+                  </Grid>
+                </Box>
+              </Grid>
+            ) : (
+            <>
+            <Grid item xs={12} md={6}>
+              <Autocomplete
+                fullWidth
+                value={(() => {
+                  const list = featureType === 'community' ? availableTeams : teams;
+                  return list.find(t => String(t.id || t._id || t.team_id) === String(formData.homeTeam)) || null;
+                })()}
+                onChange={(_, newVal) => handleChange('homeTeam', newVal?.id ?? '')}
+                options={featureType === 'community' ? availableTeams : teams}
+                getOptionLabel={(t) => t ? (t.name || t.team_name || '') : ''}
+                isOptionEqualToValue={(a, b) => a && b && String(a.id || a._id || a.team_id) === String(b.id || b._id || b.team_id)}
+                disabled={!formData.leagueId || loadingTeams}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Home Team *"
+                    placeholder="Search teams..."
+                    required
+                    sx={{ '& .MuiOutlinedInput-root': { borderRadius: '12px' } }}
+                  />
                 )}
-              </FormControl>
+                renderOption={(props, team) => (
+                  <Box component="li" {...props} sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                    {(team.isFeatured || featureType === 'community') && <Star sx={{ fontSize: 16, color: colors.brandRed }} />}
+                    <Typography sx={{ flex: 1 }}>{team.name || team.team_name}</Typography>
+                    {featureType === 'community' && team.isTeamA && (
+                      <Chip label="Featured Team" size="small" sx={{ backgroundColor: `${colors.brandRed}22`, color: colors.brandRed, fontWeight: 700, fontSize: 10, height: 20 }} />
+                    )}
+                    {(team.isFeatured || featureType === 'community') && (
+                      <Chip label={featureType === 'community' ? 'Featured Fixture' : 'Featured'} size="small" sx={{ backgroundColor: `${colors.brandRed}15`, color: colors.brandRed, fontWeight: 600, fontSize: 10, height: 20 }} />
+                    )}
+                  </Box>
+                )}
+                slotProps={{ paper: { sx: { borderRadius: '12px', mt: 1, boxShadow: '0 4px 16px rgba(0,0,0,0.15)' } } }}
+              />
+              {loadingTeams && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                  <CircularProgress size={18} sx={{ color: colors.brandRed }} />
+                  <Typography variant="caption" sx={{ color: colors.textSecondary }}>Loading teams...</Typography>
+                </Box>
+              )}
+              {(featureType === 'community' ? availableTeams : teams).length === 0 && !loadingTeams && formData.leagueId && (
+                <Typography variant="caption" sx={{ color: colors.textSecondary, display: 'block', mt: 0.5 }}>
+                  {featureType === 'community' ? 'No featured fixtures for this league' : 'No teams for this league'}
+                </Typography>
+              )}
+              {featureType === 'community' && (teams.some(t => t.isTeamA) || availableTeams.some(t => t.isTeamA)) && (
+                <Typography variant="caption" sx={{ display: 'block', mt: 0.75, color: colors.textSecondary }}>
+                  First team is the Featured Team from the Featured Fixture.
+                </Typography>
+              )}
             </Grid>
             <Grid item xs={12} md={6}>
-              <FormControl fullWidth required>
-                <InputLabel>Away Team *</InputLabel>
-                <Select
-                  value={formData.awayTeam || ''}
-                  onChange={(e) => handleChange('awayTeam', e.target.value)}
-                  label="Away Team *"
-                  disabled={Boolean(!formData.leagueId || loadingTeams)}
-                  renderValue={(value) => {
-                    if (!value) return '';
-                    // Always look in teams array (not availableTeams) since availableTeams gets filtered
-                    const team = teams.find(t => {
-                      // Handle both string and object ID comparisons
-                      const teamId = String(t.id || t._id || t.team_id);
-                      const valueId = String(value);
-                      return teamId === valueId;
-                    });
-                    return team ? (team.name || team.team_name || '') : '';
-                  }}
-                  sx={{
-                    borderRadius: '12px',
-                    '& .MuiOutlinedInput-notchedOutline': {
-                      borderRadius: '12px',
-                    },
-                  }}
-                  MenuProps={{
-                    PaperProps: {
-                      sx: {
-                        borderRadius: '12px',
-                        mt: 1,
-                        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.15)',
-                        '& .MuiMenuItem-root': {
-                          px: 2,
-                          py: 1.5,
-                          '&.Mui-selected': {
-                            backgroundColor: `${colors.brandRed}15`,
-                            color: colors.brandRed,
-                            '&:hover': {
-                              backgroundColor: `${colors.brandRed}20`,
-                            },
-                          },
-                        },
-                      },
-                    },
-                  }}
-                >
-                  {loadingTeams ? (
-                    <MenuItem disabled>
-                      <CircularProgress size={20} sx={{ mr: 1 }} />
-                      Loading teams...
-                    </MenuItem>
-                  ) : (featureType === 'community' ? availableTeams : teams).length === 0 ? (
-                    <MenuItem disabled>
-                      {formData.leagueId 
-                        ? (featureType === 'community' 
-                          ? (formData.homeTeam ? 'Select home team first' : 'No featured fixtures found for this league')
-                          : 'No teams found for this league')
-                        : 'Please select a league first'}
-                    </MenuItem>
-                  ) : (
-                    (featureType === 'community' ? availableTeams : teams).map((team) => (
-                      <MenuItem key={team.id} value={team.id}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%', flexWrap: 'wrap' }}>
-                          {(team.isFeatured || featureType === 'community') && (
-                            <Star sx={{ fontSize: 16, color: colors.brandRed }} />
-                          )}
-                          <Typography sx={{ flex: 1 }}>{team.name}</Typography>
-                          {featureType === 'community' && team.isTeamA && (
-                            <Chip
-                              label="Featured Team"
-                              size="small"
-                              sx={{
-                                backgroundColor: `${colors.brandRed}22`,
-                                color: colors.brandRed,
-                                fontWeight: 700,
-                                fontSize: 10,
-                                height: 20,
-                              }}
-                            />
-                          )}
-                          {(team.isFeatured || featureType === 'community') && (
-                            <Chip
-                              label={featureType === 'community' ? 'Featured Fixture' : 'Featured'}
-                              size="small"
-                              sx={{
-                                backgroundColor: `${colors.brandRed}15`,
-                                color: colors.brandRed,
-                                fontWeight: 600,
-                                fontSize: 10,
-                                height: 20,
-                              }}
-                            />
-                          )}
-                        </Box>
-                      </MenuItem>
-                    ))
-                  )}
-                </Select>
-              </FormControl>
+              <Autocomplete
+                fullWidth
+                value={(() => {
+                  const list = featureType === 'community' ? availableTeams : teams;
+                  return list.find(t => String(t.id || t._id || t.team_id) === String(formData.awayTeam)) || null;
+                })()}
+                onChange={(_, newVal) => handleChange('awayTeam', newVal?.id ?? '')}
+                options={featureType === 'community' ? availableTeams : teams}
+                getOptionLabel={(t) => t ? (t.name || t.team_name || '') : ''}
+                isOptionEqualToValue={(a, b) => a && b && String(a.id || a._id || a.team_id) === String(b.id || b._id || b.team_id)}
+                disabled={!formData.leagueId || loadingTeams}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Away Team *"
+                    placeholder="Search teams..."
+                    required
+                    sx={{ '& .MuiOutlinedInput-root': { borderRadius: '12px' } }}
+                  />
+                )}
+                renderOption={(props, team) => (
+                  <Box component="li" {...props} sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                    {(team.isFeatured || featureType === 'community') && <Star sx={{ fontSize: 16, color: colors.brandRed }} />}
+                    <Typography sx={{ flex: 1 }}>{team.name || team.team_name}</Typography>
+                    {featureType === 'community' && team.isTeamA && (
+                      <Chip label="Featured Team" size="small" sx={{ backgroundColor: `${colors.brandRed}22`, color: colors.brandRed, fontWeight: 700, fontSize: 10, height: 20 }} />
+                    )}
+                    {(team.isFeatured || featureType === 'community') && (
+                      <Chip label={featureType === 'community' ? 'Featured Fixture' : 'Featured'} size="small" sx={{ backgroundColor: `${colors.brandRed}15`, color: colors.brandRed, fontWeight: 600, fontSize: 10, height: 20 }} />
+                    )}
+                  </Box>
+                )}
+                slotProps={{ paper: { sx: { borderRadius: '12px', mt: 1, boxShadow: '0 4px 16px rgba(0,0,0,0.15)' } } }}
+              />
+              {(featureType === 'community' ? availableTeams : teams).length === 0 && !loadingTeams && formData.leagueId && (
+                <Typography variant="caption" sx={{ color: colors.textSecondary, display: 'block', mt: 0.5 }}>
+                  {featureType === 'community' ? (formData.homeTeam ? 'Select home team first' : 'No featured fixtures') : 'No teams for this league'}
+                </Typography>
+              )}
             </Grid>
             {featureType === 'community' && (
             <Grid item xs={12} md={6}>
@@ -1338,57 +1659,110 @@ const FixtureFormPage = () => {
             </Grid>
             )}
             <Grid item xs={12} md={featureType === 'community' ? 6 : 12}>
-              <FormControl fullWidth required>
-                <InputLabel>Match Ground / Stadium *</InputLabel>
-                <Select
-                  value={formData.venue || 'other'}
-                  onChange={(e) => handleChange('venue', e.target.value)}
-                  label="Match Ground / Stadium *"
-                  sx={{
-                    borderRadius: '12px',
-                    '& .MuiOutlinedInput-notchedOutline': {
-                      borderRadius: '12px',
-                    },
-                  }}
-                >
-                  <MenuItem value="other">
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Send sx={{ fontSize: 18, color: colors.brandRed }} />
-                      Other
-                    </Box>
-                  </MenuItem>
-                  <MenuItem value="wembley">Wembley Stadium</MenuItem>
-                  <MenuItem value="old_trafford">Old Trafford</MenuItem>
-                  <MenuItem value="anfield">Anfield</MenuItem>
-                  <MenuItem value="stamford_bridge">Stamford Bridge</MenuItem>
-                </Select>
-              </FormControl>
+              <Autocomplete
+                fullWidth
+                value={STADIUM_OPTIONS.find((o) => o.value === (formData.venue || 'other')) || STADIUM_OPTIONS[0]}
+                onChange={(_, newVal) => handleChange('venue', newVal?.value ?? 'other')}
+                options={STADIUM_OPTIONS}
+                getOptionLabel={(o) => o ? o.label : ''}
+                isOptionEqualToValue={(a, b) => a && b && a.value === b.value}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Match Ground / Stadium *"
+                    placeholder="Search stadium..."
+                    required
+                    sx={{ '& .MuiOutlinedInput-root': { borderRadius: '12px' } }}
+                  />
+                )}
+                renderOption={(props, o) => (
+                  <Box component="li" {...props} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    {o.value === 'other' && <Send sx={{ fontSize: 18, color: colors.brandRed }} />}
+                    {o.label}
+                  </Box>
+                )}
+                slotProps={{ paper: { sx: { borderRadius: '12px', mt: 1 } } }}
+              />
             </Grid>
+            {featureType !== 'cebee' && (
             <Grid item xs={12}>
-              <FormControl fullWidth required>
-                <InputLabel>League *</InputLabel>
-                <Select
-                  value={formData.leagueId}
-                  onChange={(e) => handleChange('leagueId', e.target.value)}
-                  label="League *"
+              <Autocomplete
+                fullWidth
+                options={leagues}
+                getOptionLabel={(opt) => (opt && opt.country ? `${opt.name} (${opt.country})` : (opt?.name || ''))}
+                value={leagues.find((l) => String(l?.id) === String(formData.leagueId)) || null}
+                onChange={(_, newValue) => handleChange('leagueId', newValue?.id ?? '')}
+                isOptionEqualToValue={(opt, val) => opt && val && String(opt.id) === String(val.id)}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="League *"
+                    placeholder="Search leagues..."
+                    required
+                    sx={{ '& .MuiOutlinedInput-root': { borderRadius: '12px' } }}
+                  />
+                )}
+                renderOption={(props, league) => (
+                  <Box component="li" {...props} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Stadium sx={{ fontSize: 18, color: colors.brandRed }} />
+                    {league.country ? `${league.name} (${league.country})` : league.name}
+                  </Box>
+                )}
+              />
+              {leaguesTotal > 0 && (
+                <Box
                   sx={{
-                    borderRadius: '12px',
-                    '& .MuiOutlinedInput-notchedOutline': {
-                      borderRadius: '12px',
-                    },
+                    mt: 2,
+                    pt: 2,
+                    borderTop: '1px solid rgba(0,0,0,0.08)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 2,
+                    flexWrap: 'wrap',
                   }}
                 >
-                  {leagues.map((league) => (
-                    <MenuItem key={league.id} value={league.id}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Stadium sx={{ fontSize: 18, color: colors.brandRed }} />
-                        {league.name}
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                    <Box sx={{ px: 1.5, py: 0.5, borderRadius: '10px', backgroundColor: '#F5F5F5' }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack }}>
+                        {leagues.length.toLocaleString()} / {leaguesTotal.toLocaleString()} leagues
+                      </Typography>
+                    </Box>
+                    {leaguesTotal > 0 && (
+                      <Box sx={{ width: 80, height: 6, borderRadius: 3, backgroundColor: '#E5E7EB', overflow: 'hidden' }}>
+                        <Box
+                          sx={{
+                            width: `${Math.min(100, (leagues.length / leaguesTotal) * 100)}%`,
+                            height: '100%',
+                            borderRadius: 3,
+                            background: `linear-gradient(90deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
+                            transition: 'width 0.25s ease',
+                          }}
+                        />
                       </Box>
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+                    )}
+                  </Box>
+                  {leaguesPage < leaguesTotalPages && (
+                    <Button
+                      size="small"
+                      variant="text"
+                      endIcon={leaguesLoadingMore ? null : <ExpandMore />}
+                      onClick={loadMoreLeagues}
+                      disabled={leaguesLoadingMore}
+                      sx={{
+                        textTransform: 'none',
+                        fontWeight: 600,
+                        color: colors.brandRed,
+                        '&:hover': { backgroundColor: `${colors.brandRed}0C` },
+                      }}
+                    >
+                      {leaguesLoadingMore ? 'Loading…' : 'Load more leagues'}
+                    </Button>
+                  )}
+                </Box>
+              )}
             </Grid>
+            )}
+            </> )}
           </Grid>
         </Card>
 
