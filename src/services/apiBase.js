@@ -3,8 +3,8 @@
  * Common functions for all API calls including error handling, token management, and request handling
  */
 
-// Local backend: same directory (cebee-backend-api) runs on port 3001 by default (see server.js PORT)
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
+// Live backend (Vercel). For local dev set REACT_APP_API_URL=http://localhost:3001/api
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://cebee-backend-api-alpha.vercel.app/api';
 
 /**
  * Get authentication token from localStorage
