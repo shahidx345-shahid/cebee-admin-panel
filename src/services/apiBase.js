@@ -4,7 +4,24 @@
  */
 
 // Local backend. For live use set REACT_APP_API_URL=https://api.cebeepredict.com in .env
-const API_BASE_URL = (process.env.REACT_APP_API_URL || 'http://localhost:3001') + '/api';
+// Robust URL builder: Ensures exactly one '/api' at the end
+const getBaseUrl = () => {
+  // If we are on Vercel (or any production environment), use the relative path 
+  // to engage the Vercel Rewrite Proxy. This solves all CORS issues.
+  if (process.env.NODE_ENV === 'production' && !process.env.REACT_APP_DISABLE_PROXY) {
+    return '/api';
+  }
+
+  const envUrl = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+
+  // 1. Remove any trailing slashes
+  // 2. Remove any trailing '/api' 
+  // 3. Add back exactly one '/api'
+  const normalizedUrl = envUrl.replace(/\/+$/, '').replace(/\/api$/, '');
+  return `${normalizedUrl}/api`;
+};
+
+const API_BASE_URL = getBaseUrl();
 
 /**
  * Get authentication token from localStorage
@@ -72,7 +89,7 @@ export const getStoredSession = () => {
  */
 export const apiRequest = async (endpoint, options = {}) => {
   const token = getAuthToken();
-  
+
   const defaultHeaders = {
     'Content-Type': 'application/json',
   };
@@ -97,11 +114,11 @@ export const apiRequest = async (endpoint, options = {}) => {
 
   try {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
-    
+
     // Handle non-JSON responses
     const contentType = response.headers.get('content-type');
     const isJson = contentType && contentType.includes('application/json');
-    
+
     let data;
     if (isJson) {
       data = await response.json();
@@ -142,12 +159,12 @@ export const apiRequest = async (endpoint, options = {}) => {
         errorData: data,
         errorDataString: typeof data === 'string' ? data : JSON.stringify(data, null, 2),
       });
-      
-      const errorMessage = data?.message || 
-                          data?.error?.message || 
-                          data?.error || 
-                          `Request failed with status ${response.status}`;
-      
+
+      const errorMessage = data?.message ||
+        data?.error?.message ||
+        data?.error ||
+        `Request failed with status ${response.status}`;
+
       return {
         success: false,
         error: errorMessage,
@@ -161,7 +178,7 @@ export const apiRequest = async (endpoint, options = {}) => {
     // Backend might return: { success: true, data: {...} }
     // OR: { data: {...} } directly
     const responseData = data && data.data ? data.data : data;
-    
+
     return {
       success: true,
       data: responseData,
