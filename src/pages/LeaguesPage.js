@@ -78,7 +78,7 @@ const LeaguesPage = () => {
         search: searchQuery || undefined,
         type: typeFilter !== 'all' ? typeFilter : undefined,
         ...(selectedSort && { sort: mapSortToBackend(selectedSort) }),
-        includeInactive: true, // League Management: show all leagues so admin can activate/deactivate
+        skipSync: true, // Only fetch leagues set as "Use" (from API Sync); no Football API sync. Toggle Active/Inactive here.
       };
 
       // Remove undefined values
@@ -514,7 +514,7 @@ const LeaguesPage = () => {
                 fontSize: 13,
               }}
             >
-              Manage football leagues and competitions (Max 5 active)
+              Manage leagues and competitions (Max 5 active)
             </Typography>
           </Box>
         </Box>
@@ -529,6 +529,7 @@ const LeaguesPage = () => {
             placeholder="Search leagues..."
           />
         </Box>
+        {/* Add League button - commented out
         <Button
           variant="contained"
           startIcon={<Add />}
@@ -544,6 +545,7 @@ const LeaguesPage = () => {
         >
           Add League
         </Button>
+        */}
       </Box>
 
       {/* Filter Chips */}

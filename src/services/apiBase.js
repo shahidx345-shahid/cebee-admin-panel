@@ -3,8 +3,8 @@
  * Common functions for all API calls including error handling, token management, and request handling
  */
 
-// Live backend. For local dev set REACT_APP_API_URL=http://localhost:3001 in .env
-const API_BASE_URL = (process.env.REACT_APP_API_URL || 'https://api.cebeepredict.com') + '/api';
+// Local backend. For live use set REACT_APP_API_URL=https://api.cebeepredict.com in .env
+const API_BASE_URL = (process.env.REACT_APP_API_URL || 'http://localhost:3001') + '/api';
 
 /**
  * Get authentication token from localStorage

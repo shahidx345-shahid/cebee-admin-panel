@@ -86,7 +86,7 @@ const PollFormPage = () => {
 
   const loadLeagues = async () => {
     try {
-      const result = await getLeagues({ page: 1, limit: LEAGUES_PAGE_SIZE });
+      const result = await getLeagues({ page: 1, limit: LEAGUES_PAGE_SIZE, skipSync: true });
       if (result.success && result.data) {
         const formattedLeagues = (result.data.leagues || []).map(league => ({
           // Prefer Football API league id so backend receives API id (resolveLeague accepts it)
@@ -118,7 +118,7 @@ const PollFormPage = () => {
     setLeaguesLoadingMore(true);
     try {
       const nextPage = leaguesPage + 1;
-      const result = await getLeagues({ page: nextPage, limit: LEAGUES_PAGE_SIZE });
+      const result = await getLeagues({ page: nextPage, limit: LEAGUES_PAGE_SIZE, skipSync: true });
       if (result.success && result.data?.leagues?.length) {
         const formatted = (result.data.leagues || []).map(league => ({
           id: league.apiLeagueId != null ? String(league.apiLeagueId) : (league._id ?? league.league_id),

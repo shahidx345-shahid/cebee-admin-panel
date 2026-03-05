@@ -99,7 +99,7 @@ const TeamsPage = () => {
 
   const loadLeagues = async () => {
     try {
-      const result = await getLeagues({ page: 1, limit: LEAGUES_PAGE_SIZE });
+      const result = await getLeagues({ page: 1, limit: LEAGUES_PAGE_SIZE, skipSync: true });
       if (result.success && result.data) {
         const formattedLeagues = result.data.leagues?.map(league => ({
           id: league.apiLeagueId != null ? String(league.apiLeagueId) : (league._id || league.league_id),
@@ -132,7 +132,7 @@ const TeamsPage = () => {
     setLeaguesLoadingMore(true);
     try {
       const nextPage = leaguesPage + 1;
-      const result = await getLeagues({ page: nextPage, limit: LEAGUES_PAGE_SIZE });
+      const result = await getLeagues({ page: nextPage, limit: LEAGUES_PAGE_SIZE, skipSync: true });
       if (result.success && result.data?.leagues?.length) {
         const formatted = result.data.leagues.map(league => ({
           id: league.apiLeagueId != null ? String(league.apiLeagueId) : (league._id || league.league_id),
@@ -162,6 +162,7 @@ const TeamsPage = () => {
         search: searchQuery?.trim() || undefined, // Trim whitespace and only send if not empty
         league_id: selectedLeague !== 'all' ? selectedLeague : undefined,
         status: statusFilter !== 'all' ? statusFilter : undefined,
+        skipSync: true, // Team Management: DB only, only teams from Use leagues
       };
 
       // Remove undefined values
@@ -852,7 +853,7 @@ const TeamsPage = () => {
                 placeholder="Search teams by name or ID..."
               />
             </Box>
-            {/* Add Team button */}
+            {/* Add Team button - commented out
             <Box sx={{ alignSelf: 'flex-end' }}>
               <Button
                 variant="contained"
@@ -881,6 +882,7 @@ const TeamsPage = () => {
                 Add Team
               </Button>
             </Box>
+            */}
           </Box>
 
           {/* Leagues pagination strip */}
@@ -1162,6 +1164,7 @@ const TeamsPage = () => {
             <Typography sx={{ fontWeight: 600 }}>Inactivate Team</Typography>
           </MenuItem>
         )}
+        {/* Mark as Promoted - commented out
         {!teamsFromFootballApi && selectedTeam?.entry_type === 'Original' && selectedTeam?.status === 'Active' && (
           <MenuItem
             onClick={() => {
@@ -1182,6 +1185,8 @@ const TeamsPage = () => {
             <Typography sx={{ fontWeight: 600 }}>Mark as Promoted</Typography>
           </MenuItem>
         )}
+        */}
+        {/* Relegate Team - commented out
         {!teamsFromFootballApi && selectedTeam?.status === 'Active' && (
           <MenuItem
             onClick={() => {
@@ -1202,6 +1207,7 @@ const TeamsPage = () => {
             <Typography sx={{ fontWeight: 600 }}>Relegate Team</Typography>
           </MenuItem>
         )}
+        */}
         <MenuItem
           onClick={() => {
             navigate(`/teams/${selectedTeam.team_id || selectedTeam.id}/players`);
@@ -1219,6 +1225,7 @@ const TeamsPage = () => {
           <People sx={{ fontSize: 18, color: '#3B82F6', mr: 1.5 }} />
           <Typography sx={{ fontWeight: 600 }}>View Players</Typography>
         </MenuItem>
+        {/* View History - commented out
         {!teamsFromFootballApi && (
           <MenuItem
             onClick={() => {
@@ -1238,6 +1245,7 @@ const TeamsPage = () => {
             <Typography sx={{ fontWeight: 600 }}>View History</Typography>
           </MenuItem>
         )}
+        */}
       </Menu>
 
       {/* Add Team Dialog */}

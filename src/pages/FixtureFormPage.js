@@ -116,8 +116,8 @@ const FixtureFormPage = () => {
       try {
         setLoading(true);
 
-        // Fetch leagues (paginated – first page only on init)
-        const leaguesResult = await getLeagues({ page: 1, limit: LEAGUES_PAGE_SIZE });
+        // Fetch leagues (paginated – first page only on init; Use leagues from DB only, same as Team Management)
+        const leaguesResult = await getLeagues({ page: 1, limit: LEAGUES_PAGE_SIZE, skipSync: true });
         if (leaguesResult.success && leaguesResult.data) {
           const list = leaguesResult.data.leagues || [];
           const formattedLeagues = list.map(league => ({
@@ -275,7 +275,8 @@ const FixtureFormPage = () => {
           // For CeBee Featured: Show all teams from the league
           const teamsResult = await getTeams({ 
             league_id: formData.leagueId, 
-            status: 'Active' 
+            status: 'Active',
+            skipSync: true
           });
           
           if (teamsResult.success && teamsResult.data?.teams) {
@@ -462,7 +463,7 @@ const FixtureFormPage = () => {
     setLeaguesLoadingMore(true);
     try {
       const nextPage = leaguesPage + 1;
-      const result = await getLeagues({ page: nextPage, limit: LEAGUES_PAGE_SIZE });
+      const result = await getLeagues({ page: nextPage, limit: LEAGUES_PAGE_SIZE, skipSync: true });
       if (result.success && result.data?.leagues?.length) {
         const formatted = (result.data.leagues || []).map(league => ({
           id: league.apiLeagueId != null ? String(league.apiLeagueId) : (league._id || league.league_id),

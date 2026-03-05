@@ -21,6 +21,7 @@ import {
   Alert,
   Divider,
   CircularProgress,
+  Avatar,
 } from '@mui/material';
 import {
   Add,
@@ -150,6 +151,7 @@ const PlayersPage = () => {
           player_id: player.player_id || player._id,
           team_id: player.team_id?._id || player.team_id,
           player_name: player.player_name,
+          photo: player.photo || null,
           position: player.position,
           shirt_number: player.shirt_number,
           status: player.status || 'active',
@@ -524,7 +526,34 @@ const PlayersPage = () => {
     );
   };
 
+  const getInitials = (name) => {
+    if (!name || typeof name !== 'string') return '?';
+    const parts = name.trim().split(/\s+/);
+    if (parts.length >= 2) return `${parts[0][0] || ''}${parts[parts.length - 1][0] || ''}`.toUpperCase();
+    return (name[0] || '?').toUpperCase();
+  };
+
   const columns = [
+    {
+      id: 'photo',
+      label: 'Photo',
+      render: (_, row) => (
+        <Avatar
+          src={row.photo}
+          alt={row.player_name}
+          sx={{
+            width: 40,
+            height: 40,
+            bgcolor: row.photo ? 'transparent' : colors.brandRed,
+            color: colors.brandWhite,
+            fontSize: 14,
+            fontWeight: 600,
+          }}
+        >
+          {!row.photo ? getInitials(row.player_name) : null}
+        </Avatar>
+      ),
+    },
     {
       id: 'player_id',
       label: 'Player ID',
@@ -904,6 +933,7 @@ const PlayersPage = () => {
             <MenuItem value="inactive_permanent">Permanent Inactive</MenuItem>
           </Select>
         </FormControl>
+        {/* Add Player button - commented out
         {!playersFromFootballApi && (
           <Button
             variant="contained"
@@ -924,6 +954,7 @@ const PlayersPage = () => {
             Add Player
           </Button>
         )}
+        */}
       </Card>
 
       {/* Filter Chips */}
