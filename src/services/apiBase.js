@@ -4,14 +4,15 @@
  */
 
 // Local backend. For live use set REACT_APP_API_URL=https://api.cebeepredict.com in .env
-// Use the environment variable as is if it exists, otherwise use localhost
+// Robust URL builder: Ensures exactly one '/api' at the end
 const getBaseUrl = () => {
-  const envUrl = process.env.REACT_APP_API_URL;
-  if (envUrl) {
-    // If it already ends with /api, use it as is. Otherwise, append /api
-    return envUrl.endsWith('/api') ? envUrl : `${envUrl}/api`;
-  }
-  return 'http://localhost:3001/api';
+  const envUrl = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+
+  // 1. Remove any trailing slashes
+  // 2. Remove any trailing '/api' 
+  // 3. Add back exactly one '/api'
+  const normalizedUrl = envUrl.replace(/\/+$/, '').replace(/\/api$/, '');
+  return `${normalizedUrl}/api`;
 };
 
 const API_BASE_URL = getBaseUrl();
