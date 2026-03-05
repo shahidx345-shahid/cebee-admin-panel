@@ -4,7 +4,17 @@
  */
 
 // Local backend. For live use set REACT_APP_API_URL=https://api.cebeepredict.com in .env
-const API_BASE_URL = (process.env.REACT_APP_API_URL || 'http://localhost:3001') + '/api';
+// Use the environment variable as is if it exists, otherwise use localhost
+const getBaseUrl = () => {
+  const envUrl = process.env.REACT_APP_API_URL;
+  if (envUrl) {
+    // If it already ends with /api, use it as is. Otherwise, append /api
+    return envUrl.endsWith('/api') ? envUrl : `${envUrl}/api`;
+  }
+  return 'http://localhost:3001/api';
+};
+
+const API_BASE_URL = getBaseUrl();
 
 /**
  * Get authentication token from localStorage
@@ -72,7 +82,7 @@ export const getStoredSession = () => {
  */
 export const apiRequest = async (endpoint, options = {}) => {
   const token = getAuthToken();
-  
+
   const defaultHeaders = {
     'Content-Type': 'application/json',
   };
@@ -97,11 +107,11 @@ export const apiRequest = async (endpoint, options = {}) => {
 
   try {
     const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
-    
+
     // Handle non-JSON responses
     const contentType = response.headers.get('content-type');
     const isJson = contentType && contentType.includes('application/json');
-    
+
     let data;
     if (isJson) {
       data = await response.json();
@@ -142,12 +152,12 @@ export const apiRequest = async (endpoint, options = {}) => {
         errorData: data,
         errorDataString: typeof data === 'string' ? data : JSON.stringify(data, null, 2),
       });
-      
-      const errorMessage = data?.message || 
-                          data?.error?.message || 
-                          data?.error || 
-                          `Request failed with status ${response.status}`;
-      
+
+      const errorMessage = data?.message ||
+        data?.error?.message ||
+        data?.error ||
+        `Request failed with status ${response.status}`;
+
       return {
         success: false,
         error: errorMessage,
@@ -161,7 +171,7 @@ export const apiRequest = async (endpoint, options = {}) => {
     // Backend might return: { success: true, data: {...} }
     // OR: { data: {...} } directly
     const responseData = data && data.data ? data.data : data;
-    
+
     return {
       success: true,
       data: responseData,
