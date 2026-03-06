@@ -6,6 +6,11 @@
 // Live backend. For local dev set REACT_APP_API_URL=http://localhost:3001 in .env
 const API_BASE_URL = (process.env.REACT_APP_API_URL || 'https://api.cebeepredict.com/api').replace(/\/$/, '');
 
+// Log API URL in development for easier debugging
+if (process.env.NODE_ENV === 'development') {
+  console.log('API Base URL:', API_BASE_URL);
+}
+
 /**
  * Get authentication token from localStorage
  */
