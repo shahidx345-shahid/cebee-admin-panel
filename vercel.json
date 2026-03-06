@@ -7,8 +7,8 @@
   "framework": null,
   "rewrites": [
     {
-      "source": "/api/(.*)",
-      "destination": "https://api.cebeepredict.com/api/$1"
+      "source": "/api/:path*",
+      "destination": "https://api.cebeepredict.com/api/:path*"
     },
     {
       "source": "/(.*)",

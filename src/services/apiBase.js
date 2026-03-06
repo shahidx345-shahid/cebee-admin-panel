@@ -3,25 +3,8 @@
  * Common functions for all API calls including error handling, token management, and request handling
  */
 
-// Local backend. For live use set REACT_APP_API_URL=https://api.cebeepredict.com in .env
-// Robust URL builder: Ensures exactly one '/api' at the end
-const getBaseUrl = () => {
-  // If we are on Vercel (or any production environment), use the relative path 
-  // to engage the Vercel Rewrite Proxy. This solves all CORS issues.
-  if (process.env.NODE_ENV === 'production' && !process.env.REACT_APP_DISABLE_PROXY) {
-    return '/api';
-  }
-
-  const envUrl = process.env.REACT_APP_API_URL || 'http://localhost:3001';
-
-  // 1. Remove any trailing slashes
-  // 2. Remove any trailing '/api' 
-  // 3. Add back exactly one '/api'
-  const normalizedUrl = envUrl.replace(/\/+$/, '').replace(/\/api$/, '');
-  return `${normalizedUrl}/api`;
-};
-
-const API_BASE_URL = getBaseUrl();
+// Live backend. For local dev set REACT_APP_API_URL=http://localhost:3001 in .env
+const API_BASE_URL = (process.env.REACT_APP_API_URL || 'https://api.cebeepredict.com/api').replace(/\/$/, '');
 
 /**
  * Get authentication token from localStorage
