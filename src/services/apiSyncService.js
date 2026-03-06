@@ -85,6 +85,13 @@ export const syncLeagueFixturesFromApi = async (league, season, allSeasons = fal
   return res.success ? { success: true, message: res.message } : { success: false, error: res.error || res.message };
 };
 
+/** Single fixture detail by apiFixtureId (for Match Detail page). Optionally include events (goals, cards). */
+export const getFixtureDetail = async (apiFixtureId, includeEvents = true) => {
+  if (apiFixtureId == null) return { success: false, error: 'Fixture ID is required', data: null };
+  const res = await apiGet(`${BASE}/fixture/${apiFixtureId}`, includeEvents ? { events: '1' } : {});
+  return res.success ? { success: true, data: res.data } : { success: false, error: res.error, data: null };
+};
+
 /** Teams from database (fast). Use syncTeamsFromApi(league, season) to update from API in background. */
 export const getApiTeams = async (league, season) => {
   if (!league || !season) return { success: false, error: 'League ID and Season are required', data: [] };

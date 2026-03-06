@@ -34,7 +34,7 @@ import { getApiLeagues, syncLeaguesFromApi, setLeagueUse, setLeagueOrder } from 
 import { colors } from '../config/theme';
 import { constants } from '../config/theme';
 
-const ROWS_PER_PAGE_OPTIONS = [20, 50, 100, 150];
+const ROWS_PER_PAGE_OPTIONS = [10, 20, 50, 100, 150];
 const currentSeason = new Date().getFullYear();
 const SEARCH_DEBOUNCE_MS = 300;
 
@@ -53,7 +53,7 @@ export default function DataBrowserLeaguesPage() {
   const [editingOrderId, setEditingOrderId] = useState(null);
   const [orderInput, setOrderInput] = useState('');
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(20);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
   // Debounce search and reset to first page when query changes
   useEffect(() => {

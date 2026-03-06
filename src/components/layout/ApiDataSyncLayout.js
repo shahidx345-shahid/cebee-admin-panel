@@ -27,6 +27,9 @@ import { constants } from '../../config/theme';
 const SIDEBAR_WIDTH = 280;
 const currentSeason = new Date().getFullYear();
 
+/** Pinned league API IDs (order = display order at top of sidebar). */
+const PINNED_LEAGUE_IDS = [39, 140, 135, 78, 61, 88, 94, 203, 307, 253];
+
 function groupLeaguesByCountry(leagues) {
   const byCountry = {};
   (leagues || []).forEach((l) => {
@@ -50,7 +53,7 @@ export default function ApiDataSyncLayout() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    getApiLeagues()
+    getApiLeagues({ limit: 500 })
       .then((res) => {
         if (!cancelled && res.success && Array.isArray(res.data)) {
           setLeagues(res.data);
@@ -84,7 +87,9 @@ export default function ApiDataSyncLayout() {
           (l.country || '').toLowerCase().includes(searchTrim)
       )
     : leagues;
-  const groups = groupLeaguesByCountry(filteredLeagues);
+  const pinnedLeagues = PINNED_LEAGUE_IDS.map((id) => filteredLeagues.find((l) => Number(l.apiLeagueId) === id)).filter(Boolean);
+  const restLeagues = filteredLeagues.filter((l) => !PINNED_LEAGUE_IDS.includes(Number(l.apiLeagueId)));
+  const groups = groupLeaguesByCountry(restLeagues);
 
   // Sidebar only on league detail page; All leagues and Team page = full width
   if (!isLeagueDetail) {
@@ -148,6 +153,48 @@ export default function ApiDataSyncLayout() {
           </ListItemIcon>
           <ListItemText primary="All leagues" primaryTypographyProps={{ fontSize: 14 }} />
         </ListItemButton>
+        {pinnedLeagues.length > 0 && (
+          <>
+            <Box sx={{ px: 2, pt: 1.5, pb: 0.5 }}>
+              <Typography variant="caption" sx={{ fontWeight: 700, letterSpacing: 0.5, color: 'text.secondary' }}>
+                Top leagues
+              </Typography>
+            </Box>
+            <List component="div" disablePadding dense>
+              {pinnedLeagues.map((league) => {
+                const lid = league._id?.toString() || String(league.apiLeagueId ?? '');
+                const selected = currentLeagueId === lid;
+                return (
+                  <ListItemButton
+                    key={lid}
+                    selected={selected}
+                    onClick={() => navigate(`${constants.routes.apiSync}/league/${lid}`)}
+                    sx={{
+                      mx: 1,
+                      borderRadius: 1,
+                      py: 0.6,
+                      '&.Mui-selected': {
+                        bgcolor: `${colors.brandRed}18`,
+                        borderLeft: `3px solid ${colors.brandRed}`,
+                        '&:hover': { bgcolor: `${colors.brandRed}22` },
+                      },
+                    }}
+                  >
+                    {league.logo ? (
+                      <Box component="img" src={league.logo} alt="" sx={{ width: 22, height: 22, mr: 1.5, objectFit: 'contain' }} />
+                    ) : (
+                      <SportsSoccer sx={{ fontSize: 20, mr: 1.5, color: 'text.secondary' }} />
+                    )}
+                    <ListItemText
+                      primary={league.name_display || league.league_name || lid}
+                      primaryTypographyProps={{ fontSize: 13, noWrap: true }}
+                    />
+                  </ListItemButton>
+                );
+              })}
+            </List>
+          </>
+        )}
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
             <CircularProgress size={28} />

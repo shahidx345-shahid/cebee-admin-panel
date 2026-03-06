@@ -35,6 +35,7 @@ import RewardDetailsPage from './pages/RewardDetailsPage';
 import ApiDataSyncLayout from './components/layout/ApiDataSyncLayout';
 import DataBrowserLeaguesPage from './pages/DataBrowserLeaguesPage';
 import DataBrowserLeagueDetailPage from './pages/DataBrowserLeagueDetailPage';
+import DataBrowserFixtureDetailPage from './pages/DataBrowserFixtureDetailPage';
 import DataBrowserTeamPage from './pages/DataBrowserTeamPage';
 
 // Protected Route component
@@ -122,6 +123,7 @@ function App() {
                 <Route path={constants.routes.apiSync} element={<ApiDataSyncLayout />}>
                   <Route index element={<DataBrowserLeaguesPage />} />
                   <Route path="league/:id" element={<DataBrowserLeagueDetailPage />} />
+                  <Route path="league/:id/fixture/:fixtureId" element={<DataBrowserFixtureDetailPage />} />
                   <Route path="team/:id" element={<DataBrowserTeamPage />} />
                 </Route>
                 <Route path={constants.routes.settings} element={<SettingsPage />} />

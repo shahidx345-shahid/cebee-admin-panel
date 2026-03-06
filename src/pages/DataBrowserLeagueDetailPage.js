@@ -30,6 +30,9 @@ import {
   MenuItem,
   TextField,
   InputAdornment,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
 } from '@mui/material';
 import NavigateNext from '@mui/icons-material/NavigateNext';
 import Search from '@mui/icons-material/Search';
@@ -40,6 +43,8 @@ import Event from '@mui/icons-material/Event';
 import EmojiEvents from '@mui/icons-material/EmojiEvents';
 import Info from '@mui/icons-material/Info';
 import CheckCircle from '@mui/icons-material/CheckCircle';
+import ExpandMore from '@mui/icons-material/ExpandMore';
+import CalendarToday from '@mui/icons-material/CalendarToday';
 import {
   getLeagueDetail,
   getTeamsByLeagueId,
@@ -99,6 +104,53 @@ function matchesSearch(str, q) {
   return s.includes(qq) || qq.includes(s);
 }
 
+function formatKickoffShort(dateStr) {
+  if (!dateStr) return '—';
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return '—';
+  const date = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+  return `${date} • ${time}`;
+}
+
+/** Date key (YYYY-MM-DD) for grouping fixtures/results by day. */
+function getFixtureDateKey(f) {
+  const dateStr = (f.fixture && f.fixture.date) || f.date || f.kickoffTime;
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toISOString().slice(0, 10);
+}
+
+/** Format date key for display (e.g. "Mon, 14 Mar 2026"). */
+function formatDateKeyLabel(dateKey) {
+  if (!dateKey) return '—';
+  const d = new Date(dateKey + 'T12:00:00');
+  if (Number.isNaN(d.getTime())) return dateKey;
+  return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+/** Group list of fixtures by date key. Returns object { [dateKey]: [fixtures] } with keys sorted (asc for fixtures, desc for results). */
+function groupFixturesByDate(list, sortNewestFirst = false) {
+  const byDate = {};
+  list.forEach((f) => {
+    const key = getFixtureDateKey(f) || 'unknown';
+    if (!byDate[key]) byDate[key] = [];
+    byDate[key].push(f);
+  });
+  const keys = Object.keys(byDate).filter(Boolean).sort();
+  if (sortNewestFirst) keys.reverse();
+  return { byDate, dateKeys: keys };
+}
+
+/** Resolve team logo from teams list by name (fallback when fixture has no logo). */
+function getTeamLogoFromList(teamsList, teamName) {
+  if (!Array.isArray(teamsList) || !teamName) return null;
+  const name = String(teamName).trim().toLowerCase();
+  const t = teamsList.find((x) => (String(x.team_name ?? x.name ?? '').trim().toLowerCase() === name));
+  return t?.logo || null;
+}
+
 export default function DataBrowserLeagueDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -135,6 +187,9 @@ export default function DataBrowserLeagueDetailPage() {
   const [rowsPerPageResults, setRowsPerPageResults] = useState(25);
   const [pageStandings, setPageStandings] = useState(0);
   const [rowsPerPageStandings, setRowsPerPageStandings] = useState(25);
+  // Date-group expand/collapse: array of date keys (YYYY-MM-DD) that are expanded
+  const [expandedFixtures, setExpandedFixtures] = useState([]);
+  const [expandedResults, setExpandedResults] = useState([]);
 
   const leagueId = detail?.league?._id;
   const apiLeagueId = detail?.league?.apiLeagueId;
@@ -223,9 +278,23 @@ export default function DataBrowserLeagueDetailPage() {
   });
 
   const teamsDisplay = teamsSorted.slice(pageTeams * rowsPerPageTeams, pageTeams * rowsPerPageTeams + rowsPerPageTeams);
-  const fixturesDisplay = fixturesOnlySorted.slice(pageFixtures * rowsPerPageFixtures, pageFixtures * rowsPerPageFixtures + rowsPerPageFixtures);
-  const resultsDisplay = resultsOnlySorted.slice(pageResults * rowsPerPageResults, pageResults * rowsPerPageResults + rowsPerPageResults);
+  const fixturesGrouped = groupFixturesByDate(fixturesOnlySorted, false);
+  const resultsGrouped = groupFixturesByDate(resultsOnlySorted, true);
   const standingsDisplay = standingsSorted.slice(pageStandings * rowsPerPageStandings, pageStandings * rowsPerPageStandings + rowsPerPageStandings);
+
+  // Default-expand all date groups when data changes (add new keys, keep user toggles)
+  const fixtureDateKeysStr = fixturesGrouped.dateKeys.join(',');
+  const resultDateKeysStr = resultsGrouped.dateKeys.join(',');
+  useEffect(() => {
+    if (fixturesGrouped.dateKeys.length) {
+      setExpandedFixtures(prev => { const next = new Set(prev); fixturesGrouped.dateKeys.forEach(k => next.add(k)); return Array.from(next); });
+    }
+  }, [fixtureDateKeysStr]);
+  useEffect(() => {
+    if (resultsGrouped.dateKeys.length) {
+      setExpandedResults(prev => { const next = new Set(prev); resultsGrouped.dateKeys.forEach(k => next.add(k)); return Array.from(next); });
+    }
+  }, [resultDateKeysStr]);
 
   const handleChangePageTeams = (_, newPage) => setPageTeams(newPage);
   const handleChangeRowsPerPageTeams = (e) => { setRowsPerPageTeams(parseInt(e.target.value, 10)); setPageTeams(0); };
@@ -233,6 +302,16 @@ export default function DataBrowserLeagueDetailPage() {
   const handleChangeRowsPerPageFixtures = (e) => { setRowsPerPageFixtures(parseInt(e.target.value, 10)); setPageFixtures(0); };
   const handleChangePageResults = (_, newPage) => setPageResults(newPage);
   const handleChangeRowsPerPageResults = (e) => { setRowsPerPageResults(parseInt(e.target.value, 10)); setPageResults(0); };
+  const handleFixtureAccordionChange = (dateKey) => (_, isExpanded) => {
+    setExpandedFixtures(prev => isExpanded ? (prev.includes(dateKey) ? prev : [...prev, dateKey]) : prev.filter(k => k !== dateKey));
+  };
+  const handleResultAccordionChange = (dateKey) => (_, isExpanded) => {
+    setExpandedResults(prev => isExpanded ? (prev.includes(dateKey) ? prev : [...prev, dateKey]) : prev.filter(k => k !== dateKey));
+  };
+  const expandAllFixtures = () => setExpandedFixtures([...fixturesGrouped.dateKeys]);
+  const collapseAllFixtures = () => setExpandedFixtures([]);
+  const expandAllResults = () => setExpandedResults([...resultsGrouped.dateKeys]);
+  const collapseAllResults = () => setExpandedResults([]);
   const handleChangePageStandings = (_, newPage) => setPageStandings(newPage);
   const handleChangeRowsPerPageStandings = (e) => { setRowsPerPageStandings(parseInt(e.target.value, 10)); setPageStandings(0); };
 
@@ -255,9 +334,10 @@ export default function DataBrowserLeagueDetailPage() {
     return () => { cancelled = true; };
   }, [id]);
 
-  // Teams: fetch "all" seasons once; season filter applied in UI for instant switch.
+  // Teams: fetch when Teams tab OR when Fixtures/Results (so we can use team logos as fallback).
   useEffect(() => {
-    if (tab !== TAB_TEAMS || !leagueId) return;
+    if (!leagueId) return;
+    if (tab !== TAB_TEAMS && tab !== TAB_FIXTURES && tab !== TAB_RESULTS) return;
     let cancelled = false;
     setTeamsLoading(true);
     getTeamsByLeagueId(leagueId, 'all')
@@ -691,56 +771,77 @@ export default function DataBrowserLeagueDetailPage() {
           ) : fixturesOnlyFiltered.length === 0 ? (
             <Box sx={{ py: 6, textAlign: 'center' }}><Event sx={{ fontSize: 56, color: 'grey.300', mb: 1.5 }} /><Typography variant="body2" color="text.secondary" fontWeight={500}>No fixtures match your filters. Try a different search or status.</Typography></Box>
           ) : (
-            <TableContainer component={Paper} elevation={0} sx={{ border: 'none' }}>
-              <Table size="medium" sx={{ '& .MuiTableCell-root': { py: 1.5 } }}>
-                <TableHead>
-                  <TableRow sx={{ bgcolor: 'grey.100' }}>
-                    {isAllSeasons && <TableCell sx={{ fontWeight: 700, fontSize: '0.8125rem', color: 'grey.700', borderColor: 'divider' }}>Season</TableCell>}
-                    <TableCell sx={{ fontWeight: 700, fontSize: '0.8125rem', color: 'grey.700', borderColor: 'divider' }}>Date</TableCell>
-                    <TableCell sx={{ fontWeight: 700, fontSize: '0.8125rem', color: 'grey.700', borderColor: 'divider' }}>Home</TableCell>
-                    <TableCell sx={{ fontWeight: 700, fontSize: '0.8125rem', color: 'grey.700', borderColor: 'divider' }}>Away</TableCell>
-                    <TableCell sx={{ fontWeight: 700, fontSize: '0.8125rem', color: 'grey.700', borderColor: 'divider' }}>Score</TableCell>
-                    <TableCell sx={{ fontWeight: 700, fontSize: '0.8125rem', color: 'grey.700', borderColor: 'divider' }}>Status</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {fixturesDisplay.map((f, idx) => {
-                    const fixture = f.fixture || f;
-                    const teamsObj = f.teams || {};
-                    const home = teamsObj.home?.name ?? f.homeTeam;
-                    const away = teamsObj.away?.name ?? f.awayTeam;
-                    const goals = f.goals || {};
-                    const score = goals.home != null && goals.away != null ? `${goals.home}-${goals.away}` : '–';
-                    const date = fixture.date ? new Date(fixture.date).toLocaleDateString() : '—';
-                    const st = fixture.status?.short ?? f.status ?? f.matchStatus;
-                    const year = f.season ?? (fixture.date ? new Date(fixture.date).getFullYear() : null);
-                    return (
-                      <TableRow key={f.fixture?.id ?? idx} sx={{ '&:nth-of-type(even)': { bgcolor: 'grey.50' } }}>
-                        {isAllSeasons && <TableCell sx={{ fontSize: '0.875rem', borderColor: 'divider' }}>{year ?? '—'}</TableCell>}
-                        <TableCell sx={{ fontSize: '0.875rem', borderColor: 'divider' }}>{date}</TableCell>
-                        <TableCell sx={{ fontWeight: 600, color: 'grey.900', borderColor: 'divider' }}>{home || '—'}</TableCell>
-                        <TableCell sx={{ fontWeight: 600, color: 'grey.900', borderColor: 'divider' }}>{away || '—'}</TableCell>
-                        <TableCell sx={{ fontWeight: 700, borderColor: 'divider' }}>{score}</TableCell>
-                        <TableCell sx={{ fontSize: '0.875rem', color: 'text.secondary', borderColor: 'divider' }}>{statusShort(st)}</TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-              <TablePagination
-                component="div"
-                count={fixturesOnlyFiltered.length}
-                page={pageFixtures}
-                onPageChange={handleChangePageFixtures}
-                rowsPerPage={rowsPerPageFixtures}
-                onRowsPerPageChange={handleChangeRowsPerPageFixtures}
-                rowsPerPageOptions={ROWS_PER_PAGE_OPTIONS}
-                labelRowsPerPage="Rows per page:"
-                showFirstButton
-                showLastButton
-                sx={{ borderTop: 1, borderColor: 'divider', fontWeight: 500 }}
-              />
-            </TableContainer>
+            <>
+              <Box sx={{ px: { xs: 1, sm: 2 }, py: 1, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                <Button size="small" variant="outlined" onClick={expandAllFixtures}>Expand all</Button>
+                <Button size="small" variant="outlined" onClick={collapseAllFixtures}>Collapse all</Button>
+              </Box>
+              <Box sx={{ display: 'flex', flexDirection: 'column', px: { xs: 2, sm: 3 }, pb: 2 }}>
+                {fixturesGrouped.dateKeys.map((dateKey) => {
+                  const list = fixturesGrouped.byDate[dateKey] || [];
+                  const expanded = expandedFixtures.includes(dateKey);
+                  return (
+                    <Accordion
+                      key={dateKey}
+                      expanded={expanded}
+                      onChange={handleFixtureAccordionChange(dateKey)}
+                      elevation={0}
+                      sx={{ border: `1px solid ${colors.divider}`, borderRadius: '0 !important', '&:first-of-type': { borderTopLeftRadius: 8, borderTopRightRadius: 8 }, '&:last-of-type': { borderBottomLeftRadius: 8, borderBottomRightRadius: 8 }, '&:before': { display: 'none' }, '&.Mui-expanded': { margin: 0 } }}
+                    >
+                      <AccordionSummary expandIcon={<ExpandMore />} sx={{ bgcolor: 'grey.50', minHeight: 48, '& .MuiAccordionSummary-content': { alignItems: 'center', gap: 1 } }}>
+                        <CalendarToday sx={{ fontSize: 20, color: 'grey.600' }} />
+                        <Typography variant="subtitle2" fontWeight={700} sx={{ color: 'grey.800' }}>{formatDateKeyLabel(dateKey)}</Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>({list.length} {list.length === 1 ? 'match' : 'matches'})</Typography>
+                      </AccordionSummary>
+                      <AccordionDetails sx={{ pt: 0, pb: 1.5, px: 0 }}>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                          {list.map((f, idx) => {
+                            const fixture = f.fixture || f;
+                            const teamsObj = f.teams || {};
+                            const homeName = teamsObj.home?.name ?? f.homeTeam ?? '—';
+                            const awayName = teamsObj.away?.name ?? f.awayTeam ?? '—';
+                            const homeLogo = teamsObj.home?.logo ?? f.homeLogo ?? getTeamLogoFromList(teams, homeName);
+                            const awayLogo = teamsObj.away?.logo ?? f.awayLogo ?? getTeamLogoFromList(teams, awayName);
+                            const st = fixture.status?.short ?? f.status ?? f.matchStatus;
+                            const apiFixtureId = f.fixture?.id ?? f.apiFixtureId;
+                            const kickoff = formatKickoffShort(fixture.date);
+                            return (
+                              <Paper
+                                key={f.fixture?.id ?? idx}
+                                elevation={0}
+                                onClick={(e) => { e.stopPropagation(); apiFixtureId && navigate(`${constants.routes.apiSync}/league/${id}/fixture/${apiFixtureId}`); }}
+                                sx={{
+                                  p: 1.5,
+                                  border: `1px solid ${colors.divider}`,
+                                  borderRadius: 2,
+                                  cursor: apiFixtureId ? 'pointer' : 'default',
+                                  '&:hover': apiFixtureId ? { bgcolor: 'grey.50', borderColor: colors.brandRed } : {},
+                                  transition: 'background-color 0.2s, border-color 0.2s',
+                                }}
+                              >
+                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1.5 }}>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0, flex: '1 1 200px' }}>
+                                    {homeLogo ? <Box component="img" src={homeLogo} alt="" referrerPolicy="no-referrer" sx={{ width: 36, height: 36, objectFit: 'contain', flexShrink: 0 }} /> : <SportsSoccer sx={{ color: 'grey.300', fontSize: 36, flexShrink: 0 }} />}
+                                    <Typography variant="body2" fontWeight={600} noWrap>{homeName}</Typography>
+                                    <Typography variant="body2" color="text.secondary" sx={{ flexShrink: 0 }}>vs</Typography>
+                                    <Typography variant="body2" fontWeight={600} noWrap>{awayName}</Typography>
+                                    {awayLogo ? <Box component="img" src={awayLogo} alt="" referrerPolicy="no-referrer" sx={{ width: 36, height: 36, objectFit: 'contain', flexShrink: 0 }} /> : <SportsSoccer sx={{ color: 'grey.300', fontSize: 36, flexShrink: 0 }} />}
+                                  </Box>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexShrink: 0 }}>
+                                    <Typography variant="caption" color="text.secondary">{kickoff}</Typography>
+                                    <Typography variant="caption" fontWeight={700} sx={{ color: colors.brandRed, px: 1.5, py: 0.5, borderRadius: 1, bgcolor: 'grey.100' }}>{statusShort(st)}</Typography>
+                                  </Box>
+                                </Box>
+                              </Paper>
+                            );
+                          })}
+                        </Box>
+                      </AccordionDetails>
+                    </Accordion>
+                  );
+                })}
+              </Box>
+            </>
           )}
         </Box>
       )}
@@ -808,56 +909,80 @@ export default function DataBrowserLeagueDetailPage() {
           ) : resultsOnlyFiltered.length === 0 ? (
             <Box sx={{ py: 6, textAlign: 'center' }}><CheckCircle sx={{ fontSize: 56, color: 'grey.300', mb: 1.5 }} /><Typography variant="body2" color="text.secondary" fontWeight={500}>No results match your filters. Try a different search or date range.</Typography></Box>
           ) : (
-            <TableContainer component={Paper} elevation={0} sx={{ border: 'none' }}>
-              <Table size="medium" sx={{ '& .MuiTableCell-root': { py: 1.5 } }}>
-                <TableHead>
-                  <TableRow sx={{ bgcolor: 'grey.100' }}>
-                    {isAllSeasons && <TableCell sx={{ fontWeight: 700, fontSize: '0.8125rem', color: 'grey.700', borderColor: 'divider' }}>Season</TableCell>}
-                    <TableCell sx={{ fontWeight: 700, fontSize: '0.8125rem', color: 'grey.700', borderColor: 'divider' }}>Date</TableCell>
-                    <TableCell sx={{ fontWeight: 700, fontSize: '0.8125rem', color: 'grey.700', borderColor: 'divider' }}>Home</TableCell>
-                    <TableCell sx={{ fontWeight: 700, fontSize: '0.8125rem', color: 'grey.700', borderColor: 'divider' }}>Away</TableCell>
-                    <TableCell sx={{ fontWeight: 700, fontSize: '0.8125rem', color: 'grey.700', borderColor: 'divider' }}>Score</TableCell>
-                    <TableCell sx={{ fontWeight: 700, fontSize: '0.8125rem', color: 'grey.700', borderColor: 'divider' }}>Status</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {resultsDisplay.map((f, idx) => {
-                    const fixture = f.fixture || f;
-                    const teamsObj = f.teams || {};
-                    const home = teamsObj.home?.name ?? f.homeTeam;
-                    const away = teamsObj.away?.name ?? f.awayTeam;
-                    const goals = f.goals || {};
-                    const score = goals.home != null && goals.away != null ? `${goals.home}-${goals.away}` : '–';
-                    const date = fixture.date ? new Date(fixture.date).toLocaleDateString() : '—';
-                    const st = fixture.status?.short ?? f.status ?? f.matchStatus;
-                    const year = f.season ?? (fixture.date ? new Date(fixture.date).getFullYear() : null);
-                    return (
-                      <TableRow key={f.fixture?.id ?? idx} sx={{ '&:nth-of-type(even)': { bgcolor: 'grey.50' } }}>
-                        {isAllSeasons && <TableCell sx={{ fontSize: '0.875rem', borderColor: 'divider' }}>{year ?? '—'}</TableCell>}
-                        <TableCell sx={{ fontSize: '0.875rem', borderColor: 'divider' }}>{date}</TableCell>
-                        <TableCell sx={{ fontWeight: 600, color: 'grey.900', borderColor: 'divider' }}>{home || '—'}</TableCell>
-                        <TableCell sx={{ fontWeight: 600, color: 'grey.900', borderColor: 'divider' }}>{away || '—'}</TableCell>
-                        <TableCell sx={{ fontWeight: 700, borderColor: 'divider' }}>{score}</TableCell>
-                        <TableCell sx={{ fontSize: '0.875rem', color: 'text.secondary', borderColor: 'divider' }}>{statusShort(st)}</TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-              <TablePagination
-                component="div"
-                count={resultsOnlyFiltered.length}
-                page={pageResults}
-                onPageChange={handleChangePageResults}
-                rowsPerPage={rowsPerPageResults}
-                onRowsPerPageChange={handleChangeRowsPerPageResults}
-                rowsPerPageOptions={ROWS_PER_PAGE_OPTIONS}
-                labelRowsPerPage="Rows per page:"
-                showFirstButton
-                showLastButton
-                sx={{ borderTop: 1, borderColor: 'divider', fontWeight: 500 }}
-              />
-            </TableContainer>
+            <>
+              <Box sx={{ px: { xs: 1, sm: 2 }, py: 1, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                <Button size="small" variant="outlined" onClick={expandAllResults}>Expand all</Button>
+                <Button size="small" variant="outlined" onClick={collapseAllResults}>Collapse all</Button>
+              </Box>
+              <Box sx={{ display: 'flex', flexDirection: 'column', px: { xs: 2, sm: 3 }, pb: 2 }}>
+                {resultsGrouped.dateKeys.map((dateKey) => {
+                  const list = resultsGrouped.byDate[dateKey] || [];
+                  const expanded = expandedResults.includes(dateKey);
+                  return (
+                    <Accordion
+                      key={dateKey}
+                      expanded={expanded}
+                      onChange={handleResultAccordionChange(dateKey)}
+                      elevation={0}
+                      sx={{ border: `1px solid ${colors.divider}`, borderRadius: '0 !important', '&:first-of-type': { borderTopLeftRadius: 8, borderTopRightRadius: 8 }, '&:last-of-type': { borderBottomLeftRadius: 8, borderBottomRightRadius: 8 }, '&:before': { display: 'none' }, '&.Mui-expanded': { margin: 0 } }}
+                    >
+                      <AccordionSummary expandIcon={<ExpandMore />} sx={{ bgcolor: 'grey.50', minHeight: 48, '& .MuiAccordionSummary-content': { alignItems: 'center', gap: 1 } }}>
+                        <CalendarToday sx={{ fontSize: 20, color: 'grey.600' }} />
+                        <Typography variant="subtitle2" fontWeight={700} sx={{ color: 'grey.800' }}>{formatDateKeyLabel(dateKey)}</Typography>
+                        <Typography variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>({list.length} {list.length === 1 ? 'result' : 'results'})</Typography>
+                      </AccordionSummary>
+                      <AccordionDetails sx={{ pt: 0, pb: 1.5, px: 0 }}>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                          {list.map((f, idx) => {
+                            const fixture = f.fixture || f;
+                            const teamsObj = f.teams || {};
+                            const homeName = teamsObj.home?.name ?? f.homeTeam ?? '—';
+                            const awayName = teamsObj.away?.name ?? f.awayTeam ?? '—';
+                            const homeLogo = teamsObj.home?.logo ?? f.homeLogo ?? getTeamLogoFromList(teams, homeName);
+                            const awayLogo = teamsObj.away?.logo ?? f.awayLogo ?? getTeamLogoFromList(teams, awayName);
+                            const goals = f.goals || {};
+                            const scoreHome = goals.home ?? '0';
+                            const scoreAway = goals.away ?? '0';
+                            const st = fixture.status?.short ?? f.status ?? f.matchStatus;
+                            const apiFixtureId = f.fixture?.id ?? f.apiFixtureId;
+                            const kickoff = formatKickoffShort(fixture.date);
+                            return (
+                              <Paper
+                                key={f.fixture?.id ?? idx}
+                                elevation={0}
+                                onClick={(e) => { e.stopPropagation(); apiFixtureId && navigate(`${constants.routes.apiSync}/league/${id}/fixture/${apiFixtureId}`); }}
+                                sx={{
+                                  p: 1.5,
+                                  border: `1px solid ${colors.divider}`,
+                                  borderRadius: 2,
+                                  cursor: apiFixtureId ? 'pointer' : 'default',
+                                  '&:hover': apiFixtureId ? { bgcolor: 'grey.50', borderColor: colors.brandRed } : {},
+                                  transition: 'background-color 0.2s, border-color 0.2s',
+                                }}
+                              >
+                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1.5 }}>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0, flex: '1 1 200px' }}>
+                                    {homeLogo ? <Box component="img" src={homeLogo} alt="" referrerPolicy="no-referrer" sx={{ width: 36, height: 36, objectFit: 'contain', flexShrink: 0 }} /> : <SportsSoccer sx={{ color: 'grey.300', fontSize: 36, flexShrink: 0 }} />}
+                                    <Typography variant="body2" fontWeight={600} noWrap>{homeName}</Typography>
+                                    <Typography variant="body2" fontWeight={700} sx={{ color: colors.brandRed, flexShrink: 0 }}>{scoreHome} — {scoreAway}</Typography>
+                                    <Typography variant="body2" fontWeight={600} noWrap>{awayName}</Typography>
+                                    {awayLogo ? <Box component="img" src={awayLogo} alt="" referrerPolicy="no-referrer" sx={{ width: 36, height: 36, objectFit: 'contain', flexShrink: 0 }} /> : <SportsSoccer sx={{ color: 'grey.300', fontSize: 36, flexShrink: 0 }} />}
+                                  </Box>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexShrink: 0 }}>
+                                    <Typography variant="caption" color="text.secondary">{kickoff}</Typography>
+                                    <Typography variant="caption" fontWeight={700} sx={{ color: colors.brandRed, px: 1.5, py: 0.5, borderRadius: 1, bgcolor: 'grey.100' }}>{statusShort(st)}</Typography>
+                                  </Box>
+                                </Box>
+                              </Paper>
+                            );
+                          })}
+                        </Box>
+                      </AccordionDetails>
+                    </Accordion>
+                  );
+                })}
+              </Box>
+            </>
           )}
         </Box>
       )}

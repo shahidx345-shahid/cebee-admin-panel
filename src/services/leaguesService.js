@@ -104,6 +104,23 @@ export const createLeague = async (leagueData) => {
 };
 
 /**
+ * Normalize league priorities so each "Use" league has a unique priority (1, 2, 3, ...).
+ * Call when duplicate priorities are detected. Admin only.
+ * @returns {Promise<{success: boolean, data?: { leagues: array }, error?: string}>}
+ */
+export const normalizeLeaguePriorities = async () => {
+  try {
+    const response = await apiPost('/leagues/normalize-priorities');
+    if (response.success) {
+      return { success: true, data: response.data, message: response.message };
+    }
+    return { success: false, error: response.error || response.message };
+  } catch (error) {
+    return { success: false, error: error.message || 'Failed to normalize priorities' };
+  }
+};
+
+/**
  * Update league
  * @param {string} leagueId - League ID
  * @param {object} leagueData - Updated league data

@@ -16,6 +16,7 @@ import {
   Menu,
   ListItemText,
   Alert,
+  TextField,
 } from '@mui/material';
 import {
   Add,
@@ -40,7 +41,8 @@ import { format } from 'date-fns';
 import { 
   getLeagues, 
   updateLeague, 
-  deactivateLeague 
+  deactivateLeague,
+  normalizeLeaguePriorities,
 } from '../services/leaguesService';
 
 const LeaguesPage = () => {
@@ -59,6 +61,9 @@ const LeaguesPage = () => {
   const [dateFilterAnchor, setDateFilterAnchor] = useState(null);
   const [typeFilterAnchor, setTypeFilterAnchor] = useState(null);
   const [error, setError] = useState('');
+  const [prioritySavingId, setPrioritySavingId] = useState(null);
+  /** Priority value currently being edited (keyed by league id). Keeps saved priority unchanged until blur so swap uses correct old value. */
+  const [editingPriority, setEditingPriority] = useState({});
   const [statistics, setStatistics] = useState({
     total: 0,
     active: 0,
@@ -110,8 +115,38 @@ const LeaguesPage = () => {
           ...league,
         })) || [];
 
-        setLeagues(formattedLeagues);
-        setFilteredLeagues(formattedLeagues);
+        // If any two leagues share the same priority, normalize to unique 1, 2, 3, ...
+        const priorities = formattedLeagues.map(l => l.priority ?? 0);
+        const hasDuplicatePriorities = new Set(priorities).size < priorities.length;
+        if (hasDuplicatePriorities) {
+          const norm = await normalizeLeaguePriorities();
+          if (norm.success && norm.data?.leagues?.length) {
+            const normalized = norm.data.leagues.map(league => ({
+              id: league.apiLeagueId != null ? String(league.apiLeagueId) : (league._id || league.league_id),
+              league_id: league.apiLeagueId != null ? String(league.apiLeagueId) : (league._id || league.league_id),
+              name: league.league_name || league.name,
+              league_name: league.league_name || league.name,
+              type: league.type || league.leagueType || 'League',
+              leagueType: league.leagueType || league.type,
+              isActive: league.status === 'Active',
+              status: league.status,
+              logo: league.logo,
+              country: league.country,
+              priority: league.priority ?? 0,
+              league_code: league.league_code,
+              apiLeagueId: league.apiLeagueId,
+              createdAt: league.createdAt ? new Date(league.createdAt) : null,
+              createdDateFormatted: league.createdDateFormatted,
+              updatedAt: league.updatedAt,
+              ...league,
+            }));
+            setLeagues(normalized);
+            setFilteredLeagues(normalized);
+          }
+        } else {
+          setLeagues(formattedLeagues);
+          setFilteredLeagues(formattedLeagues);
+        }
 
         const pagination = result.data.pagination || result.data;
         const total = pagination.total ?? result.data.total ?? formattedLeagues.length;
@@ -167,6 +202,61 @@ const LeaguesPage = () => {
 
 
 
+
+  const getLeagueId = (l) => l.id ?? l.league_id ?? l._id;
+
+  const handlePriorityChange = async (league, newValue) => {
+    const num = newValue === '' || newValue == null ? 0 : parseInt(String(newValue), 10);
+    if (Number.isNaN(num) || num < 0) return;
+    const leagueId = getLeagueId(league);
+    if (!leagueId) return;
+    // Use saved priority from state (not the value being typed) so swap moves the other league to our previous slot
+    const oldPriority = league.priority ?? 0;
+    const alreadyUsedBy = leagues.find(l => getLeagueId(l) !== leagueId && (l.priority ?? 0) === num);
+    setEditingPriority((prev) => ({ ...prev, [String(leagueId)]: undefined }));
+    setPrioritySavingId(leagueId);
+    setError('');
+    try {
+      if (alreadyUsedBy) {
+        // Swap: give the other league our current priority, then set ours to the new value
+        const otherId = getLeagueId(alreadyUsedBy);
+        const res1 = await updateLeague(otherId, { priority: oldPriority });
+        if (!res1.success) {
+          setError(res1.error || 'Failed to update priority');
+          return;
+        }
+        const res2 = await updateLeague(leagueId, { priority: num });
+        if (res2.success) {
+          setLeagues(prev => prev.map(l => {
+            const id = getLeagueId(l);
+            if (id === leagueId) return { ...l, priority: num };
+            if (id === otherId) return { ...l, priority: oldPriority };
+            return l;
+          }));
+          setFilteredLeagues(prev => prev.map(l => {
+            const id = getLeagueId(l);
+            if (id === leagueId) return { ...l, priority: num };
+            if (id === otherId) return { ...l, priority: oldPriority };
+            return l;
+          }));
+        } else {
+          setError(res2.error || 'Failed to update priority');
+        }
+      } else {
+        const result = await updateLeague(leagueId, { priority: num });
+        if (result.success) {
+          setLeagues(prev => prev.map(l => (getLeagueId(l) === leagueId ? { ...l, priority: num } : l)));
+          setFilteredLeagues(prev => prev.map(l => (getLeagueId(l) === leagueId ? { ...l, priority: num } : l)));
+        } else {
+          setError(result.error || 'Failed to update priority');
+        }
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to update priority');
+    } finally {
+      setPrioritySavingId(null);
+    }
+  };
 
   const toggleLeagueStatus = async (league) => {
     // Store original values for potential revert (before any updates)
@@ -379,12 +469,35 @@ const LeaguesPage = () => {
     {
       id: 'priority',
       label: 'Priority',
-      minWidth: 72,
-      render: (_, row) => (
-        <Typography variant="body2" sx={{ fontWeight: 500 }}>
-          {row.priority ?? '—'}
-        </Typography>
-      ),
+      minWidth: 88,
+      render: (_, row) => {
+        const rowId = String(getLeagueId(row));
+        const isSaving = String(prioritySavingId) === rowId;
+        const savedPriority = row.priority ?? 0;
+        const displayValue = editingPriority[rowId] !== undefined ? editingPriority[rowId] : savedPriority;
+        return (
+          <TextField
+            type="number"
+            size="small"
+            value={displayValue}
+            inputProps={{ min: 0, step: 1, style: { width: 56, textAlign: 'center', padding: '6px 8px' } }}
+            disabled={isSaving}
+            onChange={(e) => {
+              const raw = e.target.value;
+              const next = raw === '' ? 0 : Math.max(0, parseInt(raw, 10) || 0);
+              setEditingPriority((prev) => ({ ...prev, [rowId]: next }));
+            }}
+            onBlur={(e) => {
+              const v = e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value, 10) || 0);
+              handlePriorityChange(row, v);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') e.target.blur();
+            }}
+            sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1 } }}
+          />
+        );
+      },
     },
     {
       id: 'status',
