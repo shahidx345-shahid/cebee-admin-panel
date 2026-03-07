@@ -11,6 +11,14 @@ const webpackConfig = override(
       sourceMapLoader.exclude = /node_modules/;
     }
 
+    // Persistent filesystem cache – much faster second and later builds
+    config.cache = {
+      type: 'filesystem',
+      buildDependencies: {
+        config: [__filename],
+      },
+    };
+
     return config;
   }
 );
