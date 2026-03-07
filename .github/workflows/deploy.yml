@@ -1,0 +1,30 @@
+name: Deploy Admin Panel to EC2
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy on EC2 (pull + build)
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          AUTH_URL="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          mkdir -p ~/.ssh
+          echo "$EC2_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh -o StrictHostKeyChecking=accept-new -i ~/.ssh/deploy_key ec2-user@$DEPLOY_HOST " \
+            cd /home/ec2-user/cebee-admin-panel && \
+            git remote set-url origin '$AUTH_URL' && \
+            git pull origin main && \
+            git remote set-url origin https://github.com/${GITHUB_REPOSITORY}.git && \
+            npm ci && \
+            npm run build \
+          "
+          rm -f ~/.ssh/deploy_key
