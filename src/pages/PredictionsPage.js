@@ -24,7 +24,6 @@ import {
   BarChart,
   Star,
   PlayArrow,
-  ArrowUpward,
   ArrowDropDown,
   Person,
   Numbers,
@@ -652,200 +651,56 @@ const PredictionsPage = () => {
         Predictions Management
       </Typography>
 
-      {/* Stats Cards */}
+      {/* Stats Cards - aligned with Fixture Management style */}
       <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid item xs={6} md={3}>
-          <Card
-            sx={{
-              padding: 2.5,
-              background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
-              borderRadius: '20px',
-              boxShadow: `0 6px 18px ${colors.brandRed}40`,
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-              <Box
-                sx={{
-                  padding: 1.25,
-                  backgroundColor: `${colors.brandWhite}33`,
-                  borderRadius: '12px',
-                }}
-              >
+          <Card sx={{ padding: 2.5, borderRadius: '16px', border: `1px solid ${colors.divider}`, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)` }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+              <Box sx={{ padding: 1.25, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: '12px' }}>
                 <BarChart sx={{ fontSize: 24, color: colors.brandWhite }} />
               </Box>
-              <Chip
-                label="+12.5%"
-                size="small"
-                icon={<ArrowUpward sx={{ fontSize: 14 }} />}
-                sx={{
-                  backgroundColor: `${colors.brandRed}DD`,
-                  color: colors.brandWhite,
-                  height: 24,
-                  fontSize: 11,
-                  fontWeight: 600,
-                  '& .MuiChip-icon': {
-                    color: colors.brandWhite,
-                  },
-                }}
-              />
             </Box>
-            <Typography variant="h4" sx={{ fontWeight: 700, color: colors.brandWhite, mb: 0.5 }}>
-              {totalPredictions}
-            </Typography>
-            <Typography variant="body2" sx={{ color: `${colors.brandWhite}DD`, fontSize: 13 }}>
-              Total Predictions
-            </Typography>
+            <Typography variant="h4" sx={{ fontWeight: 700, color: colors.brandWhite, mb: 0.5 }}>{totalPredictions}</Typography>
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.9)', fontSize: 13 }}>Total Predictions</Typography>
           </Card>
         </Grid>
         <Grid item xs={6} md={3}>
-          <Card
-            sx={{
-              padding: 2.5,
-              background: colors.brandWhite,
-              border: `1.5px solid ${colors.info}26`,
-              borderRadius: '20px',
-              boxShadow: `0 6px 14px ${colors.info}1F`,
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-              <Box
-                sx={{
-                  padding: 1.25,
-                  backgroundColor: `${colors.info}1F`,
-                  borderRadius: '12px',
-                }}
-              >
+          <Card sx={{ padding: 2.5, borderRadius: '16px', border: `1px solid ${colors.divider}`, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', bgcolor: colors.brandWhite }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+              <Box sx={{ padding: 1.25, backgroundColor: `${colors.info}18`, borderRadius: '12px' }}>
                 <Star sx={{ fontSize: 24, color: colors.info }} />
               </Box>
-              <Chip
-                label="+8.2%"
-                size="small"
-                icon={<ArrowUpward sx={{ fontSize: 14 }} />}
-                sx={{
-                  backgroundColor: `${colors.success}1A`,
-                  color: colors.success,
-                  height: 24,
-                  fontSize: 11,
-                  fontWeight: 600,
-                  '& .MuiChip-icon': {
-                    color: colors.success,
-                  },
-                }}
-              />
             </Box>
-            <Typography variant="h4" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.5 }}>
-              {accuracyRate}%
-            </Typography>
-            <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13 }}>
-              Accuracy Rate
-            </Typography>
+            <Typography variant="h4" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.5 }}>{accuracyRate}%</Typography>
+            <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13 }}>Accuracy Rate</Typography>
           </Card>
         </Grid>
         <Grid item xs={6} md={3}>
-          <Card
-            sx={{
-              padding: 2.5,
-              background: colors.brandWhite,
-              border: `1.5px solid ${colors.warning}26`,
-              borderRadius: '20px',
-              boxShadow: `0 6px 14px ${colors.warning}1F`,
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-              <Box
-                sx={{
-                  padding: 1.25,
-                  backgroundColor: `${colors.warning}1F`,
-                  borderRadius: '12px',
-                }}
-              >
+          <Card sx={{ padding: 2.5, borderRadius: '16px', border: `1px solid ${colors.divider}`, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', bgcolor: colors.brandWhite }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+              <Box sx={{ padding: 1.25, backgroundColor: `${colors.warning}18`, borderRadius: '12px' }}>
                 <PlayArrow sx={{ fontSize: 24, color: colors.warning }} />
               </Box>
-              <Chip
-                label="+15.3%"
-                size="small"
-                icon={<ArrowUpward sx={{ fontSize: 14 }} />}
-                sx={{
-                  backgroundColor: `${colors.success}1A`,
-                  color: colors.success,
-                  height: 24,
-                  fontSize: 11,
-                  fontWeight: 600,
-                  '& .MuiChip-icon': {
-                    color: colors.success,
-                  },
-                }}
-              />
             </Box>
-            <Typography variant="h4" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.5 }}>
-              {ongoingCount}
-            </Typography>
-            <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13 }}>
-              Ongoing Predictions
-            </Typography>
+            <Typography variant="h4" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.5 }}>{ongoingCount}</Typography>
+            <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13 }}>Ongoing Predictions</Typography>
           </Card>
         </Grid>
         <Grid item xs={6} md={3}>
-          <Card
-            sx={{
-              padding: 2.5,
-              background: colors.brandWhite,
-              border: `1.5px solid ${colors.success}26`,
-              borderRadius: '20px',
-              boxShadow: `0 6px 14px ${colors.success}1F`,
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-              <Box
-                sx={{
-                  padding: 1.25,
-                  backgroundColor: `${colors.success}1F`,
-                  borderRadius: '50%',
-                  width: 48,
-                  height: 48,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
+          <Card sx={{ padding: 2.5, borderRadius: '16px', border: `1px solid ${colors.divider}`, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', bgcolor: colors.brandWhite }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+              <Box sx={{ padding: 1.25, backgroundColor: `${colors.success}18`, borderRadius: '12px' }}>
                 <CheckCircle sx={{ fontSize: 24, color: colors.success }} />
               </Box>
-              <Chip
-                label="+5.1%"
-                size="small"
-                icon={<ArrowUpward sx={{ fontSize: 14 }} />}
-                sx={{
-                  backgroundColor: `${colors.success}1A`,
-                  color: colors.success,
-                  height: 24,
-                  fontSize: 11,
-                  fontWeight: 600,
-                  '& .MuiChip-icon': {
-                    color: colors.success,
-                  },
-                }}
-              />
             </Box>
-            <Typography variant="h4" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.5 }}>
-              {completedCount}
-            </Typography>
-            <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13 }}>
-              Completed Predictions
-            </Typography>
+            <Typography variant="h4" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.5 }}>{completedCount}</Typography>
+            <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13 }}>Completed Predictions</Typography>
           </Card>
         </Grid>
       </Grid>
 
       {/* CMd Filter */}
-      <Card
-        sx={{
-          mb: 3,
-          borderRadius: '16px',
-          backgroundColor: colors.brandWhite,
-          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-          padding: 2,
-        }}
-      >
+      <Card sx={{ mb: 3, borderRadius: '16px', border: `1px solid ${colors.divider}`, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', padding: 2.5 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
             <EventIcon sx={{ fontSize: 20, color: colors.brandRed }} />
@@ -1084,106 +939,77 @@ const PredictionsPage = () => {
         </Menu>
       </Box>
 
-      {/* Predictions List Header */}
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <Box
-            sx={{
-              padding: 0.75,
-              backgroundColor: colors.brandRed,
-              borderRadius: '8px',
-            }}
-          >
-            <BarChart sx={{ fontSize: 18, color: colors.brandWhite }} />
+      {/* Predictions List - card aligned with Fixture list */}
+      <Card sx={{ borderRadius: '16px', border: `1px solid ${colors.divider}`, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'hidden', p: 2.5 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <Box sx={{ width: 4, height: 24, borderRadius: 1, bgcolor: colors.brandRed }} />
+            <Typography variant="h6" sx={{ fontWeight: 700, color: colors.brandBlack, fontSize: 18 }}>
+              Predictions List
+            </Typography>
+            <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13, ml: 1 }}>
+              {filteredPredictions.length} predictions found
+            </Typography>
           </Box>
-          <Typography
-            variant="h6"
+          <Button
+            variant="outlined"
+            startIcon={<ListIcon sx={{ fontSize: 16 }} />}
+            endIcon={<ArrowDropDown sx={{ fontSize: 16 }} />}
+            onClick={(e) => setPaginationAnchor(e.currentTarget)}
             sx={{
-              fontWeight: 700,
+              borderColor: colors.brandRed,
               color: colors.brandBlack,
-              fontSize: 18,
-            }}
-          >
-            Predictions List
-          </Typography>
-          <Typography
-            variant="body2"
-            sx={{
-              color: colors.textSecondary,
+              backgroundColor: colors.brandWhite,
+              borderRadius: '8px',
+              textTransform: 'none',
+              fontWeight: 500,
+              px: 2,
+              py: 0.75,
               fontSize: 13,
-              ml: 1,
             }}
           >
-            {filteredPredictions.length} predictions found
-          </Typography>
+            {rowsPerPage} / page
+          </Button>
+          <Menu
+            anchorEl={paginationAnchor}
+            open={Boolean(paginationAnchor)}
+            onClose={() => setPaginationAnchor(null)}
+            PaperProps={{
+              sx: {
+                borderRadius: '12px',
+                minWidth: 150,
+                boxShadow: `0 4px 12px ${colors.shadow}33`,
+              },
+            }}
+          >
+            <MenuItem onClick={() => { setRowsPerPage(10); setPage(0); setPaginationAnchor(null); }}>10 / page</MenuItem>
+            <MenuItem onClick={() => { setRowsPerPage(25); setPage(0); setPaginationAnchor(null); }}>25 / page</MenuItem>
+            <MenuItem onClick={() => { setRowsPerPage(50); setPage(0); setPaginationAnchor(null); }}>50 / page</MenuItem>
+            <MenuItem onClick={() => { setRowsPerPage(100); setPage(0); setPaginationAnchor(null); }}>100 / page</MenuItem>
+          </Menu>
         </Box>
-        <Button
-          variant="outlined"
-          startIcon={<ListIcon sx={{ fontSize: 16 }} />}
-          endIcon={<ArrowDropDown sx={{ fontSize: 16 }} />}
-          onClick={(e) => setPaginationAnchor(e.currentTarget)}
-          sx={{
-            borderColor: colors.brandRed,
-            color: colors.brandBlack,
-            backgroundColor: colors.brandWhite,
-            borderRadius: '8px',
-            textTransform: 'none',
-            fontWeight: 500,
-            px: 2,
-            py: 0.75,
-            fontSize: 13,
-          }}
-        >
-          {rowsPerPage} / page
-        </Button>
-        <Menu
-          anchorEl={paginationAnchor}
-          open={Boolean(paginationAnchor)}
-          onClose={() => setPaginationAnchor(null)}
-          PaperProps={{
-            sx: {
-              borderRadius: '12px',
-              minWidth: 150,
-              boxShadow: `0 4px 12px ${colors.shadow}33`,
-            },
-          }}
-        >
-          <MenuItem onClick={() => { setRowsPerPage(10); setPage(0); setPaginationAnchor(null); }}>
-            10 / page
-          </MenuItem>
-          <MenuItem onClick={() => { setRowsPerPage(25); setPage(0); setPaginationAnchor(null); }}>
-            25 / page
-          </MenuItem>
-          <MenuItem onClick={() => { setRowsPerPage(50); setPage(0); setPaginationAnchor(null); }}>
-            50 / page
-          </MenuItem>
-          <MenuItem onClick={() => { setRowsPerPage(100); setPage(0); setPaginationAnchor(null); }}>
-            100 / page
-          </MenuItem>
-        </Menu>
-      </Box>
 
-      {/* Data Table */}
-      <DataTable
-        columns={columns}
-        data={paginatedPredictions}
-        loading={loading}
-        page={page}
-        rowsPerPage={rowsPerPage}
-        totalCount={pagination.total || 0}
-        onPageChange={(e, newPage) => setPage(newPage)}
-        onRowsPerPageChange={(e) => {
-          setRowsPerPage(parseInt(e.target.value, 10));
-          setPage(0);
-        }}
-        onRowClick={(row) => {
-          const firstPredictionId = row.predictions && row.predictions.length > 0 
-            ? row.predictions[0].id 
-            : row.id;
-          navigate(`/predictions/details/${encodeURIComponent(firstPredictionId)}`);
-        }}
-        emptyMessage="No predictions found"
-      />
+        <DataTable
+          columns={columns}
+          data={paginatedPredictions}
+          loading={loading}
+          page={page}
+          rowsPerPage={rowsPerPage}
+          totalCount={pagination.total || 0}
+          onPageChange={(e, newPage) => setPage(newPage)}
+          onRowsPerPageChange={(e) => {
+            setRowsPerPage(parseInt(e.target.value, 10));
+            setPage(0);
+          }}
+          onRowClick={(row) => {
+            const firstPredictionId = row.predictions && row.predictions.length > 0
+              ? row.predictions[0].id
+              : row.id;
+            navigate(`/predictions/details/${encodeURIComponent(firstPredictionId)}`);
+          }}
+          emptyMessage="No predictions found"
+        />
+      </Card>
     </Box>
   );
 };

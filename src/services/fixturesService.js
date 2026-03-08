@@ -40,9 +40,14 @@ export const getFixtures = async (params = {}) => {
  * @param {string} fixtureId - Fixture ID
  * @returns {Promise<{success: boolean, data?: object, error?: string}>}
  */
-export const getFixture = async (fixtureId) => {
+/**
+ * @param {string} fixtureId - Fixture ID
+ * @param {{ stats?: boolean }} options - If stats=true, backend will fetch match statistics from API when fixture is API-linked and live/completed
+ */
+export const getFixture = async (fixtureId, options = {}) => {
   try {
-    const response = await apiGet(`/fixtures/${fixtureId}`);
+    const query = options.stats ? '?stats=1' : '';
+    const response = await apiGet(`/fixtures/${fixtureId}${query}`);
     
     if (response.success) {
       return {

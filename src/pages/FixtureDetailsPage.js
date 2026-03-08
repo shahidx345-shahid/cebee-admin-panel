@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, Link } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -36,7 +36,6 @@ import {
   SportsSoccer,
   AccessTime,
   HourglassEmpty,
-  LocationOn,
   CalendarToday,
   People,
   ArrowUpward,
@@ -74,12 +73,44 @@ const FixtureDetailsPage = () => {
   });
   const [selectedFlowStatus, setSelectedFlowStatus] = useState(null);
   const [updating, setUpdating] = useState(false);
+  const [liveTick, setLiveTick] = useState(0);
+  const [countdownTick, setCountdownTick] = useState(0);
+
+  useEffect(() => {
+    if (!fixture) return;
+    const s = String(fixture.matchStatus || fixture.status || 'scheduled').toLowerCase();
+    const isLiveOrHT = s === 'live' || s === 'halftime';
+    if (!isLiveOrHT || !fixture.kickoffTime) return;
+    const id = setInterval(() => setLiveTick((t) => t + 1), 1000);
+    return () => clearInterval(id);
+  }, [fixture?.matchStatus, fixture?.status, fixture?.kickoffTime]);
+
+  useEffect(() => {
+    if (!fixture?.kickoffTime) return;
+    const kickoff = new Date(fixture.kickoffTime).getTime();
+    if (Date.now() >= kickoff) return;
+    const s = String(fixture.matchStatus || fixture.status || 'scheduled').toLowerCase();
+    if (s === 'live' || s === 'halftime') return;
+    const id = setInterval(() => setCountdownTick((t) => t + 1), 1000);
+    return () => clearInterval(id);
+  }, [fixture?.kickoffTime, fixture?.matchStatus, fixture?.status]);
+
+  // Real-time score polling when match is live or HT
+  useEffect(() => {
+    if (!id || !fixture) return;
+    const s = String(fixture.matchStatus || fixture.status || 'scheduled').toLowerCase();
+    const isLiveOrHT = s === 'live' || s === 'halftime';
+    if (!isLiveOrHT) return;
+    const POLL_INTERVAL_MS = 15000; // 15 seconds
+    const intervalId = setInterval(() => reloadFixtureData(), POLL_INTERVAL_MS);
+    return () => clearInterval(intervalId);
+  }, [id, fixture?.matchStatus, fixture?.status]);
 
   // Helper function to reload fixture data from API
   const reloadFixtureData = async () => {
     if (!id) return;
     try {
-      const fixtureResult = await getFixture(id);
+      const fixtureResult = await getFixture(id, { stats: true });
       if (fixtureResult.success && fixtureResult.data) {
         const fixtureData = fixtureResult.data.fixture || fixtureResult.data;
         
@@ -95,6 +126,8 @@ const FixtureDetailsPage = () => {
           awayTeam: fixtureData.awayTeam || fixtureData.away_team || '',
           league: fixtureData.league || fixtureData.leagueName || fixtureData.league_name || (fixtureData.leagueId?.league_name) || '',
           leagueId: fixtureData.leagueId?._id || fixtureData.leagueId || '',
+          homeTeamId: fixtureData.homeTeamId?._id || fixtureData.homeTeamId || null,
+          awayTeamId: fixtureData.awayTeamId?._id || fixtureData.awayTeamId || null,
           kickoffTime: (() => {
             const kickoff = fixtureData.kickoffTime || fixtureData.kickoff_time;
             if (!kickoff) return null;
@@ -165,7 +198,7 @@ const FixtureDetailsPage = () => {
         }
 
         // Fetch fixture from API
-        const fixtureResult = await getFixture(id);
+        const fixtureResult = await getFixture(id, { stats: true });
         
         if (fixtureResult.success && fixtureResult.data) {
           // Backend returns { success: true, data: { fixture: {...} } }
@@ -191,6 +224,8 @@ const FixtureDetailsPage = () => {
               awayTeam: fixtureData.awayTeam || fixtureData.away_team || '',
               league: fixtureData.league || fixtureData.leagueName || fixtureData.league_name || (fixtureData.leagueId?.league_name) || '',
               leagueId: fixtureData.leagueId?._id || fixtureData.leagueId || '',
+              homeTeamId: fixtureData.homeTeamId?._id || fixtureData.homeTeamId || null,
+              awayTeamId: fixtureData.awayTeamId?._id || fixtureData.awayTeamId || null,
               kickoffTime: (() => {
                 const kickoff = fixtureData.kickoffTime || fixtureData.kickoff_time;
                 if (!kickoff) return null;
@@ -272,19 +307,19 @@ const FixtureDetailsPage = () => {
                     const userEmail = user.email || pred.userEmail || pred.user_email || '';
                     const homeGoals = pred.homeGoals ?? pred.predictedHomeScore ?? pred.homeScore;
                     const awayGoals = pred.awayGoals ?? pred.predictedAwayScore ?? pred.awayScore;
+                    // Use backend displayByLabel when present; otherwise build same shape for display by name
+                    const displayByLabel = pred.displayByLabel || {
+                      Score: (homeGoals != null && awayGoals != null) ? `${homeGoals}-${awayGoals}` : null,
+                      FPTS: pred.firstPlayer || null,
+                      GR: pred.goalRange || null,
+                      FGM: pred.firstGoalMinutes != null && pred.firstGoalMinutes !== '' ? (String(pred.firstGoalMinutes).endsWith("'") ? pred.firstGoalMinutes : `${pred.firstGoalMinutes}'`) : null,
+                      CS: pred.cleanSheet || null,
+                    };
                     const parts = [];
-                    if (homeGoals != null && awayGoals != null) {
-                      parts.push(`${homeGoals}-${awayGoals}`);
-                    }
-                    if (pred.firstPlayer) {
-                      parts.push(`1st: ${pred.firstPlayer}`);
-                    }
-                    if (pred.firstGoalMinutes != null && pred.firstGoalMinutes !== '') {
-                      parts.push(`${pred.firstGoalMinutes}'`);
-                    }
-                    if (pred.goalRange) {
-                      parts.push(`Range: ${pred.goalRange}`);
-                    }
+                    if (displayByLabel.Score) parts.push(displayByLabel.Score);
+                    if (displayByLabel.FPTS) parts.push(`1st: ${displayByLabel.FPTS}`);
+                    if (displayByLabel.FGM) parts.push(displayByLabel.FGM);
+                    if (displayByLabel.GR) parts.push(`Range: ${displayByLabel.GR}`);
                     const predictionStr = parts.length > 0 ? parts.join(' • ') : '—';
                     return {
                       id: pred._id || pred.id,
@@ -303,7 +338,12 @@ const FixtureDetailsPage = () => {
                       points: pred.spAwarded ?? pred.points ?? 0,
                       isCorrect: pred.status === 'correct' || pred.isCorrect || pred.is_correct || false,
                       prediction: predictionStr,
+                      displayByLabel,
                       status: pred.status || 'ongoing',
+                      scorelineCorrect: pred.scorelineCorrect,
+                      firstPlayerCorrect: pred.firstPlayerCorrect,
+                      goalRangeCorrect: pred.goalRangeCorrect,
+                      firstGoalMinutesCorrect: pred.firstGoalMinutesCorrect,
                     };
                   });
                   setPredictions(formattedPredictions);
@@ -746,7 +786,7 @@ const FixtureDetailsPage = () => {
         setEndMatchDialogOpen(false);
         // Reload fixture data to get updated status from backend
         await reloadFixtureData();
-        alert('Match ended successfully. Match is now in Result Pending state. You can upload the score later.');
+        alert('Match ended successfully. You can upload the score to complete the match.');
       } else {
         alert(result.error || 'Failed to end match');
       }
@@ -1185,172 +1225,277 @@ const FixtureDetailsPage = () => {
   const statusConfig = getStatusCardConfig();
   const StatusIcon = statusConfig.icon;
 
+  // Show actual status: Live, HT, Result Pending, Results Processing, Full Time, etc.
+  const matchStatusDisplay = (() => {
+    const s = String(fixture.matchStatus || fixture.status || 'scheduled').toLowerCase();
+    if (s === 'halftime') return 'HT';
+    if (s === 'live') return 'Live';
+    if (s === 'completed') return 'Full Time';
+    if (s === 'resultpending' || s === 'result_pending') return 'Result Pending';
+    if (s === 'resultsprocessing' || s === 'results_processing') return 'Results Processing';
+    if (s === 'pending') return 'Pending';
+    if (s === 'scheduled') return 'Scheduled';
+    if (s === 'published' || s === 'predictionopen' || s === 'predictionlock') return 'Not Started';
+    return 'Not Started';
+  })();
+
+  const kickoffFormatted = fixture.kickoffTime && !isNaN(new Date(fixture.kickoffTime).getTime())
+    ? format(new Date(fixture.kickoffTime), 'EEE, d MMM yyyy • HH:mm')
+    : null;
+  const venueDisplay = fixture.venue && fixture.venue.trim() ? fixture.venue : 'Stadium TBD';
+  const roundLabel = (fixture.round && String(fixture.round).trim()) || (fixture.matchday ? `Matchday ${fixture.matchday}` : null) || (fixture.cmdName && String(fixture.cmdName).trim()) || null;
+  // Display league name without "(API 253)" suffix for a clean label
+  const leagueDisplay = (fixture.league || 'League').replace(/\s*\(API\s+\d+\)\s*$/i, '').trim() || fixture.league || 'League';
+
+  const statusChipColor = (() => {
+    switch (matchStatusDisplay) {
+      case 'Live': return { bgcolor: `${colors.brandRed}18`, color: colors.brandRed, border: `1px solid ${colors.brandRed}40` };
+      case 'HT': return { bgcolor: `${colors.brandRed}12`, color: colors.brandDarkRed, border: `1px solid ${colors.brandRed}30` };
+      case 'Full Time': return { bgcolor: `${colors.success}18`, color: colors.success, border: `1px solid ${colors.success}40` };
+      case 'Result Pending': return { bgcolor: '#FFF3E0', color: '#E65100', border: '1px solid #FFE0B2' };
+      case 'Results Processing': return { bgcolor: '#E3F2FD', color: '#1565C0', border: '1px solid #BBDEFB' };
+      case 'Pending': return { bgcolor: '#F3E5F5', color: '#7B1FA2', border: '1px solid #E1BEE7' };
+      case 'Scheduled': return { bgcolor: '#F0F4F8', color: '#475569', border: '1px solid #E2E8F0' };
+      default: return { bgcolor: '#F8FAFC', color: '#64748B', border: '1px solid #E2E8F0' };
+    }
+  })();
+
+  const isLiveOrHT = matchStatusDisplay === 'Live' || matchStatusDisplay === 'HT';
+  const liveElapsedMins = isLiveOrHT && fixture.kickoffTime
+    ? Math.max(0, Math.floor((Date.now() - new Date(fixture.kickoffTime).getTime()) / 60000))
+    : null;
+
+  const countdownToKickoffMs = fixture.kickoffTime && !isLiveOrHT
+    ? new Date(fixture.kickoffTime).getTime() - Date.now()
+    : null;
+  const countdownToKickoffStr = (() => {
+    if (countdownToKickoffMs == null || countdownToKickoffMs <= 0) return null;
+    const d = Math.floor(countdownToKickoffMs / 86400000);
+    const h = Math.floor((countdownToKickoffMs % 86400000) / 3600000);
+    const m = Math.floor((countdownToKickoffMs % 3600000) / 60000);
+    if (d > 0) return `Starts in ${d}d ${h}h ${m}m`;
+    if (h > 0) return `Starts in ${h}h ${m}m`;
+    if (m > 0) return `Starts in ${m}m`;
+    return 'Starts soon';
+  })();
+
+  const LOGO_SIZE = 64;
+  const TeamBlock = ({ teamId, name, logoUrl, side }) => {
+    const logoEl = (
+      <Box
+        sx={{
+          width: LOGO_SIZE,
+          height: LOGO_SIZE,
+          borderRadius: '50%',
+          bgcolor: '#fff',
+          border: '1px solid #eee',
+          boxSizing: 'border-box',
+          margin: '0 auto 10px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          overflow: 'hidden',
+          flexShrink: 0,
+        }}
+      >
+        {logoUrl ? (
+          <Box
+            component="img"
+            src={logoUrl}
+            alt=""
+            sx={{
+              width: LOGO_SIZE - 16,
+              height: LOGO_SIZE - 16,
+              objectFit: 'contain',
+              display: 'block',
+            }}
+          />
+        ) : (
+          <SportsSoccer sx={{ fontSize: 28, color: colors.brandBlack }} />
+        )}
+      </Box>
+    );
+    const nameEl = <Typography variant="subtitle1" sx={{ fontWeight: 600, color: colors.brandBlack }}>{name || 'TBD'}</Typography>;
+    const sideEl = <Typography variant="caption" sx={{ color: 'text.secondary' }}>{side}</Typography>;
+    const block = (
+      <Box sx={{ textAlign: 'center', padding: '16px 8px' }}>
+        {logoEl}
+        {nameEl}
+        {sideEl}
+      </Box>
+    );
+    if (teamId) {
+      return (
+        <Link to={`${constants.routes.apiSync}/team/${teamId}`} style={{ textDecoration: 'none', color: 'inherit' }} title="View squad (API Data & Sync)">
+          <Box sx={{ textAlign: 'center', padding: '16px 8px', borderRadius: 2, cursor: 'pointer', '&:hover': { bgcolor: 'rgba(0,0,0,0.04)' }, '&:hover img': { opacity: 0.9 } }}>
+            {logoEl}
+            {nameEl}
+            {sideEl}
+          </Box>
+        </Link>
+      );
+    }
+    return block;
+  };
+
   return (
-    <Box sx={{ width: '100%', maxWidth: '100%', pb: 4 }}>
-      {/* Back Button */}
+    <Box sx={{ width: '100%', maxWidth: 900, pb: 4 }}>
       <Button
         startIcon={<ArrowBack />}
         onClick={() => navigate(constants.routes.fixtures)}
-        sx={{
-          mb: 3,
-          color: colors.brandRed,
-          textTransform: 'none',
-          fontWeight: 600,
-          '&:hover': {
-            backgroundColor: `${colors.brandRed}0A`,
-          },
-        }}
+        sx={{ mb: 2, color: colors.brandRed, textTransform: 'none', fontWeight: 600, '&:hover': { bgcolor: `${colors.brandRed}0A` } }}
       >
         Back to Fixtures
       </Button>
 
-      {/* Scorecard Header */}
-      <Card
-        sx={{
-          mb: 3,
-          borderRadius: '24px',
-          background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
-          boxShadow: `0 8px 32px ${colors.brandRed}40`,
-          position: 'relative',
-          overflow: 'hidden',
-          color: colors.brandWhite
-        }}
-      >
-        <Box sx={{
-          position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
-          opacity: 0.1,
-          backgroundImage: 'radial-gradient(circle at 10% 20%, rgba(255,255,255,0.4) 0%, transparent 20%), radial-gradient(circle at 90% 80%, rgba(255,255,255,0.4) 0%, transparent 20%)'
-        }} />
-
-        <CardContent sx={{ p: 4, position: 'relative', zIndex: 1 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1 }}>
-            <Chip icon={<CalendarToday sx={{ fontSize: 14, color: '#fff !important' }} />} label={fixture.kickoffTime && !isNaN(new Date(fixture.kickoffTime).getTime()) ? format(new Date(fixture.kickoffTime), 'EEE, MMM dd • HH:mm') : 'TBD'} sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: '#fff', border: '1px solid rgba(255,255,255,0.3)', fontWeight: 600 }} />
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
-              {(fixture.hot || fixture.isCommunityFeatured || fixture.isCeBeFeatured) && (
-                <Chip label="Featured Fixture" size="small" sx={{ fontWeight: 700, bgcolor: 'rgba(255,255,255,0.25)', color: '#fff', border: '1px solid rgba(255,255,255,0.4)' }} />
-              )}
-              <Chip label={(fixture.status || 'scheduled').toUpperCase()} sx={{ fontWeight: 700, bgcolor: fixture.status === 'live' ? colors.brandBlack : 'rgba(255,255,255,0.2)', color: '#fff' }} />
-              {fixture.matchStatus && fixture.matchStatus !== fixture.status && (
-                <Chip label={`Match: ${(fixture.matchStatus || '').toUpperCase()}`} sx={{ fontWeight: 700, bgcolor: 'rgba(255,255,255,0.2)', color: '#fff' }} />
-              )}
+      <Card sx={{ borderRadius: '16px', border: `1px solid ${colors.divider}`, boxShadow: '0 4px 20px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
+        <CardContent sx={{ p: 3.5 }}>
+          {/* MLS row: league + round on left, status on right */}
+          <Box sx={{ pl: 2, borderLeft: `4px solid ${colors.brandRed}`, mb: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
+            <Box>
+              <Typography variant="overline" sx={{ color: colors.textSecondary, fontWeight: 700, letterSpacing: '0.06em', fontSize: 12 }}>
+                {leagueDisplay}{roundLabel ? ` · ${roundLabel}` : ''}
+              </Typography>
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Chip label={matchStatusDisplay} size="small" sx={{ fontWeight: 600, ...statusChipColor }} />
             </Box>
           </Box>
+          <Box sx={{ mb: 2 }}>
+            {countdownToKickoffStr && (
+              <Typography variant="body2" sx={{ color: colors.brandRed, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <AccessTime sx={{ fontSize: 18 }} />
+                {countdownToKickoffStr}
+              </Typography>
+            )}
+            {kickoffFormatted && (
+              <Typography variant="body2" sx={{ color: colors.textSecondary, display: 'flex', alignItems: 'center', gap: 1, mt: countdownToKickoffStr ? 0.5 : 0 }}>
+                <AccessTime sx={{ fontSize: 18, color: colors.brandRed }} />
+                {kickoffFormatted}
+              </Typography>
+            )}
+          </Box>
 
-          <Grid container alignItems="center" justifyContent="center" spacing={2}>
-            {/* Home Team (Team A = Featured Team when Community Featured) */}
-            <Grid item xs={4} sx={{ textAlign: 'center' }}>
-              <Box sx={{ width: 80, height: 80, borderRadius: '50%', bgcolor: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
-                <SportsSoccer sx={{ fontSize: 40, color: colors.brandBlack }} />
-              </Box>
-              <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>{fixture.homeTeam}</Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 0.5, flexWrap: 'wrap' }}>
-                <Typography variant="body2" sx={{ opacity: 0.8 }}>Home</Typography>
-                {fixture.isCommunityFeatured && (
-                  <Chip label="Featured Team" size="small" sx={{ bgcolor: 'rgba(255,255,255,0.25)', color: '#fff', border: '1px solid rgba(255,255,255,0.4)', fontWeight: 600, height: 18, fontSize: 10 }} />
-                )}
-              </Box>
+          {liveElapsedMins != null && (
+            <Typography variant="h6" sx={{ textAlign: 'center', color: colors.brandRed, fontWeight: 700, mb: 1 }}>
+              {liveElapsedMins}'
+            </Typography>
+          )}
+
+          <Grid container alignItems="center" justifyContent="center" spacing={2} sx={{ mb: 2 }}>
+            <Grid item xs={5} sm={4} sx={{ textAlign: 'center' }}>
+              <TeamBlock teamId={fixture.homeTeamId} name={fixture.homeTeam} logoUrl={fixture.homeTeamLogo} side="Home" />
             </Grid>
-
-            {/* Score */}
-            <Grid item xs={4} sx={{ textAlign: 'center' }}>
-              <Box sx={{ bgcolor: 'rgba(0,0,0,0.2)', borderRadius: '16px', px: 4, py: 2, display: 'inline-block' }}>
-                <Typography variant="h2" sx={{ fontWeight: 800, lineHeight: 1 }}>
-                  {fixture.homeScore !== undefined ? fixture.homeScore : '-'} : {fixture.awayScore !== undefined ? fixture.awayScore : '-'}
-                </Typography>
-                {(fixture.status === 'live' || fixture.status === 'fullTime') && (
-                  <Typography variant="caption" sx={{ display: 'block', mt: 1, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 1 }}>
-                    {fixture.status === 'live' ? 'Live' : 'Full Time'}
-                  </Typography>
-                )}
-              </Box>
+            <Grid item xs={2} sm={4} sx={{ textAlign: 'center' }}>
+              <Typography variant="h4" sx={{ fontWeight: 700, color: colors.brandBlack }}>
+                {fixture.homeScore != null && fixture.awayScore != null ? `${fixture.homeScore} – ${fixture.awayScore}` : 'vs'}
+              </Typography>
+              <Typography variant="body2" sx={{ color: colors.textSecondary, mt: 0.5, fontWeight: 500 }}>
+                {venueDisplay}
+              </Typography>
             </Grid>
-
-            {/* Away Team (Team B when Community Featured) */}
-            <Grid item xs={4} sx={{ textAlign: 'center' }}>
-              <Box sx={{ width: 80, height: 80, borderRadius: '50%', bgcolor: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}>
-                <SportsSoccer sx={{ fontSize: 40, color: colors.brandBlack }} />
-              </Box>
-              <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>{fixture.awayTeam}</Typography>
-              <Typography variant="body2" sx={{ opacity: 0.8 }}>Away</Typography>
+            <Grid item xs={5} sm={4} sx={{ textAlign: 'center' }}>
+              <TeamBlock teamId={fixture.awayTeamId} name={fixture.awayTeam} logoUrl={fixture.awayTeamLogo} side="Away" />
             </Grid>
           </Grid>
-          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 2, mt: 3, opacity: 0.9 }}>
-            <LocationOn sx={{ fontSize: 18 }} />
-            <Typography variant="body2" sx={{ fontWeight: 500 }}>
-              {fixture?.homeTeam === 'Arsenal' ? 'Emirates Stadium' : 
-               fixture?.homeTeam === 'Manchester United' ? 'Old Trafford' :
-               fixture?.homeTeam === 'Liverpool' ? 'Anfield' :
-               fixture?.homeTeam === 'Newcastle' ? 'St James\' Park' :
-               'Stadium TBD'}
-            </Typography>
-            <Typography variant="body2" sx={{ opacity: 0.7 }}>•</Typography>
-            <Typography variant="body2" sx={{ fontWeight: 500 }}>
-              {fixture?.league || 'Premier League'}
-            </Typography>
-          </Box>
+
+          <Divider sx={{ my: 2 }} />
+
+          {/* Real-time score update – goal scorers per team (like scoreboard) */}
+          {(isLiveOrHT || (fixture.homeGoalScorers?.length > 0 || fixture.awayGoalScorers?.length > 0)) && (
+            <Box sx={{ mt: 2, p: 2, borderRadius: 2, bgcolor: '#FAFAFA', border: '1px solid #E2E8F0' }}>
+              <Typography variant="caption" sx={{ color: colors.textSecondary, fontWeight: 600, display: 'block', mb: 1.5 }}>
+                LIVE SCORE · Updates every 15s
+              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'stretch', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
+                <Box sx={{ flex: 1, minWidth: 120 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700, color: colors.brandBlack, borderBottom: '1px solid #E2E8F0', pb: 0.5, mb: 1 }}>
+                    {fixture.homeTeam || 'Home'}
+                  </Typography>
+                  {(() => {
+                    const list = fixture.homeGoalScorers || [];
+                    const byPlayer = {};
+                    list.forEach(({ name, minute }) => {
+                      if (!name) return;
+                      if (!byPlayer[name]) byPlayer[name] = [];
+                      byPlayer[name].push(minute);
+                    });
+                    const entries = Object.entries(byPlayer).map(([name, mins]) => ({
+                      name,
+                      minutes: mins.filter((m) => m != null).sort((a, b) => a - b)
+                    }));
+                    if (entries.length === 0) return <Typography variant="body2" sx={{ color: colors.textSecondary }}>—</Typography>;
+                    return entries.map(({ name, minutes }) => (
+                      <Typography key={name} variant="body2" sx={{ mb: 0.5 }}>
+                        {name} {minutes.map((m) => `${m}'`).join(', ')}
+                      </Typography>
+                    ));
+                  })()}
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', px: 1 }}>
+                  <SportsSoccer sx={{ fontSize: 28, color: colors.textSecondary }} />
+                </Box>
+                <Box sx={{ flex: 1, minWidth: 120, textAlign: 'right' }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700, color: colors.brandBlack, borderBottom: '1px solid #E2E8F0', pb: 0.5, mb: 1 }}>
+                    {fixture.awayTeam || 'Away'}
+                  </Typography>
+                  {(() => {
+                    const list = fixture.awayGoalScorers || [];
+                    const byPlayer = {};
+                    list.forEach(({ name, minute }) => {
+                      if (!name) return;
+                      if (!byPlayer[name]) byPlayer[name] = [];
+                      byPlayer[name].push(minute);
+                    });
+                    const entries = Object.entries(byPlayer).map(([name, mins]) => ({
+                      name,
+                      minutes: mins.filter((m) => m != null).sort((a, b) => a - b)
+                    }));
+                    if (entries.length === 0) return <Typography variant="body2" sx={{ color: colors.textSecondary }}>—</Typography>;
+                    return entries.map(({ name, minutes }) => (
+                      <Typography key={name} variant="body2" sx={{ mb: 0.5 }}>
+                        {name} {minutes.map((m) => `${m}'`).join(', ')}
+                      </Typography>
+                    ));
+                  })()}
+                </Box>
+              </Box>
+              {!fixture.homeGoalScorers?.length && !fixture.awayGoalScorers?.length && fixture.firstGoalScorer && (
+                <Typography variant="caption" sx={{ color: colors.textSecondary, display: 'block', mt: 1, textAlign: 'center' }}>
+                  First goal: {fixture.firstGoalScorer}{fixture.firstGoalMinute != null ? ` (${fixture.firstGoalMinute}')` : ''}
+                </Typography>
+              )}
+            </Box>
+          )}
         </CardContent>
       </Card>
 
-      {/* Interactive Match State Flow - Full Width */}
-      <Card sx={{ borderRadius: '20px', p: 3, mb: 3, bgcolor: '#FFFFFF', border: `1px solid ${colors.divider}` }}>
+      {/* Match State Flow */}
+      <Card sx={{ borderRadius: '16px', p: 3, mb: 3, bgcolor: '#FFFFFF', border: `1px solid ${colors.divider}`, boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
           <Typography variant="subtitle1" sx={{ fontWeight: 700, color: colors.brandBlack }}>
             Match State Flow
           </Typography>
         </Box>
         
-        <Box sx={{ position: 'relative', mb: 2 }}>
-          {/* Flow Steps */}
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', mb: 3 }}>
-            {/* Connecting Line */}
+        <Box sx={{ position: 'relative', mb: 2, px: 0 }}>
+          {/* Flow Steps - first and last steps at corners */}
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', position: 'relative', mb: 3, width: '100%', gap: 6 }}>
+            {/* Connecting Line - full width (track); direction = tail (left) → head (right) */}
             <Box
               sx={{
                 position: 'absolute',
-                top: '20px',
-                left: '8%',
-                right: '8%',
-                height: '3px',
-                bgcolor: '#E5E7EB',
+                top: '22px',
+                left: 0,
+                right: 0,
+                height: '2px',
+                bgcolor: '#E2E8F0',
+                borderRadius: 1,
                 zIndex: 0,
               }}
             />
-            {/* Progress Line */}
-            <Box
-              sx={{
-                position: 'absolute',
-                top: '20px',
-                left: '8%',
-                width: (() => {
-                  const statusOrder = {
-                    'predictionOpen': 0,
-                    'predictionLock': 1,
-                    'live': 2,
-                    'resultPending': 3,
-                    'resultsProcessing': 3,
-                    'pending': 3,
-                    'completed': 4,
-                  };
-                  const selectedOrder = statusOrder[selectedFlowStatus] ?? 0;
-                  const totalSteps = 4;
-                  const progressPercent = (selectedOrder / totalSteps) * 84; // 84% is the width between 8% and 92%
-                  return `${progressPercent}%`;
-                })(),
-                height: '3px',
-                bgcolor: colors.brandRed,
-                zIndex: 1,
-                transition: 'width 0.3s ease',
-              }}
-            />
-            
-            {/* Status Steps */}
-            {[
-              { key: 'predictionOpen', label: 'Prediction Open', order: 0 },
-              { key: 'predictionLock', label: 'Prediction Lock', order: 1 },
-              { key: 'live', label: 'Live', order: 2 },
-              { key: 'resultPending', label: 'Result Pending', order: 3 },
-              { key: 'completed', label: 'Completed', order: 4 },
-            ].map((step, index) => {
-              // Map selected status to order
+            {/* Progress Line: tail at left, head at right; arrowhead at head for clear direction */}
+            {(() => {
               const statusOrder = {
                 'predictionOpen': 0,
                 'predictionLock': 1,
@@ -1358,15 +1503,66 @@ const FixtureDetailsPage = () => {
                 'resultPending': 3,
                 'resultsProcessing': 3,
                 'pending': 3,
-                'completed': 4,
+                'completed': 3,
+              };
+              const selectedOrder = statusOrder[selectedFlowStatus] ?? 0;
+              const totalSteps = 3;
+              const progressPercent = Math.min(100, (selectedOrder / totalSteps) * 100);
+              return (
+                <>
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      top: '22px',
+                      left: 0,
+                      height: '2px',
+                      borderRadius: 1,
+                      width: `${progressPercent}%`,
+                      bgcolor: colors.brandRed,
+                      zIndex: 1,
+                      transition: 'width 0.3s ease',
+                    }}
+                  />
+                  {/* Arrow head at the end of progress (tail = left, head = right) */}
+                  {progressPercent > 0 && (
+                    <Box
+                      sx={{
+                        position: 'absolute',
+                        top: '14px',
+                        left: `calc(${progressPercent}% - 10px)`,
+                        width: 0,
+                        height: 0,
+                        borderTop: '8px solid transparent',
+                        borderBottom: '8px solid transparent',
+                        borderLeft: `10px solid ${colors.brandRed}`,
+                        zIndex: 1,
+                        transition: 'left 0.3s ease',
+                      }}
+                    />
+                  )}
+                </>
+              );
+            })()}
+            
+            {/* Status Steps - 4 steps, first and last at corners */}
+            {[
+              { key: 'predictionOpen', label: 'Prediction Open', order: 0 },
+              { key: 'predictionLock', label: 'Prediction Lock', order: 1 },
+              { key: 'live', label: 'Live', order: 2 },
+              { key: 'completed', label: 'Completed', order: 3 },
+            ].map((step) => {
+              const statusOrder = {
+                'predictionOpen': 0,
+                'predictionLock': 1,
+                'live': 2,
+                'resultPending': 3,
+                'resultsProcessing': 3,
+                'pending': 3,
+                'completed': 3,
               };
               
               const selectedOrder = statusOrder[selectedFlowStatus] ?? 0;
               const isActive = step.order <= selectedOrder;
-              
-              // Status steps are display-only - they show the current status from API
-              // Status changes should be done through specific action buttons (Approve, End Match, etc.)
-              const isClickable = false;
               
               return (
                 <Box
@@ -1378,24 +1574,26 @@ const FixtureDetailsPage = () => {
                     flexDirection: 'column',
                     alignItems: 'center',
                     cursor: 'default',
-                    flex: 1,
+                    flexShrink: 0,
                     transition: 'transform 0.2s',
+                    minWidth: 100,
+                    px: 2,
                   }}
                 >
                   {/* Status Circle */}
                   <Box
                     sx={{
-                      width: '40px',
-                      height: '40px',
+                      width: '44px',
+                      height: '44px',
                       borderRadius: '50%',
-                      bgcolor: isActive ? colors.brandRed : '#E5E7EB',
+                      bgcolor: isActive ? colors.brandRed : '#F1F5F9',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       mb: 1,
-                      border: `3px solid ${isActive ? colors.brandRed : '#E5E7EB'}`,
-                      transition: 'all 0.3s ease',
-                      boxShadow: isActive ? `0 4px 12px ${colors.brandRed}40` : 'none',
+                      border: `2px solid ${isActive ? colors.brandRed : '#E2E8F0'}`,
+                      transition: 'all 0.25s ease',
+                      boxShadow: isActive ? `0 4px 14px ${colors.brandRed}35` : '0 1px 4px rgba(0,0,0,0.06)',
                     }}
                   >
                     {isActive && (
@@ -1414,10 +1612,11 @@ const FixtureDetailsPage = () => {
                     variant="caption"
                     sx={{
                       fontWeight: isActive ? 700 : 500,
-                      color: isActive ? colors.brandRed : colors.textSecondary,
+                      color: isActive ? colors.brandBlack : colors.textSecondary,
                       fontSize: '11px',
                       textAlign: 'center',
-                      transition: 'all 0.3s ease',
+                      letterSpacing: '0.02em',
+                      transition: 'all 0.25s ease',
                     }}
                   >
                     {step.label}
@@ -1433,22 +1632,26 @@ const FixtureDetailsPage = () => {
           mt: 2, 
           p: 2, 
           borderRadius: '12px', 
-          bgcolor: selectedFlowStatus === 'predictionOpen' ? '#E3F2FD' :
-                   selectedFlowStatus === 'predictionLock' ? '#FFF4E6' :
-                   selectedFlowStatus === 'live' ? '#FFE5E5' :
-                   selectedFlowStatus === 'resultPending' || selectedFlowStatus === 'resultsProcessing' || selectedFlowStatus === 'pending' ? '#FFF4E6' :
-                   selectedFlowStatus === 'completed' ? '#ECFDF5' : '#F3F4F6',
+          border: '1px solid',
+          borderColor: selectedFlowStatus === 'predictionOpen' ? '#BFDBFE' :
+                       selectedFlowStatus === 'predictionLock' ? '#FED7AA' :
+                       selectedFlowStatus === 'live' ? '#FECACA' :
+                       selectedFlowStatus === 'completed' || selectedFlowStatus === 'resultPending' || selectedFlowStatus === 'resultsProcessing' || selectedFlowStatus === 'pending' ? '#A7F3D0' : '#E5E7EB',
+          bgcolor: selectedFlowStatus === 'predictionOpen' ? '#EFF6FF' :
+                   selectedFlowStatus === 'predictionLock' ? '#FFFBEB' :
+                   selectedFlowStatus === 'live' ? '#FEF2F2' :
+                   selectedFlowStatus === 'completed' || selectedFlowStatus === 'resultPending' || selectedFlowStatus === 'resultsProcessing' || selectedFlowStatus === 'pending' ? '#ECFDF5' : '#F9FAFB',
           textAlign: 'center',
         }}>
           <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack }}>
             Status: <span style={{ color: colors.brandRed, textTransform: 'uppercase' }}>
-              {fixture?.status || 'N/A'}
+              {['resultsProcessing', 'resultPending', 'pending'].includes(fixture?.status) ? 'COMPLETED' : (fixture?.status || 'N/A')}
             </span>
             {fixture?.matchStatus && fixture.matchStatus !== fixture?.status && (
               <>
                 <br />
                 Match Flow: <span style={{ color: colors.brandRed, textTransform: 'uppercase' }}>
-                  {fixture.matchStatus}
+                  {['resultsProcessing', 'resultPending', 'pending'].includes(fixture?.matchStatus) ? 'COMPLETED' : fixture.matchStatus}
                 </span>
               </>
             )}
@@ -1531,6 +1734,14 @@ const FixtureDetailsPage = () => {
                 </Typography>
               </Box>
             )}
+            {/* Match status at bottom of card */}
+            <Box sx={{ mt: 3, pt: 2, borderTop: `1px solid ${colors.divider}`, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+              <Chip
+                label={matchStatusDisplay}
+                size="small"
+                sx={{ fontWeight: 600, ...statusChipColor }}
+              />
+            </Box>
           </Card>
 
           {/* Predictions List */}
@@ -1569,36 +1780,53 @@ const FixtureDetailsPage = () => {
                 {
                   id: 'prediction',
                   label: 'Prediction',
-                  render: (_, row) => <Typography variant="body2" fontWeight={600}>{row.prediction}</Typography>
+                  render: (_, row) => {
+                    const byLabel = row.displayByLabel || {};
+                    const entries = Object.entries(byLabel).filter(([, v]) => v != null && v !== '');
+                    if (entries.length === 0) return <Typography variant="body2" fontWeight={600}>—</Typography>;
+                    return (
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                        {entries.map(([label, value]) => (
+                          <Typography key={label} variant="body2" sx={{ fontWeight: 500 }}>
+                            <Box component="span" sx={{ fontWeight: 700, color: colors.textSecondary, mr: 0.5 }}>{label}:</Box>
+                            {value}
+                          </Typography>
+                        ))}
+                      </Box>
+                    );
+                  }
                 },
                 {
-                  id: 'status',
-                  label: 'Fixture Flow Status',
+                  id: 'sp',
+                  label: 'Result & SP',
                   render: (_, row) => {
-                    const pStatus = row.status || 'ongoing';
-                    let label = 'Unknown';
-                    let color = 'default';
-                    let icon = AccessTime;
-
-                    if (pStatus === 'won') { label = 'WON'; color = 'success'; icon = CheckCircle; }
-                    else if (pStatus === 'lost') { label = 'LOST'; color = 'error'; icon = CheckCircle; }
-                    else {
-                      const fStatus = fixture.status || 'scheduled';
-                      if (fStatus === 'scheduled') { label = 'Open'; color = 'info'; }
-                      else if (fStatus === 'live') { label = 'Locked / Live'; color = 'warning'; icon = Lock; }
-                      else if (fStatus === 'completed' || fStatus === 'resultsProcessing') { label = 'Awaiting Settlement'; color = 'warning'; icon = HourglassEmpty; }
-                      else { label = 'Open'; color = 'info'; }
-                    }
-
+                    const sp = row.points != null ? row.points : (row.spAwarded != null ? row.spAwarded : 0);
+                    const statusLabel = row.status === 'correct' ? 'Correct' : row.status === 'incorrect' ? 'Incorrect' : row.status === 'partial' ? 'Partial' : 'Pending';
+                    const evaluated = row.status === 'correct' || row.status === 'incorrect' || row.status === 'partial';
+                    const stats = [
+                      { label: 'Score', ok: row.scorelineCorrect },
+                      { label: 'FPTS', ok: row.firstPlayerCorrect },
+                      { label: 'GR', ok: row.goalRangeCorrect },
+                      { label: 'FGM', ok: row.firstGoalMinutesCorrect },
+                    ];
                     return (
-                      <Chip
-                        icon={<Box component={icon} sx={{ fontSize: '14px !important' }} />}
-                        label={label}
-                        size="small"
-                        color={color === 'default' ? 'default' : color}
-                        variant={color === 'default' ? 'outlined' : 'filled'}
-                        sx={{ fontWeight: 700, height: 24, fontSize: 11 }}
-                      />
+                      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 0.75 }}>
+                        <Typography variant="body2" fontWeight={700} sx={{ color: sp > 0 ? colors.brandRed : colors.textSecondary }}>
+                          {sp} SP
+                        </Typography>
+                        <Typography variant="caption" fontWeight={600} sx={{ color: row.status === 'correct' ? 'success.main' : row.status === 'incorrect' ? 'error.main' : row.status === 'partial' ? 'warning.main' : 'text.secondary' }}>
+                          {statusLabel}
+                        </Typography>
+                        {evaluated && (
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.25 }}>
+                            {stats.map(({ label, ok }) => (
+                              <Typography key={label} variant="caption" sx={{ color: ok === true ? 'success.main' : ok === false ? 'error.main' : 'text.secondary' }}>
+                                {label} {ok === true ? '✓' : ok === false ? '✗' : '—'}
+                              </Typography>
+                            ))}
+                          </Box>
+                        )}
+                      </Box>
                     );
                   }
                 }
@@ -1611,125 +1839,6 @@ const FixtureDetailsPage = () => {
               onRowsPerPageChange={(e) => setRowsPerPage(e.target.value)}
               emptyMessage="No predictions found"
             />
-          </Card>
-        </Grid>
-
-        {/* Right Sidebar: Timeline & Actions */}
-        <Grid item xs={12} md={4}>
-          {/* Admin Actions */}
-          <Card sx={{ borderRadius: '20px', p: 3, mb: 3, bgcolor: '#FFF8F6', border: `1px solid ${colors.brandRed}20` }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 2, color: colors.brandRed }}>Admin Actions</Typography>
-            
-            {isApproved && (
-              <Alert severity="success" sx={{ mb: 2, borderRadius: '8px' }}>
-                <Typography variant="body2" sx={{ fontWeight: 600, fontSize: 13 }}>
-                  Match Details Approved
-                </Typography>
-              </Alert>
-            )}
-
-            <Button 
-              fullWidth 
-              variant="contained" 
-              disabled={isApproved}
-              startIcon={<CheckCircle />}
-              onClick={handleApproveMatch}
-              sx={{ 
-                mb: 1, 
-                bgcolor: colors.brandRed, 
-                textTransform: 'none',
-                fontWeight: 600,
-                '&:hover': { bgcolor: colors.brandDarkRed },
-                '&.Mui-disabled': {
-                  bgcolor: colors.divider,
-                  color: colors.textSecondary,
-                }
-              }}
-            >
-              {isApproved ? 'Match Details Approved' : 'Approve Match Details'}
-            </Button>
-
-            {/* End Match Button (only show when match is live - backend requirement) */}
-            {fixture?.status === 'live' && (
-              <Button 
-                fullWidth 
-                variant="outlined" 
-                startIcon={<StopCircle />}
-                onClick={handleEndMatch}
-                sx={{
-                  mb: 1,
-                  borderColor: colors.warning,
-                  color: colors.warning,
-                  textTransform: 'none',
-                  fontWeight: 600,
-                  '&:hover': {
-                    borderColor: colors.warning,
-                    bgcolor: `${colors.warning}14`,
-                  }
-                }}
-              >
-                End Match
-              </Button>
-            )}
-
-            {/* Update Score Button (only show when match is ended - resultsProcessing or completed) */}
-            {(fixture?.status === 'resultsProcessing' || fixture?.status === 'completed' || fixture?.status === 'resultPending') && (
-              <Button 
-                fullWidth 
-                variant="outlined" 
-                color="error"
-                startIcon={<Save />}
-                onClick={handleOpenScoreDialog}
-                sx={{
-                  textTransform: 'none',
-                  fontWeight: 600,
-                }}
-              >
-                Update Score
-              </Button>
-            )}
-          </Card>
-
-          {/* Key Events Timeline */}
-          <Card sx={{ borderRadius: '20px', p: 3 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700, mb: 2 }}>Match Timeline</Typography>
-            <Box sx={{ position: 'relative', pl: 2, borderLeft: `2px solid ${colors.divider}` }}>
-              {((() => {
-                const homeTeamName = typeof fixture?.homeTeam === 'string' ? fixture.homeTeam : (fixture?.homeTeam?.team_name || fixture?.homeTeam?.name || 'Home Team');
-                const awayTeamName = typeof fixture?.awayTeam === 'string' ? fixture.awayTeam : (fixture?.awayTeam?.team_name || fixture?.awayTeam?.name || 'Away Team');
-                if (fixture?.timeline && Array.isArray(fixture.timeline) && fixture.timeline.length > 0) {
-                  const mapped = fixture.timeline.map(ev => ({
-                    min: String(ev.minute ?? ev.min ?? ''),
-                    event: String(ev.event ?? ''),
-                    detail: String(ev.detail ?? ''),
-                    color: ev.type === 'goal' ? colors.info : ev.type === 'card' ? colors.warning : ev.type === 'fulltime' ? colors.success : colors.brandRed
-                  }));
-                  mapped.sort((a, b) => (parseInt(a.min, 10) || 0) - (parseInt(b.min, 10) || 0));
-                  return mapped;
-                }
-                if (fixture?.status === 'live' || fixture?.status === 'completed') {
-                  return [
-                    { min: '0', event: 'Kickoff', detail: '', color: colors.brandRed },
-                    { min: '90', event: 'Full Time', detail: fixture?.status === 'completed' && fixture?.homeScore != null && fixture?.awayScore != null ? `${fixture.homeScore}-${fixture.awayScore}` : '', color: colors.success },
-                  ];
-                }
-                const timelineEvents = [
-                  { min: '', event: 'Match Scheduled', detail: fixture?.kickoffTime && !isNaN(new Date(fixture.kickoffTime).getTime()) ? format(new Date(fixture.kickoffTime), 'MMM dd, yyyy HH:mm') : '', color: colors.info },
-                ];
-                const fixtureStatus = fixture?.status || fixture?.matchStatus || '';
-                if (fixtureStatus === 'published' || fixtureStatus === 'predictionOpen') {
-                  timelineEvents.push({ min: '', event: 'Predictions Open', detail: `${predictions.length || 0} predictions made`, color: colors.success });
-                }
-                return timelineEvents;
-              })()).map((ev, i) => (
-                <Box key={i} sx={{ mb: 3, position: 'relative' }}>
-                  <Box sx={{ position: 'absolute', left: -21, top: 0, width: 10, height: 10, borderRadius: '50%', bgcolor: ev.color }} />
-                  {ev.min && <Typography variant="caption" sx={{ color: colors.textSecondary, fontWeight: 700 }}>{String(ev.min)}'</Typography>}
-                  <Typography variant="body2" fontWeight={600} sx={{ color: colors.brandBlack }}>{String(ev.event)}</Typography>
-                  {ev.detail && <Typography variant="caption" sx={{ color: colors.textSecondary }}>{String(ev.detail)}</Typography>}
-                </Box>
-              ))}
-            </Box>
           </Card>
         </Grid>
       </Grid>
@@ -1829,7 +1938,7 @@ const FixtureDetailsPage = () => {
             This will change the match status to <strong>"Full Time (Results Processing)"</strong> without uploading the final score yet.
           </Typography>
           <Typography variant="body2" sx={{ color: colors.textSecondary }}>
-            The match will move to the "Result Pending" state in the flow. You can return later to upload the final score and complete the match.
+            The match will be marked as ended. You can return later to upload the final score and complete the match.
           </Typography>
         </DialogContent>
         <DialogActions sx={{ p: 3, pt: 0 }}>

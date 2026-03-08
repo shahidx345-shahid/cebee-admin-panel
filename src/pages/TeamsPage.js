@@ -40,7 +40,7 @@ import {
   People,
   ExpandMore,
 } from '@mui/icons-material';
-import { colors } from '../config/theme';
+import { colors, constants } from '../config/theme';
 import SearchBar from '../components/common/SearchBar';
 import DataTable from '../components/common/DataTable';
 import { format } from 'date-fns';
@@ -1210,7 +1210,7 @@ const TeamsPage = () => {
         */}
         <MenuItem
           onClick={() => {
-            navigate(`/teams/${selectedTeam.team_id || selectedTeam.id}/players`);
+            navigate(`${constants.routes.apiSync}/team/${selectedTeam.team_id || selectedTeam.id}`);
             handleMenuClose();
           }}
           sx={{

@@ -16,6 +16,7 @@ import {
   Chip,
   InputAdornment,
   Autocomplete,
+  IconButton,
 } from '@mui/material';
 import {
   Save,
@@ -33,6 +34,7 @@ import {
   RadioButtonUnchecked,
   Info,
   ExpandMore,
+  Close,
 } from '@mui/icons-material';
 import { colors, constants } from '../config/theme';
 import { DateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
@@ -949,11 +951,14 @@ const FixtureFormPage = () => {
             </Alert>
           )}
 
-          {/* Previous CMds List */}
+          {/* Previous CMds List (display only; completed CMds cannot be switched to) */}
           {cmds.filter(cmd => cmd.status === 'completed').length > 0 && (
             <Box sx={{ mb: 2 }}>
-              <Typography variant="body2" sx={{ fontWeight: 600, mb: 1, color: colors.textSecondary }}>
+              <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5, color: colors.textSecondary }}>
                 Previous CMds
+              </Typography>
+              <Typography variant="caption" sx={{ display: 'block', mb: 1, color: colors.textSecondary, opacity: 0.9 }}>
+                For reference only. Completed CMds cannot be reactivated.
               </Typography>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                 {cmds
@@ -961,24 +966,20 @@ const FixtureFormPage = () => {
                   .map((cmd) => (
                     <Box
                       key={cmd.id}
-                      onClick={() => handleSelectCmd(cmd.id)}
                       sx={{
                         p: 2,
                         borderRadius: '8px',
                         backgroundColor: colors.brandWhite,
                         border: `1px solid ${colors.divider}`,
-                        cursor: 'pointer',
+                        cursor: 'default',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
-                        '&:hover': {
-                          borderColor: colors.brandRed,
-                          backgroundColor: `${colors.brandRed}05`,
-                        },
+                        opacity: 0.85,
                       }}
                     >
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                        <RadioButtonUnchecked sx={{ fontSize: 18, color: colors.textSecondary }} />
+                        <RadioButtonUnchecked sx={{ fontSize: 18, color: colors.textSecondary, opacity: 0.6 }} />
                         <Box>
                           <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack }}>
                             {cmd.name}
@@ -1016,9 +1017,25 @@ const FixtureFormPage = () => {
                 mt: 2,
               }}
             >
-              <Typography variant="body1" sx={{ fontWeight: 700, mb: 2, color: colors.brandBlack }}>
-                Create New CMd
-              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                <Typography variant="body1" sx={{ fontWeight: 700, color: colors.brandBlack }}>
+                  Create New CMd
+                </Typography>
+                <IconButton
+                  size="small"
+                  onClick={() => setShowNewCmdForm(false)}
+                  aria-label="Close Create CMd form"
+                  sx={{
+                    color: colors.textSecondary,
+                    '&:hover': {
+                      backgroundColor: `${colors.brandRed}15`,
+                      color: colors.brandRed,
+                    },
+                  }}
+                >
+                  <Close sx={{ fontSize: 22 }} />
+                </IconButton>
+              </Box>
               <Grid container spacing={2}>
                 <Grid item xs={12}>
                   <TextField
@@ -1111,13 +1128,25 @@ const FixtureFormPage = () => {
           )}
         </Card>
 
-        {/* Feature Type Section */}
+        {/* Feature Type Section — Category: CeBee or Community */}
         <Card sx={{ padding: 3, borderRadius: '16px', mb: 3 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-            <Star sx={{ fontSize: 20, color: colors.brandRed }} />
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>
-              Feature Type
-            </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Star sx={{ fontSize: 20, color: colors.brandRed }} />
+              <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                Feature Type
+              </Typography>
+            </Box>
+            <Chip
+              label={`Category: ${featureType === 'cebee' ? 'CeBee Featured' : 'Community Featured'}`}
+              size="small"
+              sx={{
+                fontWeight: 700,
+                backgroundColor: featureType === 'cebee' ? `${colors.brandRed}18` : `${colors.brandRed}18`,
+                color: colors.brandRed,
+                border: `1px solid ${colors.brandRed}40`,
+              }}
+            />
           </Box>
           <Grid container spacing={2}>
             <Grid item xs={12} md={6}>
@@ -1226,30 +1255,41 @@ const FixtureFormPage = () => {
           <Card
             sx={{
               padding: 3,
-              borderRadius: '16px',
+              borderRadius: '20px',
               mb: 3,
               border: `1px solid ${colors.divider || '#eee'}`,
-              boxShadow: '0 2px 12px rgba(0,0,0,0.04)',
-              background: `linear-gradient(180deg, ${colors.brandWhite} 0%, ${colors.brandRed ? `${colors.brandRed}04` : '#fafafa'} 100%)`,
+              boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
+              background: `linear-gradient(180deg, ${colors.brandWhite} 0%, ${colors.brandRed ? `${colors.brandRed}06` : '#fafafa'} 100%)`,
+              overflow: 'hidden',
             }}
           >
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 1 }}>
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.5,
+                mb: 2,
+                pb: 2,
+                borderBottom: `2px solid ${colors.brandRed ? `${colors.brandRed}20` : '#eee'}`,
+              }}
+            >
               <Box
                 sx={{
-                  width: 40,
-                  height: 40,
+                  width: 44,
+                  height: 44,
                   borderRadius: '12px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed || colors.brandRed} 100%)`,
                   color: colors.brandWhite,
+                  boxShadow: `0 4px 12px ${colors.brandRed}40`,
                 }}
               >
-                <EventIcon sx={{ fontSize: 22 }} />
+                <EventIcon sx={{ fontSize: 24 }} />
               </Box>
               <Box>
-                <Typography variant="h6" sx={{ fontWeight: 700, color: colors.brandBlack, lineHeight: 1.3 }}>
+                <Typography variant="h6" sx={{ fontWeight: 700, color: colors.brandBlack, lineHeight: 1.3, letterSpacing: '-0.02em' }}>
                   Competition & Fixture
                 </Typography>
                 <Typography variant="body2" sx={{ color: colors.textSecondary, mt: 0.25 }}>
@@ -1262,6 +1302,61 @@ const FixtureFormPage = () => {
                 <Typography variant="caption" sx={{ display: 'block', mb: 0.75, color: colors.textSecondary, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                   Step 1 — League
                 </Typography>
+                {leaguesTotal > 0 && (
+                  <Box
+                    sx={{
+                      mb: 2,
+                      p: 1.5,
+                      borderRadius: '12px',
+                      backgroundColor: `${colors.brandRed}08`,
+                      border: `1px solid ${colors.brandRed}25`,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 2,
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                      <Box sx={{ px: 1.5, py: 0.5, borderRadius: '10px', backgroundColor: colors.brandWhite, border: `1px solid ${colors.brandRed}30`, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+                        <Typography variant="body2" sx={{ fontWeight: 700, color: colors.brandRed }}>
+                          {leagues.length.toLocaleString()} / {leaguesTotal.toLocaleString()} leagues
+                        </Typography>
+                      </Box>
+                      {leaguesTotal > 0 && (
+                        <Box sx={{ width: 72, height: 6, borderRadius: 3, backgroundColor: `${colors.brandRed}20`, overflow: 'hidden' }}>
+                          <Box
+                            sx={{
+                              width: `${Math.min(100, (leagues.length / leaguesTotal) * 100)}%`,
+                              height: '100%',
+                              borderRadius: 3,
+                              background: `linear-gradient(90deg, ${colors.brandRed} 0%, ${colors.brandDarkRed || colors.brandRed} 100%)`,
+                              transition: 'width 0.25s ease',
+                            }}
+                          />
+                        </Box>
+                      )}
+                    </Box>
+                    {leaguesPage < leaguesTotalPages && (
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        endIcon={leaguesLoadingMore ? null : <ExpandMore />}
+                        onClick={loadMoreLeagues}
+                        disabled={leaguesLoadingMore}
+                        sx={{
+                          textTransform: 'none',
+                          fontWeight: 600,
+                          borderRadius: '10px',
+                          borderColor: colors.brandRed,
+                          color: colors.brandRed,
+                          '&:hover': { borderColor: colors.brandDarkRed, backgroundColor: `${colors.brandRed}0C` },
+                        }}
+                      >
+                        {leaguesLoadingMore ? 'Loading…' : 'Load more'}
+                      </Button>
+                    )}
+                  </Box>
+                )}
                 <Autocomplete
                   fullWidth
                   options={leagues}
@@ -1292,32 +1387,6 @@ const FixtureFormPage = () => {
                     </Box>
                   )}
                 />
-                {leaguesTotal > 0 && (
-                  <Box sx={{ mt: 1.5, display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
-                    <Chip
-                      size="small"
-                      label={`${leagues.length} / ${leaguesTotal} leagues`}
-                      sx={{
-                        borderRadius: '8px',
-                        fontWeight: 600,
-                        backgroundColor: `${colors.brandRed}12`,
-                        color: colors.brandRed,
-                      }}
-                    />
-                    {leaguesPage < leaguesTotalPages && (
-                      <Button
-                        size="small"
-                        variant="text"
-                        endIcon={leaguesLoadingMore ? null : <ExpandMore />}
-                        onClick={loadMoreLeagues}
-                        disabled={leaguesLoadingMore}
-                        sx={{ textTransform: 'none', fontWeight: 600, color: colors.brandRed, '&:hover': { backgroundColor: `${colors.brandRed}0C` } }}
-                      >
-                        {leaguesLoadingMore ? 'Loading…' : 'Load more leagues'}
-                      </Button>
-                    )}
-                  </Box>
-                )}
               </Grid>
               <Grid item xs={12} md={3}>
                 <Typography variant="caption" sx={{ display: 'block', mb: 0.75, color: colors.textSecondary, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
@@ -1429,12 +1498,48 @@ const FixtureFormPage = () => {
         )}
 
         {/* Team Details Section */}
-        <Card sx={{ padding: 3, borderRadius: '16px', mb: 3 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-            <Stadium sx={{ fontSize: 20, color: colors.brandRed }} />
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>
-              Team Details
-            </Typography>
+        <Card
+          sx={{
+            padding: 3,
+            borderRadius: '20px',
+            mb: 3,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
+            border: `1px solid ${colors.divider || '#eee'}`,
+            overflow: 'hidden',
+          }}
+        >
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1.5,
+              mb: 2.5,
+              pb: 2,
+              borderBottom: `2px solid ${colors.brandRed ? `${colors.brandRed}20` : '#f0f0f0'}`,
+            }}
+          >
+            <Box
+              sx={{
+                width: 44,
+                height: 44,
+                borderRadius: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed || colors.brandRed} 100%)`,
+                boxShadow: `0 4px 12px ${colors.brandRed}40`,
+              }}
+            >
+              <Stadium sx={{ fontSize: 24, color: colors.brandWhite }} />
+            </Box>
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: colors.brandBlack, letterSpacing: '-0.02em' }}>
+                Team Details
+              </Typography>
+              <Typography variant="body2" sx={{ color: colors.textSecondary, mt: 0.25 }}>
+                Teams, matchday & venue
+              </Typography>
+            </Box>
           </Box>
 
           {/* Info Banner */}
@@ -1442,9 +1547,10 @@ const FixtureFormPage = () => {
             icon={<CheckCircle sx={{ color: colors.success }} />}
             sx={{
               mb: 3,
-              backgroundColor: `${colors.success}15`,
-              border: `1px solid ${colors.success}33`,
+              backgroundColor: `${colors.success}12`,
+              border: `1px solid ${colors.success}40`,
               borderRadius: '12px',
+              boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
               '& .MuiAlert-icon': {
                 color: colors.success,
               },
@@ -1463,30 +1569,21 @@ const FixtureFormPage = () => {
             {featureType === 'cebee' && selectedApiFixture ? (
               <Grid item xs={12}>
                 <Box
-                sx={{
+                  sx={{
                     p: 2.5,
-                    borderRadius: '12px',
+                    borderRadius: '16px',
                     backgroundColor: `${colors.success}0C`,
-                    border: `1px solid ${colors.success}30`,
+                    border: `1px solid ${colors.success}40`,
+                    boxShadow: '0 2px 12px rgba(0,0,0,0.04)',
                   }}
                 >
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                    <CheckCircle sx={{ color: colors.success, fontSize: 22 }} />
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+                    <Box sx={{ width: 36, height: 36, borderRadius: '10px', backgroundColor: `${colors.success}25`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <CheckCircle sx={{ color: colors.success, fontSize: 20 }} />
+                    </Box>
                     <Typography variant="subtitle2" sx={{ fontWeight: 700, color: colors.success }}>
                       Auto-filled from selected fixture
                     </Typography>
-                            <Chip
-                              size="small"
-                      label="From API"
-                              sx={{
-                        ml: 1,
-                        borderRadius: '8px',
-                        fontWeight: 600,
-                        backgroundColor: colors.brandWhite,
-                        color: colors.textSecondary,
-                        border: `1px solid ${colors.divider || '#eee'}`,
-                      }}
-                    />
                   </Box>
                   <Grid container spacing={2}>
                     <Grid item xs={12} sm={6} md={3}>
@@ -1542,6 +1639,88 @@ const FixtureFormPage = () => {
               </Grid>
             ) : (
             <>
+            {featureType !== 'cebee' && (
+            <Grid item xs={12}>
+              {leaguesTotal > 0 && (
+                <Box
+                  sx={{
+                    mb: 2,
+                    p: 1.5,
+                    borderRadius: '12px',
+                    backgroundColor: `${colors.brandRed}08`,
+                    border: `1px solid ${colors.brandRed}25`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 2,
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                    <Box sx={{ px: 1.5, py: 0.5, borderRadius: '10px', backgroundColor: colors.brandWhite, border: `1px solid ${colors.brandRed}30`, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+                      <Typography variant="body2" sx={{ fontWeight: 700, color: colors.brandRed }}>
+                        {leagues.length.toLocaleString()} / {leaguesTotal.toLocaleString()} leagues
+                      </Typography>
+                    </Box>
+                    {leaguesTotal > 0 && (
+                      <Box sx={{ width: 72, height: 6, borderRadius: 3, backgroundColor: `${colors.brandRed}20`, overflow: 'hidden' }}>
+                        <Box
+                          sx={{
+                            width: `${Math.min(100, (leagues.length / leaguesTotal) * 100)}%`,
+                            height: '100%',
+                            borderRadius: 3,
+                            background: `linear-gradient(90deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
+                            transition: 'width 0.25s ease',
+                          }}
+                        />
+                      </Box>
+                    )}
+                  </Box>
+                  {leaguesPage < leaguesTotalPages && (
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      endIcon={leaguesLoadingMore ? null : <ExpandMore />}
+                      onClick={loadMoreLeagues}
+                      disabled={leaguesLoadingMore}
+                      sx={{
+                        textTransform: 'none',
+                        fontWeight: 600,
+                        borderRadius: '10px',
+                        borderColor: colors.brandRed,
+                        color: colors.brandRed,
+                        '&:hover': { borderColor: colors.brandDarkRed, backgroundColor: `${colors.brandRed}0C` },
+                      }}
+                    >
+                      {leaguesLoadingMore ? 'Loading…' : 'Load more'}
+                    </Button>
+                  )}
+                </Box>
+              )}
+              <Autocomplete
+                fullWidth
+                options={leagues}
+                getOptionLabel={(opt) => (opt && opt.country ? `${opt.name} (${opt.country})` : (opt?.name || ''))}
+                value={leagues.find((l) => String(l?.id) === String(formData.leagueId)) || null}
+                onChange={(_, newValue) => handleChange('leagueId', newValue?.id ?? '')}
+                isOptionEqualToValue={(opt, val) => opt && val && String(opt.id) === String(val.id)}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                  label="League *"
+                    placeholder="Search leagues..."
+                    required
+                    sx={{ '& .MuiOutlinedInput-root': { borderRadius: '12px' } }}
+                  />
+                )}
+                renderOption={(props, league) => (
+                  <Box component="li" {...props} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Stadium sx={{ fontSize: 18, color: colors.brandRed }} />
+                    {league.country ? `${league.name} (${league.country})` : league.name}
+                  </Box>
+                )}
+              />
+            </Grid>
+            )}
             <Grid item xs={12} md={6}>
               <Autocomplete
                 fullWidth
@@ -1635,31 +1814,32 @@ const FixtureFormPage = () => {
                 </Typography>
               )}
             </Grid>
-            {featureType === 'community' && (
+            {(featureType === 'cebee' || featureType === 'community') && (
             <Grid item xs={12} md={6}>
               <TextField
                 fullWidth
                 required
-                  label="Matchday *"
-                  value={formData.matchday || ''}
+                label="Matchday *"
+                value={featureType === 'cebee'
+                  ? (currentCmd?.name || cmds.find((c) => (c.id || c._id) === formData.cmdId)?.name || '')
+                  : (formData.matchday || '')}
                 InputProps={{
-                    readOnly: true,
-                  }}
-                  helperText="Automatically set from selected CMd"
+                  readOnly: true,
+                }}
                 sx={{
-                    borderRadius: '12px',
+                  borderRadius: '12px',
                   '& .MuiOutlinedInput-root': {
                     borderRadius: '12px',
-                      backgroundColor: colors.brandWhite,
-                    },
-                    '& .MuiInputBase-input': {
-                      cursor: 'default',
+                    backgroundColor: colors.brandWhite,
+                  },
+                  '& .MuiInputBase-input': {
+                    cursor: 'default',
                   },
                 }}
               />
             </Grid>
             )}
-            <Grid item xs={12} md={featureType === 'community' ? 6 : 12}>
+            <Grid item xs={12} md={featureType === 'cebee' || featureType === 'community' ? 6 : 12}>
               <Autocomplete
                 fullWidth
                 value={STADIUM_OPTIONS.find((o) => o.value === (formData.venue || 'other')) || STADIUM_OPTIONS[0]}
@@ -1685,95 +1865,52 @@ const FixtureFormPage = () => {
                 slotProps={{ paper: { sx: { borderRadius: '12px', mt: 1 } } }}
               />
             </Grid>
-            {featureType !== 'cebee' && (
-            <Grid item xs={12}>
-              <Autocomplete
-                fullWidth
-                options={leagues}
-                getOptionLabel={(opt) => (opt && opt.country ? `${opt.name} (${opt.country})` : (opt?.name || ''))}
-                value={leagues.find((l) => String(l?.id) === String(formData.leagueId)) || null}
-                onChange={(_, newValue) => handleChange('leagueId', newValue?.id ?? '')}
-                isOptionEqualToValue={(opt, val) => opt && val && String(opt.id) === String(val.id)}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                  label="League *"
-                    placeholder="Search leagues..."
-                    required
-                    sx={{ '& .MuiOutlinedInput-root': { borderRadius: '12px' } }}
-                  />
-                )}
-                renderOption={(props, league) => (
-                  <Box component="li" {...props} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Stadium sx={{ fontSize: 18, color: colors.brandRed }} />
-                    {league.country ? `${league.name} (${league.country})` : league.name}
-                  </Box>
-                )}
-              />
-              {leaguesTotal > 0 && (
-                <Box
-                  sx={{
-                    mt: 2,
-                    pt: 2,
-                    borderTop: '1px solid rgba(0,0,0,0.08)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 2,
-                    flexWrap: 'wrap',
-                  }}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                    <Box sx={{ px: 1.5, py: 0.5, borderRadius: '10px', backgroundColor: '#F5F5F5' }}>
-                      <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack }}>
-                        {leagues.length.toLocaleString()} / {leaguesTotal.toLocaleString()} leagues
-                      </Typography>
-                      </Box>
-                    {leaguesTotal > 0 && (
-                      <Box sx={{ width: 80, height: 6, borderRadius: 3, backgroundColor: '#E5E7EB', overflow: 'hidden' }}>
-                        <Box
-                          sx={{
-                            width: `${Math.min(100, (leagues.length / leaguesTotal) * 100)}%`,
-                            height: '100%',
-                            borderRadius: 3,
-                            background: `linear-gradient(90deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
-                            transition: 'width 0.25s ease',
-                          }}
-                        />
-                      </Box>
-                    )}
-                  </Box>
-                  {leaguesPage < leaguesTotalPages && (
-                    <Button
-                      size="small"
-                      variant="text"
-                      endIcon={leaguesLoadingMore ? null : <ExpandMore />}
-                      onClick={loadMoreLeagues}
-                      disabled={leaguesLoadingMore}
-                      sx={{
-                        textTransform: 'none',
-                        fontWeight: 600,
-                        color: colors.brandRed,
-                        '&:hover': { backgroundColor: `${colors.brandRed}0C` },
-                      }}
-                    >
-                      {leaguesLoadingMore ? 'Loading…' : 'Load more leagues'}
-                    </Button>
-                  )}
-                </Box>
-              )}
-            </Grid>
-            )}
             </> )}
           </Grid>
         </Card>
 
         {/* Kickoff Schedule Section */}
-        <Card sx={{ padding: 3, borderRadius: '16px', mb: 3 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-            <CalendarToday sx={{ fontSize: 20, color: colors.brandRed }} />
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>
-              Schedule
-            </Typography>
+        <Card
+          sx={{
+            padding: 3,
+            borderRadius: '20px',
+            mb: 3,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
+            border: `1px solid ${colors.divider || '#eee'}`,
+          }}
+        >
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1.5,
+              mb: 2.5,
+              pb: 2,
+              borderBottom: `2px solid ${colors.brandRed ? `${colors.brandRed}20` : '#f0f0f0'}`,
+            }}
+          >
+            <Box
+              sx={{
+                width: 44,
+                height: 44,
+                borderRadius: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed || colors.brandRed} 100%)`,
+                boxShadow: `0 4px 12px ${colors.brandRed}40`,
+              }}
+            >
+              <CalendarToday sx={{ fontSize: 24, color: colors.brandWhite }} />
+            </Box>
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: colors.brandBlack, letterSpacing: '-0.02em' }}>
+                Schedule
+              </Typography>
+              <Typography variant="body2" sx={{ color: colors.textSecondary, mt: 0.25 }}>
+                Publish & kickoff times
+              </Typography>
+            </Box>
           </Box>
           <Grid container spacing={2} alignItems="center">
             <Grid item xs={12} md={6}>

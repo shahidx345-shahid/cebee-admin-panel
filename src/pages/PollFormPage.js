@@ -77,7 +77,7 @@ const PollFormPage = () => {
 
   const [formData, setFormData] = useState({
     leagueId: '',
-    season: new Date().getFullYear(),
+    season: 2025,
     startTime: new Date(),
     closeTime: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), // 2 days default
   });
@@ -749,8 +749,8 @@ const PollFormPage = () => {
                     type="number"
                     value={formData.season ?? ''}
                     onChange={(e) => {
-                      const v = e.target.value ? parseInt(e.target.value, 10) : new Date().getFullYear();
-                      handleChange('season', Number.isNaN(v) ? new Date().getFullYear() : v);
+                      const v = e.target.value ? parseInt(e.target.value, 10) : 2025;
+                      handleChange('season', Number.isNaN(v) ? 2025 : v);
                     }}
                     inputProps={{ min: 2020, max: 2030 }}
                     sx={{

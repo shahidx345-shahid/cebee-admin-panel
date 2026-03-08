@@ -1,9 +1,9 @@
 /**
- * League Detail – Data Browser. Tabs: Overview, Teams, Fixtures, Results, Standings. Sync buttons per section.
+ * League Detail – Data Browser. Tabs: Overview, Standings, Teams, Fixtures, Results (sync order). Sync buttons per section.
  */
 
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -34,6 +34,7 @@ import {
   AccordionSummary,
   AccordionDetails,
 } from '@mui/material';
+import ArrowBack from '@mui/icons-material/ArrowBack';
 import NavigateNext from '@mui/icons-material/NavigateNext';
 import Search from '@mui/icons-material/Search';
 import Sync from '@mui/icons-material/Sync';
@@ -66,6 +67,7 @@ const TAB_RESULTS = 'results';
 const TAB_STANDINGS = 'standings';
 const ROWS_PER_PAGE_OPTIONS = [10, 25, 50, 100];
 const currentSeason = new Date().getFullYear();
+const DEFAULT_SEASON_TEAMS_AND_STANDINGS = 2025; // Teams & Standings tabs default; other tabs use current season (e.g. 2026)
 const SEASON_MIN = 2020;
 const SEASON_MAX = currentSeason + 1;
 const seasonOptions = [
@@ -104,18 +106,27 @@ function matchesSearch(str, q) {
   return s.includes(qq) || qq.includes(s);
 }
 
+/** Canonical kickoff date from fixture (backend sends fixture.date from kickoffTime). */
+function getFixtureKickoff(f) {
+  const fixture = f.fixture || f;
+  return fixture?.date ?? f.date ?? f.kickoffTime ?? null;
+}
+
+const KICKOFF_TIMEZONE = 'Etc/GMT-1'; // UTC+1
+
 function formatKickoffShort(dateStr) {
-  if (!dateStr) return '—';
+  if (dateStr == null || dateStr === '') return '—';
   const d = new Date(dateStr);
   if (Number.isNaN(d.getTime())) return '—';
-  const date = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-  const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+  const opts = { timeZone: KICKOFF_TIMEZONE };
+  const date = d.toLocaleDateString('en-GB', { ...opts, day: 'numeric', month: 'short' });
+  const time = d.toLocaleTimeString('en-GB', { ...opts, hour: '2-digit', minute: '2-digit', hour12: false });
   return `${date} • ${time}`;
 }
 
 /** Date key (YYYY-MM-DD) for grouping fixtures/results by day. */
 function getFixtureDateKey(f) {
-  const dateStr = (f.fixture && f.fixture.date) || f.date || f.kickoffTime;
+  const dateStr = getFixtureKickoff(f);
   if (!dateStr) return '';
   const d = new Date(dateStr);
   if (Number.isNaN(d.getTime())) return '';
@@ -143,6 +154,77 @@ function groupFixturesByDate(list, sortNewestFirst = false) {
   return { byDate, dateKeys: keys };
 }
 
+/** Round string from fixture (league.round, fixture.round, or f.round). */
+function getFixtureRound(f) {
+  const r = f.round ?? f.league?.round ?? f.fixture?.round ?? '';
+  return r != null && String(r).trim() !== '' ? String(r).trim() : '';
+}
+
+/** Extract numeric part of round for sorting (e.g. "Regular Season - 30" -> 30). */
+function getRoundSortNumber(roundStr) {
+  if (!roundStr) return -1;
+  const m = String(roundStr).match(/\d+/g);
+  return m && m.length > 0 ? parseInt(m[m.length - 1], 10) : -1;
+}
+
+/** Display label for round (e.g. "ROUND 30", "Gameweek 30"). */
+function formatRoundLabel(roundStr) {
+  if (!roundStr) return '—';
+  const r = String(roundStr).trim();
+  const num = getRoundSortNumber(r);
+  if (num >= 0 && (r === String(num) || r.endsWith(' - ' + num) || r.toLowerCase().includes('gameweek'))) {
+    return r.toLowerCase().includes('gameweek') ? `Gameweek ${num}` : `ROUND ${num}`;
+  }
+  return r || '—';
+}
+
+/** Group fixtures by round. sortNewestFirstWithinRound: true for results, false for fixtures.
+ *  Results: reversed — most recent round first, most recent match first in each round. Fixtures: soonest first. */
+function groupFixturesByRound(list, sortNewestFirstWithinRound = false) {
+  const byRound = {};
+  const getDate = (f) => { const k = getFixtureKickoff(f); return k ? new Date(k).getTime() : 0; };
+  list.forEach((f) => {
+    const key = getFixtureRound(f) || '_no_round';
+    if (!byRound[key]) byRound[key] = [];
+    byRound[key].push(f);
+  });
+  // Within each round: results = descending (most recent first); fixtures = ascending (soonest first)
+  Object.keys(byRound).forEach((key) => {
+    byRound[key].sort((a, b) => sortNewestFirstWithinRound ? getDate(b) - getDate(a) : getDate(a) - getDate(b));
+  });
+  const roundKeys = Object.keys(byRound).filter((k) => k !== '_no_round');
+  const noRoundKey = byRound['_no_round'] ? ['_no_round'] : [];
+  if (sortNewestFirstWithinRound) {
+    // Results: reversed — round with latest match first; within round most recent match first
+    roundKeys.sort((a, b) => {
+      const maxA = Math.max(...(byRound[a] || []).map(getDate).filter(Boolean)) || 0;
+      const maxB = Math.max(...(byRound[b] || []).map(getDate).filter(Boolean)) || 0;
+      if (maxA !== maxB) return maxB - maxA;
+      const numA = getRoundSortNumber(a);
+      const numB = getRoundSortNumber(b);
+      if (numA < 0 && numB < 0) return a.localeCompare(b);
+      if (numA < 0) return 1;
+      if (numB < 0) return -1;
+      return numB - numA;
+    });
+  } else {
+    // Fixtures: round with soonest match on top (sort by earliest kickoff in round)
+    roundKeys.sort((a, b) => {
+      const minA = Math.min(...(byRound[a] || []).map(getDate).filter(Boolean)) || 0;
+      const minB = Math.min(...(byRound[b] || []).map(getDate).filter(Boolean)) || 0;
+      if (minA !== minB) return minA - minB;
+      const numA = getRoundSortNumber(a);
+      const numB = getRoundSortNumber(b);
+      if (numA < 0 && numB < 0) return a.localeCompare(b);
+      if (numA < 0) return 1;
+      if (numB < 0) return -1;
+      return numA - numB;
+    });
+  }
+  const allKeys = [...roundKeys, ...noRoundKey];
+  return { byRound, roundKeys: allKeys };
+}
+
 /** Resolve team logo from teams list by name (fallback when fixture has no logo). */
 function getTeamLogoFromList(teamsList, teamName) {
   if (!Array.isArray(teamsList) || !teamName) return null;
@@ -151,10 +233,23 @@ function getTeamLogoFromList(teamsList, teamName) {
   return t?.logo || null;
 }
 
+/** Resolve team id (API id or Mongo _id) from teams list by name. */
+function getTeamIdFromList(teamsList, teamName) {
+  if (!Array.isArray(teamsList) || !teamName) return null;
+  const name = String(teamName).trim().toLowerCase();
+  const t = teamsList.find((x) => (String(x.team_name ?? x.name ?? '').trim().toLowerCase() === name));
+  return t?.apiTeamId ?? t?._id ?? t?.team_id ?? null;
+}
+
+const TAB_VALID = [TAB_OVERVIEW, TAB_STANDINGS, TAB_TEAMS, TAB_FIXTURES, TAB_RESULTS];
+
 export default function DataBrowserLeagueDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [tab, setTab] = useState(TAB_OVERVIEW);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabFromUrl = searchParams.get('tab');
+  const initialTab = tabFromUrl && TAB_VALID.includes(tabFromUrl) ? tabFromUrl : TAB_OVERVIEW;
+  const [tab, setTab] = useState(initialTab);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [message, setMessage] = useState(null);
@@ -166,8 +261,10 @@ export default function DataBrowserLeagueDetailPage() {
   const [standings, setStandings] = useState([]);
   const [standingsLoading, setStandingsLoading] = useState(false);
   const [syncing, setSyncing] = useState(null);
-  // Season is display filter only. Default "all" = show all data from DB. Sync always fetches and stores all seasons.
-  const [selectedSeason, setSelectedSeason] = useState('all');
+  // Season: 2025 for Teams/Standings, current year for others. Initialise from tab so back from team keeps 25.
+  const [selectedSeason, setSelectedSeason] = useState(
+    initialTab === TAB_TEAMS || initialTab === TAB_STANDINGS ? DEFAULT_SEASON_TEAMS_AND_STANDINGS : currentSeason
+  );
   // Filters (per-tab) for easier data viewing
   const [searchQuery, setSearchQuery] = useState('');
   const [fixtureStatusFilter, setFixtureStatusFilter] = useState('all'); // all | scheduled | live | ht
@@ -191,6 +288,15 @@ export default function DataBrowserLeagueDetailPage() {
   const [expandedFixtures, setExpandedFixtures] = useState([]);
   const [expandedResults, setExpandedResults] = useState([]);
 
+  // Keep tab and season in sync with URL so Back from team/fixture restores tab and Teams/Standings stay on 2025
+  useEffect(() => {
+    const t = searchParams.get('tab');
+    if (t && TAB_VALID.includes(t)) {
+      setTab(t);
+      if (t === TAB_TEAMS || t === TAB_STANDINGS) setSelectedSeason(DEFAULT_SEASON_TEAMS_AND_STANDINGS);
+    }
+  }, [searchParams]);
+
   const leagueId = detail?.league?._id;
   const apiLeagueId = detail?.league?.apiLeagueId;
   const seasonFilter = selectedSeason === 'all' ? 'all' : selectedSeason;
@@ -198,7 +304,7 @@ export default function DataBrowserLeagueDetailPage() {
 
   // Filter by selected season in UI (instant switch, no refetch)
   const teamsForSeason = selectedSeason === 'all' ? teams : teams.filter((t) => String(t.season_tag ?? t.season ?? '') === String(selectedSeason));
-  const getFixtureSeason = (f) => f.season ?? (f.fixture?.date ? new Date(f.fixture.date).getFullYear() : null);
+  const getFixtureSeason = (f) => { const k = getFixtureKickoff(f); return f.season ?? (k ? new Date(k).getFullYear() : null); };
   const fixturesForSeason = selectedSeason === 'all' ? fixtures : fixtures.filter((f) => { const y = getFixtureSeason(f); return y != null && String(y) === String(selectedSeason); });
   const standingsForSeason = selectedSeason === 'all' ? standings : standings.filter((r) => String(r._season ?? '') === String(selectedSeason));
 
@@ -226,7 +332,7 @@ export default function DataBrowserLeagueDetailPage() {
     if (!matchesSearch(home, searchQuery) && !matchesSearch(away, searchQuery)) return false;
     if (resultsDateFrom || resultsDateTo) {
       const fixture = f.fixture || f;
-      const dateStr = fixture.date ? new Date(fixture.date).toISOString().slice(0, 10) : '';
+      const dateStr = getFixtureKickoff(f) ? new Date(getFixtureKickoff(f)).toISOString().slice(0, 10) : '';
       if (resultsDateFrom && dateStr < resultsDateFrom) return false;
       if (resultsDateTo && dateStr > resultsDateTo) return false;
     }
@@ -241,7 +347,7 @@ export default function DataBrowserLeagueDetailPage() {
     if (sortTeams === 'name-za') return nameB.localeCompare(nameA);
     return nameA.localeCompare(nameB);
   });
-  const getFixtureDate = (f) => (f.fixture?.date || f.date) ? new Date(f.fixture?.date || f.date).getTime() : 0;
+  const getFixtureDate = (f) => { const k = getFixtureKickoff(f); return k ? new Date(k).getTime() : 0; };
   const getFixtureHome = (f) => (f.teams?.home?.name ?? f.homeTeam ?? '').toLowerCase();
   const getFixtureAway = (f) => (f.teams?.away?.name ?? f.awayTeam ?? '').toLowerCase();
   const fixturesOnlySorted = [...fixturesOnlyFiltered].sort((a, b) => {
@@ -278,23 +384,23 @@ export default function DataBrowserLeagueDetailPage() {
   });
 
   const teamsDisplay = teamsSorted.slice(pageTeams * rowsPerPageTeams, pageTeams * rowsPerPageTeams + rowsPerPageTeams);
-  const fixturesGrouped = groupFixturesByDate(fixturesOnlySorted, false);
-  const resultsGrouped = groupFixturesByDate(resultsOnlySorted, true);
+  const fixturesGroupedByRound = groupFixturesByRound(fixturesOnlySorted, false);
+  const resultsGroupedByRound = groupFixturesByRound(resultsOnlySorted, true);
   const standingsDisplay = standingsSorted.slice(pageStandings * rowsPerPageStandings, pageStandings * rowsPerPageStandings + rowsPerPageStandings);
 
-  // Default-expand all date groups when data changes (add new keys, keep user toggles)
-  const fixtureDateKeysStr = fixturesGrouped.dateKeys.join(',');
-  const resultDateKeysStr = resultsGrouped.dateKeys.join(',');
+  // Default-expand all round groups when data changes
+  const fixtureRoundKeysStr = fixturesGroupedByRound.roundKeys.join(',');
+  const resultRoundKeysStr = resultsGroupedByRound.roundKeys.join(',');
   useEffect(() => {
-    if (fixturesGrouped.dateKeys.length) {
-      setExpandedFixtures(prev => { const next = new Set(prev); fixturesGrouped.dateKeys.forEach(k => next.add(k)); return Array.from(next); });
+    if (fixturesGroupedByRound.roundKeys.length) {
+      setExpandedFixtures(prev => { const next = new Set(prev); fixturesGroupedByRound.roundKeys.forEach(k => next.add(k)); return Array.from(next); });
     }
-  }, [fixtureDateKeysStr]);
+  }, [fixtureRoundKeysStr]);
   useEffect(() => {
-    if (resultsGrouped.dateKeys.length) {
-      setExpandedResults(prev => { const next = new Set(prev); resultsGrouped.dateKeys.forEach(k => next.add(k)); return Array.from(next); });
+    if (resultsGroupedByRound.roundKeys.length) {
+      setExpandedResults(prev => { const next = new Set(prev); resultsGroupedByRound.roundKeys.forEach(k => next.add(k)); return Array.from(next); });
     }
-  }, [resultDateKeysStr]);
+  }, [resultRoundKeysStr]);
 
   const handleChangePageTeams = (_, newPage) => setPageTeams(newPage);
   const handleChangeRowsPerPageTeams = (e) => { setRowsPerPageTeams(parseInt(e.target.value, 10)); setPageTeams(0); };
@@ -302,15 +408,15 @@ export default function DataBrowserLeagueDetailPage() {
   const handleChangeRowsPerPageFixtures = (e) => { setRowsPerPageFixtures(parseInt(e.target.value, 10)); setPageFixtures(0); };
   const handleChangePageResults = (_, newPage) => setPageResults(newPage);
   const handleChangeRowsPerPageResults = (e) => { setRowsPerPageResults(parseInt(e.target.value, 10)); setPageResults(0); };
-  const handleFixtureAccordionChange = (dateKey) => (_, isExpanded) => {
-    setExpandedFixtures(prev => isExpanded ? (prev.includes(dateKey) ? prev : [...prev, dateKey]) : prev.filter(k => k !== dateKey));
+  const handleFixtureAccordionChange = (roundKey) => (_, isExpanded) => {
+    setExpandedFixtures(prev => isExpanded ? (prev.includes(roundKey) ? prev : [...prev, roundKey]) : prev.filter(k => k !== roundKey));
   };
-  const handleResultAccordionChange = (dateKey) => (_, isExpanded) => {
-    setExpandedResults(prev => isExpanded ? (prev.includes(dateKey) ? prev : [...prev, dateKey]) : prev.filter(k => k !== dateKey));
+  const handleResultAccordionChange = (roundKey) => (_, isExpanded) => {
+    setExpandedResults(prev => isExpanded ? (prev.includes(roundKey) ? prev : [...prev, roundKey]) : prev.filter(k => k !== roundKey));
   };
-  const expandAllFixtures = () => setExpandedFixtures([...fixturesGrouped.dateKeys]);
+  const expandAllFixtures = () => setExpandedFixtures([...fixturesGroupedByRound.roundKeys]);
   const collapseAllFixtures = () => setExpandedFixtures([]);
-  const expandAllResults = () => setExpandedResults([...resultsGrouped.dateKeys]);
+  const expandAllResults = () => setExpandedResults([...resultsGroupedByRound.roundKeys]);
   const collapseAllResults = () => setExpandedResults([]);
   const handleChangePageStandings = (_, newPage) => setPageStandings(newPage);
   const handleChangeRowsPerPageStandings = (e) => { setRowsPerPageStandings(parseInt(e.target.value, 10)); setPageStandings(0); };
@@ -470,7 +576,7 @@ export default function DataBrowserLeagueDetailPage() {
 
   const handleTeamClick = (team) => {
     const tid = team.team_id ?? team._id ?? team.apiTeamId;
-    if (tid) navigate(`${constants.routes.apiSync}/team/${tid}`);
+    if (tid) navigate(`${constants.routes.apiSync}/team/${tid}`, { state: { leagueId: id, tab } });
   };
 
   if (loading || !detail) {
@@ -487,11 +593,14 @@ export default function DataBrowserLeagueDetailPage() {
 
   return (
     <Box sx={{ maxWidth: 1200, mx: 'auto', p: { xs: 2, sm: 3 }, minHeight: '60vh', bgcolor: 'grey.50' }}>
+      <Button startIcon={<ArrowBack />} onClick={() => navigate(-1)} size="small" sx={{ mb: 2 }}>
+        Back
+      </Button>
       <Breadcrumbs separator={<NavigateNext fontSize="small" />} sx={{ mb: 2.5, '& .MuiBreadcrumbs-separator': { mx: 0.75 }, '& .MuiTypography-root': { fontSize: '0.875rem' } }}>
         <Link
           component="button"
           variant="body2"
-          onClick={() => navigate(constants.routes.apiSync)}
+          onClick={() => navigate(-1)}
           sx={{ color: colors.brandRed, cursor: 'pointer', textDecoration: 'none', fontWeight: 500, '&:hover': { textDecoration: 'underline' } }}
         >
           API Data & Sync
@@ -503,6 +612,17 @@ export default function DataBrowserLeagueDetailPage() {
 
       {message && <Alert severity="success" onClose={() => setMessage(null)} sx={{ mb: 2, borderRadius: 2 }}>{message}</Alert>}
       {error && <Alert severity="error" onClose={() => setError(null)} sx={{ mb: 2, borderRadius: 2 }}>{error}</Alert>}
+
+      <Alert
+        severity="info"
+        icon={<Info />}
+        sx={{ mb: 2, borderRadius: 2, '& .MuiAlert-message': { width: '100%' } }}
+      >
+        <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.5 }}>Sync order (required)</Typography>
+        <Typography variant="body2" component="span">
+          1) <strong>Standings</strong> → 2) <strong>Teams</strong> → 3) <strong>Fixtures</strong>. Only official current-season data is saved; filtered-out data (relegated, historical, etc.) is not saved.
+        </Typography>
+      </Alert>
 
       <Card variant="outlined" sx={{ mb: 3, borderRadius: 2.5, boxShadow: '0 2px 8px rgba(0,0,0,0.06)', borderColor: 'divider', overflow: 'hidden' }}>
         <CardContent sx={{ p: { xs: 2.5, sm: 3 } }}>
@@ -543,7 +663,16 @@ export default function DataBrowserLeagueDetailPage() {
 
       <Tabs
         value={tab}
-        onChange={(_, v) => setTab(v)}
+        onChange={(_, v) => {
+          setTab(v);
+          setSearchParams((prev) => {
+            const next = new URLSearchParams(prev);
+            next.set('tab', v);
+            return next;
+          });
+          const use2025 = v === TAB_TEAMS || v === TAB_STANDINGS;
+          setSelectedSeason(use2025 ? DEFAULT_SEASON_TEAMS_AND_STANDINGS : currentSeason);
+        }}
         sx={{
           mb: 0,
           minHeight: 48,
@@ -562,10 +691,10 @@ export default function DataBrowserLeagueDetailPage() {
         textColor="inherit"
       >
         <Tab icon={<Info sx={{ fontSize: 20 }} />} iconPosition="start" label="Overview" value={TAB_OVERVIEW} />
+        <Tab icon={<EmojiEvents sx={{ fontSize: 20 }} />} iconPosition="start" label="Standings" value={TAB_STANDINGS} />
         <Tab icon={<Groups sx={{ fontSize: 20 }} />} iconPosition="start" label="Teams" value={TAB_TEAMS} />
         <Tab icon={<Event sx={{ fontSize: 20 }} />} iconPosition="start" label="Fixtures" value={TAB_FIXTURES} />
         <Tab icon={<CheckCircle sx={{ fontSize: 20 }} />} iconPosition="start" label="Results" value={TAB_RESULTS} />
-        <Tab icon={<EmojiEvents sx={{ fontSize: 20 }} />} iconPosition="start" label="Standings" value={TAB_STANDINGS} />
       </Tabs>
 
       {tab === TAB_OVERVIEW && (
@@ -630,7 +759,10 @@ export default function DataBrowserLeagueDetailPage() {
       {tab === TAB_TEAMS && (
         <Box sx={{ border: 1, borderColor: 'divider', borderTop: 'none', borderRadius: '0 0 12px 12px', bgcolor: 'background.paper', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2, px: { xs: 2, sm: 3 }, py: 2, borderBottom: 1, borderColor: 'divider', bgcolor: 'grey.50' }}>
-            <Typography variant="subtitle1" fontWeight={700} sx={{ color: 'grey.800' }}>Teams in this league</Typography>
+            <Box>
+              <Typography variant="subtitle1" fontWeight={700} sx={{ color: 'grey.800' }}>Teams in this league</Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25 }}>Sync Standings first (step 1). Only teams in current season standings are saved.</Typography>
+            </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
               <TextField
                 size="small"
@@ -662,7 +794,7 @@ export default function DataBrowserLeagueDetailPage() {
           {teamsLoading ? (
             <Box sx={{ py: 6, textAlign: 'center' }}><CircularProgress sx={{ color: colors.brandRed }} /><Typography variant="body2" color="text.secondary" sx={{ mt: 1.5, fontWeight: 500 }}>Loading teams…</Typography></Box>
           ) : teams.length === 0 ? (
-            <Box sx={{ py: 6, textAlign: 'center' }}><Groups sx={{ fontSize: 56, color: 'grey.300', mb: 1.5 }} /><Typography variant="body2" color="text.secondary" fontWeight={500}>No teams in this league. Sync teams from API.</Typography></Box>
+            <Box sx={{ py: 6, textAlign: 'center' }}><Groups sx={{ fontSize: 56, color: 'grey.300', mb: 1.5 }} /><Typography variant="body2" color="text.secondary" fontWeight={500}>No teams in this league. Sync Standings first, then Sync Teams (only official teams are saved).</Typography></Box>
           ) : teamsFiltered.length === 0 ? (
             <Box sx={{ py: 6, textAlign: 'center' }}><Groups sx={{ fontSize: 56, color: 'grey.300', mb: 1.5 }} /><Typography variant="body2" color="text.secondary" fontWeight={500}>No teams match your search. Try a different filter.</Typography></Box>
           ) : (
@@ -720,7 +852,10 @@ export default function DataBrowserLeagueDetailPage() {
       {tab === TAB_FIXTURES && (
         <Box sx={{ border: 1, borderColor: 'divider', borderTop: 'none', borderRadius: '0 0 12px 12px', bgcolor: 'background.paper', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2, px: { xs: 2, sm: 3 }, py: 2, borderBottom: 1, borderColor: 'divider', bgcolor: 'grey.50' }}>
-            <Typography variant="subtitle1" fontWeight={700} sx={{ color: 'grey.800' }}>Fixtures ({fixturesOnlyFiltered.length}{fixturesOnlyFiltered.length !== fixturesOnly.length ? ` of ${fixturesOnly.length}` : ''})</Typography>
+            <Box>
+              <Typography variant="subtitle1" fontWeight={700} sx={{ color: 'grey.800' }}>Fixtures ({fixturesOnlyFiltered.length}{fixturesOnlyFiltered.length !== fixturesOnly.length ? ` of ${fixturesOnly.length}` : ''})</Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25 }}>Sync Standings first (step 1). Only fixtures with both teams in standings are saved.</Typography>
+            </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
               <TextField
                 size="small"
@@ -765,7 +900,7 @@ export default function DataBrowserLeagueDetailPage() {
           {fixturesLoading ? (
             <Box sx={{ py: 6, textAlign: 'center' }}><CircularProgress sx={{ color: colors.brandRed }} /><Typography variant="body2" color="text.secondary" sx={{ mt: 1.5, fontWeight: 500 }}>Loading fixtures…</Typography></Box>
           ) : fixtures.length === 0 ? (
-            <Box sx={{ py: 6, textAlign: 'center' }}><Event sx={{ fontSize: 56, color: 'grey.300', mb: 1.5 }} /><Typography variant="body2" color="text.secondary" fontWeight={500}>No fixtures in DB. Sync Fixtures to fetch from Football API.</Typography></Box>
+            <Box sx={{ py: 6, textAlign: 'center' }}><Event sx={{ fontSize: 56, color: 'grey.300', mb: 1.5 }} /><Typography variant="body2" color="text.secondary" fontWeight={500}>No fixtures in DB. Sync Standings first, then Sync Fixtures (only fixtures with both teams in standings are saved).</Typography></Box>
           ) : fixturesOnly.length === 0 ? (
             <Box sx={{ py: 6, textAlign: 'center' }}><Event sx={{ fontSize: 56, color: 'grey.300', mb: 1.5 }} /><Typography variant="body2" color="text.secondary" fontWeight={500}>No upcoming fixtures. Check the Results tab for completed matches.</Typography></Box>
           ) : fixturesOnlyFiltered.length === 0 ? (
@@ -777,20 +912,21 @@ export default function DataBrowserLeagueDetailPage() {
                 <Button size="small" variant="outlined" onClick={collapseAllFixtures}>Collapse all</Button>
               </Box>
               <Box sx={{ display: 'flex', flexDirection: 'column', px: { xs: 2, sm: 3 }, pb: 2 }}>
-                {fixturesGrouped.dateKeys.map((dateKey) => {
-                  const list = fixturesGrouped.byDate[dateKey] || [];
-                  const expanded = expandedFixtures.includes(dateKey);
+                {fixturesGroupedByRound.roundKeys.map((roundKey) => {
+                  const list = fixturesGroupedByRound.byRound[roundKey] || [];
+                  const expanded = expandedFixtures.includes(roundKey);
+                  const roundLabel = roundKey === '_no_round' ? 'Other' : formatRoundLabel(roundKey);
                   return (
                     <Accordion
-                      key={dateKey}
+                      key={roundKey}
                       expanded={expanded}
-                      onChange={handleFixtureAccordionChange(dateKey)}
+                      onChange={handleFixtureAccordionChange(roundKey)}
                       elevation={0}
                       sx={{ border: `1px solid ${colors.divider}`, borderRadius: '0 !important', '&:first-of-type': { borderTopLeftRadius: 8, borderTopRightRadius: 8 }, '&:last-of-type': { borderBottomLeftRadius: 8, borderBottomRightRadius: 8 }, '&:before': { display: 'none' }, '&.Mui-expanded': { margin: 0 } }}
                     >
                       <AccordionSummary expandIcon={<ExpandMore />} sx={{ bgcolor: 'grey.50', minHeight: 48, '& .MuiAccordionSummary-content': { alignItems: 'center', gap: 1 } }}>
                         <CalendarToday sx={{ fontSize: 20, color: 'grey.600' }} />
-                        <Typography variant="subtitle2" fontWeight={700} sx={{ color: 'grey.800' }}>{formatDateKeyLabel(dateKey)}</Typography>
+                        <Typography variant="subtitle2" fontWeight={700} sx={{ color: 'grey.800' }}>{roundLabel}</Typography>
                         <Typography variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>({list.length} {list.length === 1 ? 'match' : 'matches'})</Typography>
                       </AccordionSummary>
                       <AccordionDetails sx={{ pt: 0, pb: 1.5, px: 0 }}>
@@ -802,16 +938,19 @@ export default function DataBrowserLeagueDetailPage() {
                             const awayName = teamsObj.away?.name ?? f.awayTeam ?? '—';
                             const homeLogo = teamsObj.home?.logo ?? f.homeLogo ?? getTeamLogoFromList(teams, homeName);
                             const awayLogo = teamsObj.away?.logo ?? f.awayLogo ?? getTeamLogoFromList(teams, awayName);
+                            const homeTeamId = teamsObj.home?.id ?? getTeamIdFromList(teams, homeName);
+                            const awayTeamId = teamsObj.away?.id ?? getTeamIdFromList(teams, awayName);
                             const st = fixture.status?.short ?? f.status ?? f.matchStatus;
                             const apiFixtureId = f.fixture?.id ?? f.apiFixtureId;
-                            const kickoff = formatKickoffShort(fixture.date);
+                            const kickoff = formatKickoffShort(getFixtureKickoff(f));
+                            const goToTeam = (tid) => (e) => { e.stopPropagation(); if (tid) navigate(`${constants.routes.apiSync}/team/${tid}`, { state: { leagueId: id, tab } }); };
                             return (
                               <Paper
                                 key={f.fixture?.id ?? idx}
                                 elevation={0}
-                                onClick={(e) => { e.stopPropagation(); apiFixtureId && navigate(`${constants.routes.apiSync}/league/${id}/fixture/${apiFixtureId}`); }}
+                                onClick={(e) => { e.stopPropagation(); apiFixtureId && navigate(`${constants.routes.apiSync}/league/${id}/fixture/${apiFixtureId}`, { state: { tab } }); }}
                                 sx={{
-                                  p: 1.5,
+                                  p: 2,
                                   border: `1px solid ${colors.divider}`,
                                   borderRadius: 2,
                                   cursor: apiFixtureId ? 'pointer' : 'default',
@@ -819,17 +958,38 @@ export default function DataBrowserLeagueDetailPage() {
                                   transition: 'background-color 0.2s, border-color 0.2s',
                                 }}
                               >
-                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1.5 }}>
-                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0, flex: '1 1 200px' }}>
-                                    {homeLogo ? <Box component="img" src={homeLogo} alt="" referrerPolicy="no-referrer" sx={{ width: 36, height: 36, objectFit: 'contain', flexShrink: 0 }} /> : <SportsSoccer sx={{ color: 'grey.300', fontSize: 36, flexShrink: 0 }} />}
-                                    <Typography variant="body2" fontWeight={600} noWrap>{homeName}</Typography>
-                                    <Typography variant="body2" color="text.secondary" sx={{ flexShrink: 0 }}>vs</Typography>
-                                    <Typography variant="body2" fontWeight={600} noWrap>{awayName}</Typography>
-                                    {awayLogo ? <Box component="img" src={awayLogo} alt="" referrerPolicy="no-referrer" sx={{ width: 36, height: 36, objectFit: 'contain', flexShrink: 0 }} /> : <SportsSoccer sx={{ color: 'grey.300', fontSize: 36, flexShrink: 0 }} />}
+                                {/* Same layout as fixture detail page: home (logo + name) | vs + meta | away (logo + name) */}
+                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, flexWrap: 'wrap' }}>
+                                  <Box
+                                    onClick={goToTeam(homeTeamId)}
+                                    role={homeTeamId ? 'button' : undefined}
+                                    title={homeTeamId ? 'View squad' : undefined}
+                                    sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 100, ...(homeTeamId && { cursor: 'pointer' }) }}
+                                  >
+                                    {homeLogo ? (
+                                      <Box component="img" src={homeLogo} alt="" referrerPolicy="no-referrer" sx={{ width: 40, height: 40, objectFit: 'contain', mb: 0.5 }} />
+                                    ) : (
+                                      <SportsSoccer sx={{ color: 'grey.300', fontSize: 40, mb: 0.5 }} />
+                                    )}
+                                    <Typography variant="body2" fontWeight={600} textAlign="center" noWrap sx={{ maxWidth: 120 }}>{homeName}</Typography>
                                   </Box>
-                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexShrink: 0 }}>
-                                    <Typography variant="caption" color="text.secondary">{kickoff}</Typography>
-                                    <Typography variant="caption" fontWeight={700} sx={{ color: colors.brandRed, px: 1.5, py: 0.5, borderRadius: 1, bgcolor: 'grey.100' }}>{statusShort(st)}</Typography>
+                                  <Box sx={{ textAlign: 'center', px: 1.5, minWidth: 80 }}>
+                                    <Typography variant="body2" color="text.secondary" fontWeight={600}>vs</Typography>
+                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25 }}>{kickoff}</Typography>
+                                    <Typography variant="caption" fontWeight={700} sx={{ color: colors.brandRed, display: 'inline-block', mt: 0.25, px: 1, py: 0.25, borderRadius: 1, bgcolor: 'grey.100' }}>{statusShort(st)}</Typography>
+                                  </Box>
+                                  <Box
+                                    onClick={goToTeam(awayTeamId)}
+                                    role={awayTeamId ? 'button' : undefined}
+                                    title={awayTeamId ? 'View squad' : undefined}
+                                    sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 100, ...(awayTeamId && { cursor: 'pointer' }) }}
+                                  >
+                                    {awayLogo ? (
+                                      <Box component="img" src={awayLogo} alt="" referrerPolicy="no-referrer" sx={{ width: 40, height: 40, objectFit: 'contain', mb: 0.5 }} />
+                                    ) : (
+                                      <SportsSoccer sx={{ color: 'grey.300', fontSize: 40, mb: 0.5 }} />
+                                    )}
+                                    <Typography variant="body2" fontWeight={600} textAlign="center" noWrap sx={{ maxWidth: 120 }}>{awayName}</Typography>
                                   </Box>
                                 </Box>
                               </Paper>
@@ -903,7 +1063,7 @@ export default function DataBrowserLeagueDetailPage() {
           {fixturesLoading ? (
             <Box sx={{ py: 6, textAlign: 'center' }}><CircularProgress sx={{ color: colors.brandRed }} /><Typography variant="body2" color="text.secondary" sx={{ mt: 1.5, fontWeight: 500 }}>Loading results…</Typography></Box>
           ) : fixtures.length === 0 ? (
-            <Box sx={{ py: 6, textAlign: 'center' }}><CheckCircle sx={{ fontSize: 56, color: 'grey.300', mb: 1.5 }} /><Typography variant="body2" color="text.secondary" fontWeight={500}>No fixtures in DB. Sync Fixtures to fetch from Football API.</Typography></Box>
+            <Box sx={{ py: 6, textAlign: 'center' }}><CheckCircle sx={{ fontSize: 56, color: 'grey.300', mb: 1.5 }} /><Typography variant="body2" color="text.secondary" fontWeight={500}>No fixtures in DB. Sync Standings first, then Sync Fixtures.</Typography></Box>
           ) : resultsOnly.length === 0 ? (
             <Box sx={{ py: 6, textAlign: 'center' }}><CheckCircle sx={{ fontSize: 56, color: 'grey.300', mb: 1.5 }} /><Typography variant="body2" color="text.secondary" fontWeight={500}>No results yet. Check the Fixtures tab for upcoming matches.</Typography></Box>
           ) : resultsOnlyFiltered.length === 0 ? (
@@ -915,20 +1075,21 @@ export default function DataBrowserLeagueDetailPage() {
                 <Button size="small" variant="outlined" onClick={collapseAllResults}>Collapse all</Button>
               </Box>
               <Box sx={{ display: 'flex', flexDirection: 'column', px: { xs: 2, sm: 3 }, pb: 2 }}>
-                {resultsGrouped.dateKeys.map((dateKey) => {
-                  const list = resultsGrouped.byDate[dateKey] || [];
-                  const expanded = expandedResults.includes(dateKey);
+                {resultsGroupedByRound.roundKeys.map((roundKey) => {
+                  const list = resultsGroupedByRound.byRound[roundKey] || [];
+                  const expanded = expandedResults.includes(roundKey);
+                  const roundLabel = roundKey === '_no_round' ? 'Other' : formatRoundLabel(roundKey);
                   return (
                     <Accordion
-                      key={dateKey}
+                      key={roundKey}
                       expanded={expanded}
-                      onChange={handleResultAccordionChange(dateKey)}
+                      onChange={handleResultAccordionChange(roundKey)}
                       elevation={0}
                       sx={{ border: `1px solid ${colors.divider}`, borderRadius: '0 !important', '&:first-of-type': { borderTopLeftRadius: 8, borderTopRightRadius: 8 }, '&:last-of-type': { borderBottomLeftRadius: 8, borderBottomRightRadius: 8 }, '&:before': { display: 'none' }, '&.Mui-expanded': { margin: 0 } }}
                     >
                       <AccordionSummary expandIcon={<ExpandMore />} sx={{ bgcolor: 'grey.50', minHeight: 48, '& .MuiAccordionSummary-content': { alignItems: 'center', gap: 1 } }}>
                         <CalendarToday sx={{ fontSize: 20, color: 'grey.600' }} />
-                        <Typography variant="subtitle2" fontWeight={700} sx={{ color: 'grey.800' }}>{formatDateKeyLabel(dateKey)}</Typography>
+                        <Typography variant="subtitle2" fontWeight={700} sx={{ color: 'grey.800' }}>{roundLabel}</Typography>
                         <Typography variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>({list.length} {list.length === 1 ? 'result' : 'results'})</Typography>
                       </AccordionSummary>
                       <AccordionDetails sx={{ pt: 0, pb: 1.5, px: 0 }}>
@@ -940,19 +1101,22 @@ export default function DataBrowserLeagueDetailPage() {
                             const awayName = teamsObj.away?.name ?? f.awayTeam ?? '—';
                             const homeLogo = teamsObj.home?.logo ?? f.homeLogo ?? getTeamLogoFromList(teams, homeName);
                             const awayLogo = teamsObj.away?.logo ?? f.awayLogo ?? getTeamLogoFromList(teams, awayName);
+                            const homeTeamId = teamsObj.home?.id ?? getTeamIdFromList(teams, homeName);
+                            const awayTeamId = teamsObj.away?.id ?? getTeamIdFromList(teams, awayName);
                             const goals = f.goals || {};
                             const scoreHome = goals.home ?? '0';
                             const scoreAway = goals.away ?? '0';
                             const st = fixture.status?.short ?? f.status ?? f.matchStatus;
                             const apiFixtureId = f.fixture?.id ?? f.apiFixtureId;
-                            const kickoff = formatKickoffShort(fixture.date);
+                            const kickoff = formatKickoffShort(getFixtureKickoff(f));
+                            const goToTeam = (tid) => (e) => { e.stopPropagation(); if (tid) navigate(`${constants.routes.apiSync}/team/${tid}`, { state: { leagueId: id, tab } }); };
                             return (
                               <Paper
                                 key={f.fixture?.id ?? idx}
                                 elevation={0}
-                                onClick={(e) => { e.stopPropagation(); apiFixtureId && navigate(`${constants.routes.apiSync}/league/${id}/fixture/${apiFixtureId}`); }}
+                                onClick={(e) => { e.stopPropagation(); apiFixtureId && navigate(`${constants.routes.apiSync}/league/${id}/fixture/${apiFixtureId}`, { state: { tab } }); }}
                                 sx={{
-                                  p: 1.5,
+                                  p: 2,
                                   border: `1px solid ${colors.divider}`,
                                   borderRadius: 2,
                                   cursor: apiFixtureId ? 'pointer' : 'default',
@@ -960,17 +1124,38 @@ export default function DataBrowserLeagueDetailPage() {
                                   transition: 'background-color 0.2s, border-color 0.2s',
                                 }}
                               >
-                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1.5 }}>
-                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0, flex: '1 1 200px' }}>
-                                    {homeLogo ? <Box component="img" src={homeLogo} alt="" referrerPolicy="no-referrer" sx={{ width: 36, height: 36, objectFit: 'contain', flexShrink: 0 }} /> : <SportsSoccer sx={{ color: 'grey.300', fontSize: 36, flexShrink: 0 }} />}
-                                    <Typography variant="body2" fontWeight={600} noWrap>{homeName}</Typography>
-                                    <Typography variant="body2" fontWeight={700} sx={{ color: colors.brandRed, flexShrink: 0 }}>{scoreHome} — {scoreAway}</Typography>
-                                    <Typography variant="body2" fontWeight={600} noWrap>{awayName}</Typography>
-                                    {awayLogo ? <Box component="img" src={awayLogo} alt="" referrerPolicy="no-referrer" sx={{ width: 36, height: 36, objectFit: 'contain', flexShrink: 0 }} /> : <SportsSoccer sx={{ color: 'grey.300', fontSize: 36, flexShrink: 0 }} />}
+                                {/* Same layout as fixture detail page: home (logo + name) | score + meta | away (logo + name) */}
+                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, flexWrap: 'wrap' }}>
+                                  <Box
+                                    onClick={goToTeam(homeTeamId)}
+                                    role={homeTeamId ? 'button' : undefined}
+                                    title={homeTeamId ? 'View squad' : undefined}
+                                    sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 100, ...(homeTeamId && { cursor: 'pointer' }) }}
+                                  >
+                                    {homeLogo ? (
+                                      <Box component="img" src={homeLogo} alt="" referrerPolicy="no-referrer" sx={{ width: 40, height: 40, objectFit: 'contain', mb: 0.5 }} />
+                                    ) : (
+                                      <SportsSoccer sx={{ color: 'grey.300', fontSize: 40, mb: 0.5 }} />
+                                    )}
+                                    <Typography variant="body2" fontWeight={600} textAlign="center" noWrap sx={{ maxWidth: 120 }}>{homeName}</Typography>
                                   </Box>
-                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexShrink: 0 }}>
-                                    <Typography variant="caption" color="text.secondary">{kickoff}</Typography>
-                                    <Typography variant="caption" fontWeight={700} sx={{ color: colors.brandRed, px: 1.5, py: 0.5, borderRadius: 1, bgcolor: 'grey.100' }}>{statusShort(st)}</Typography>
+                                  <Box sx={{ textAlign: 'center', px: 1.5, minWidth: 80 }}>
+                                    <Typography variant="body2" fontWeight={700} sx={{ color: colors.brandRed }}>{scoreHome} — {scoreAway}</Typography>
+                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25 }}>{kickoff}</Typography>
+                                    <Typography variant="caption" fontWeight={700} sx={{ color: colors.brandRed, display: 'inline-block', mt: 0.25, px: 1, py: 0.25, borderRadius: 1, bgcolor: 'grey.100' }}>{statusShort(st)}</Typography>
+                                  </Box>
+                                  <Box
+                                    onClick={goToTeam(awayTeamId)}
+                                    role={awayTeamId ? 'button' : undefined}
+                                    title={awayTeamId ? 'View squad' : undefined}
+                                    sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 100, ...(awayTeamId && { cursor: 'pointer' }) }}
+                                  >
+                                    {awayLogo ? (
+                                      <Box component="img" src={awayLogo} alt="" referrerPolicy="no-referrer" sx={{ width: 40, height: 40, objectFit: 'contain', mb: 0.5 }} />
+                                    ) : (
+                                      <SportsSoccer sx={{ color: 'grey.300', fontSize: 40, mb: 0.5 }} />
+                                    )}
+                                    <Typography variant="body2" fontWeight={600} textAlign="center" noWrap sx={{ maxWidth: 120 }}>{awayName}</Typography>
                                   </Box>
                                 </Box>
                               </Paper>
@@ -990,7 +1175,10 @@ export default function DataBrowserLeagueDetailPage() {
       {tab === TAB_STANDINGS && (
         <Box sx={{ border: 1, borderColor: 'divider', borderTop: 'none', borderRadius: '0 0 12px 12px', bgcolor: 'background.paper', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2, px: { xs: 2, sm: 3 }, py: 2, borderBottom: 1, borderColor: 'divider', bgcolor: 'grey.50' }}>
-            <Typography variant="subtitle1" fontWeight={700} sx={{ color: 'grey.800' }}>Standings ({standingsFiltered.length}{standingsFiltered.length !== standings.length ? ` of ${standings.length}` : ''})</Typography>
+            <Box>
+              <Typography variant="subtitle1" fontWeight={700} sx={{ color: 'grey.800' }}>Standings ({standingsFiltered.length}{standingsFiltered.length !== standings.length ? ` of ${standings.length}` : ''})</Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25 }}>Step 1 – sync this first. Then Teams, then Fixtures. Source of truth for official teams.</Typography>
+            </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
               <TextField
                 size="small"
@@ -1026,7 +1214,7 @@ export default function DataBrowserLeagueDetailPage() {
           {standingsLoading ? (
             <Box sx={{ py: 6, textAlign: 'center' }}><CircularProgress sx={{ color: colors.brandRed }} /><Typography variant="body2" color="text.secondary" sx={{ mt: 1.5, fontWeight: 500 }}>Loading standings…</Typography></Box>
           ) : standings.length === 0 ? (
-            <Box sx={{ py: 6, textAlign: 'center' }}><EmojiEvents sx={{ fontSize: 56, color: 'grey.300', mb: 1.5 }} /><Typography variant="body2" color="text.secondary" fontWeight={500}>No standings in DB. Sync Standings to fetch from API.</Typography></Box>
+            <Box sx={{ py: 6, textAlign: 'center' }}><EmojiEvents sx={{ fontSize: 56, color: 'grey.300', mb: 1.5 }} /><Typography variant="body2" color="text.secondary" fontWeight={500}>No standings in DB. Sync Standings first (step 1), then Teams, then Fixtures.</Typography></Box>
           ) : standingsFiltered.length === 0 ? (
             <Box sx={{ py: 6, textAlign: 'center' }}><EmojiEvents sx={{ fontSize: 56, color: 'grey.300', mb: 1.5 }} /><Typography variant="body2" color="text.secondary" fontWeight={500}>No teams match your search. Try a different filter.</Typography></Box>
           ) : (
@@ -1049,12 +1237,24 @@ export default function DataBrowserLeagueDetailPage() {
                   {standingsDisplay.map((row, idx) => {
                     const team = row.team || {};
                     const all = row.all || {};
+                    const teamId = team.id ?? getTeamIdFromList(teams, team.name);
+                    const goToTeam = () => { if (teamId) navigate(`${constants.routes.apiSync}/team/${teamId}`, { state: { leagueId: id, tab } }); };
                     return (
                       <TableRow key={`${row._season ?? ''}-${row.rank ?? idx}`} sx={{ '&:nth-of-type(even)': { bgcolor: 'grey.50' } }}>
                         {isAllSeasons && <TableCell sx={{ fontSize: '0.875rem', borderColor: 'divider' }}>{row._season ?? '—'}</TableCell>}
                         <TableCell sx={{ fontWeight: 700, fontSize: '0.875rem', borderColor: 'divider' }}>{row.rank ?? idx + 1}</TableCell>
                         <TableCell sx={{ borderColor: 'divider' }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                          <Box
+                            onClick={goToTeam}
+                            role={teamId ? 'button' : undefined}
+                            title={teamId ? 'View squad' : undefined}
+                            sx={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 1.5,
+                              ...(teamId && { cursor: 'pointer', '&:hover': { opacity: 0.85 } }),
+                            }}
+                          >
                             {team.logo && <Box component="img" src={team.logo} alt="" sx={{ width: 28, height: 28, objectFit: 'contain' }} />}
                             <Typography variant="body2" fontWeight={600} sx={{ color: 'grey.900' }}>{team.name ?? '—'}</Typography>
                           </Box>

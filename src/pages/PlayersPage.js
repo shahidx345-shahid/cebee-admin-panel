@@ -31,8 +31,6 @@ import {
   MoreVert,
   Edit,
   ArrowBack,
-  SportsSoccer,
-  Groups,
   Info,
   Block,
   Restore,
@@ -139,7 +137,7 @@ const PlayersPage = () => {
       } else {
         setTeam({
           team_id: teamId,
-          team_name: 'Unknown',
+          team_name: teamResult.data?.team?.team_name || `Team ${teamId}`,
           league_id: null,
           league_name: '—',
           status: '—',
@@ -718,98 +716,6 @@ const PlayersPage = () => {
           </Box>
         </Box>
       </Box>
-
-      {/* Team Header Card */}
-      <Card
-        sx={{
-          padding: 3,
-          mb: 3,
-          borderRadius: '20px',
-          backgroundColor: colors.brandWhite,
-          boxShadow: '0 1px 3px 0 rgba(0, 0, 0, 0.1)',
-        }}
-      >
-        <Grid container spacing={3} alignItems="center">
-          <Grid item xs={12} md={6}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Box
-                sx={{
-                  width: 64,
-                  height: 64,
-                  borderRadius: '16px',
-                  backgroundColor: '#FEE2E2',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <SportsSoccer sx={{ fontSize: 32, color: colors.brandRed }} />
-              </Box>
-              <Box>
-                <Typography variant="h5" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 0.5 }}>
-                  {team.team_name}
-                </Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
-                  {team.league_name && team.league_name !== '—' && (
-                    <Chip
-                      label={team.league_name}
-                      size="small"
-                      sx={{
-                        backgroundColor: '#FEE2E2',
-                        color: colors.brandRed,
-                        fontWeight: 600,
-                        fontSize: 11,
-                      }}
-                    />
-                  )}
-                  {team.season_tag && team.season_tag !== '—' && (
-                    <Chip
-                      label={team.season_tag}
-                      size="small"
-                      sx={{
-                        backgroundColor: '#DBEAFE',
-                        color: '#3B82F6',
-                        fontWeight: 600,
-                        fontSize: 11,
-                      }}
-                    />
-                  )}
-                  {!playersFromFootballApi && team.status && (
-                    <Chip
-                      label={team.status}
-                      size="small"
-                      sx={{
-                        backgroundColor: '#10B981',
-                        color: colors.brandWhite,
-                        fontWeight: 600,
-                        fontSize: 11,
-                      }}
-                    />
-                  )}
-                </Box>
-              </Box>
-            </Box>
-          </Grid>
-          {!playersFromFootballApi && (
-            <Grid item xs={12} md={6}>
-              <Box sx={{ display: 'flex', justifyContent: { xs: 'flex-start', md: 'flex-end' }, gap: 1.5 }}>
-                <Button
-                  variant="outlined"
-                  startIcon={<Groups />}
-                  onClick={() => navigate(`/teams/history/${team.team_id}`)}
-                  sx={{
-                    textTransform: 'none',
-                    fontWeight: 600,
-                    borderRadius: '12px',
-                  }}
-                >
-                  View History
-                </Button>
-              </Box>
-            </Grid>
-          )}
-        </Grid>
-      </Card>
 
       {/* Stats Cards */}
       <Grid container spacing={2.5} sx={{ mb: 3 }}>

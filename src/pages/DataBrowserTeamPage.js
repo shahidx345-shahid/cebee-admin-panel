@@ -3,7 +3,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -22,6 +22,7 @@ import {
   Alert,
   TablePagination,
 } from '@mui/material';
+import ArrowBack from '@mui/icons-material/ArrowBack';
 import NavigateNext from '@mui/icons-material/NavigateNext';
 import Sync from '@mui/icons-material/Sync';
 import SportsSoccer from '@mui/icons-material/SportsSoccer';
@@ -56,16 +57,17 @@ function groupPlayersByPosition(players) {
 export default function DataBrowserTeamPage() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [message, setMessage] = useState(null);
   const [team, setTeam] = useState(null);
   const [players, setPlayers] = useState([]);
-  const [pagination, setPagination] = useState({ page: 1, limit: 25, total: 0, pages: 0 });
+  const [pagination, setPagination] = useState({ page: 1, limit: 50, total: 0, pages: 0 });
   const [playersLoading, setPlayersLoading] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(25);
+  const [rowsPerPage, setRowsPerPage] = useState(50);
 
   // Data flow: On load → from DB only. On Sync Players → API → save to DB → refetch from DB → display.
   useEffect(() => {
@@ -131,6 +133,17 @@ export default function DataBrowserTeamPage() {
     } else setError(res.error);
   };
 
+  const handleBack = () => {
+    const { leagueId, fixtureId, tab } = location.state || {};
+    if (fixtureId != null && leagueId != null) {
+      navigate(`${constants.routes.apiSync}/league/${leagueId}/fixture/${fixtureId}`);
+    } else if (leagueId != null) {
+      navigate(`${constants.routes.apiSync}/league/${leagueId}${tab ? `?tab=${tab}` : ''}`);
+    } else {
+      navigate(-1);
+    }
+  };
+
   if (loading && !team) {
     return (
       <Box sx={{ p: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
@@ -143,17 +156,22 @@ export default function DataBrowserTeamPage() {
     return (
       <Box sx={{ p: 3 }}>
         <Alert severity="error">{error}</Alert>
-        <Button sx={{ mt: 2 }} onClick={() => navigate(constants.routes.apiSync)}>Back to Leagues</Button>
+        <Button sx={{ mt: 2 }} startIcon={<ArrowBack />} onClick={handleBack}>Back</Button>
       </Box>
     );
   }
 
   const teamName = team?.team_name ?? team?.name ?? '—';
-  const leagueName = team?.league?.name_display ?? team?.league?.league_name ?? team?.league_name ?? '—';
+  const leagueNameRaw = team?.league?.name_display ?? team?.league?.league_name ?? team?.league_name ?? '—';
+  // Strip "(API 253)" or similar from league name so we show e.g. "MLS" only
+  const leagueName = typeof leagueNameRaw === 'string' ? leagueNameRaw.replace(/\s*\(API\s+\d+\)\s*/gi, '').trim() || leagueNameRaw : leagueNameRaw;
   const country = team?.country ?? team?.league?.country ?? '—';
 
   return (
     <Box sx={{ p: { xs: 2, sm: 3 }, maxWidth: 1200, mx: 'auto' }}>
+      <Button startIcon={<ArrowBack />} onClick={handleBack} size="small" sx={{ mb: 2 }}>
+        Back
+      </Button>
       <Breadcrumbs
         separator={<NavigateNext fontSize="small" sx={{ color: 'text.secondary' }} />}
         sx={{ mb: 2.5, '& .MuiBreadcrumbs-li': { display: 'flex', alignItems: 'center' } }}
@@ -161,7 +179,7 @@ export default function DataBrowserTeamPage() {
         <Link
           component="button"
           variant="body2"
-          onClick={() => navigate(constants.routes.apiSync)}
+          onClick={handleBack}
           sx={{ color: colors.brandRed, cursor: 'pointer', textDecoration: 'none', fontWeight: 500, '&:hover': { textDecoration: 'underline' } }}
         >
           API Data & Sync

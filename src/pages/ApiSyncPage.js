@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -43,7 +44,7 @@ import {
   syncTeamsFromApi,
   syncPlayersFromApi,
 } from '../services/apiSyncService';
-import { colors } from '../config/theme';
+import { colors, constants } from '../config/theme';
 
 const VIEW_LEAGUES = 'leagues';
 const VIEW_TEAMS = 'teams';
@@ -70,6 +71,7 @@ function safeStr(v) {
 }
 
 const ApiSyncPage = () => {
+  const navigate = useNavigate();
   const [view, setView] = useState(VIEW_LEAGUES);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
@@ -690,8 +692,14 @@ const ApiSyncPage = () => {
                               const logoUrl = row.team?.logo ?? row.logo ?? null;
                               const teamId = row.team?.id ?? row.id;
                               const teamName = toCellValue(row.team?.name ?? row.name);
+                              const goToPlayers = () => { if (teamId != null && teamId !== '') navigate(`${constants.routes.apiSync}/team/${teamId}`); };
                               return (
-                                <TableRow key={String(teamId)} hover>
+                                <TableRow
+                                  key={String(teamId)}
+                                  hover
+                                  onClick={goToPlayers}
+                                  sx={{ cursor: teamId != null && teamId !== '' ? 'pointer' : 'default' }}
+                                >
                                   <TableCell sx={{ width: 56, py: 0.75 }}>
                                     {logoUrl ? (
                                       <Box component="img" src={logoUrl} alt="" sx={{ width: 28, height: 28, objectFit: 'contain', display: 'block' }} onError={(e) => { e.target.style.display = 'none'; }} />

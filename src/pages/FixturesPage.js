@@ -25,6 +25,7 @@ import {
   ListItemText,
   Menu,
   IconButton,
+  Divider,
 } from '@mui/material';
 import {
   Add,
@@ -82,7 +83,7 @@ const FixturesPage = () => {
   });
   const [actionMenuAnchor, setActionMenuAnchor] = useState(null);
   const [menuFixture, setMenuFixture] = useState(null);
-  const [stats, setStats] = useState({ scheduled: 0, published: 0, live: 0, resultPending: 0, completed: 0 }); // from GET /fixtures/statistics
+  const [stats, setStats] = useState({ scheduled: 0, published: 0, live: 0, completed: 0 }); // from GET /fixtures/statistics
   const fixtureStatistics = stats; // alias so stat cards can use either name (avoids stale refs from HMR)
 
   const getSampleFixtures = () => {
@@ -193,12 +194,16 @@ const FixturesPage = () => {
             matchId: fixture.matchId || fixture.match_id || fixture._id || fixture.id,
             homeTeam: fixture.homeTeam || fixture.home_team || '',
             awayTeam: fixture.awayTeam || fixture.away_team || '',
+            homeTeamLogo: fixture.homeTeamLogo || fixture.home_team_logo || null,
+            awayTeamLogo: fixture.awayTeamLogo || fixture.away_team_logo || null,
             league: league,
             kickoffTime: fixture.kickoffTime ? new Date(fixture.kickoffTime) : fixture.kickoff_time ? new Date(fixture.kickoff_time) : new Date(),
             status: fixture.status || fixture.matchStatus || 'scheduled',
             matchStatus: fixture.matchStatus || fixture.status || 'scheduled',
+            matchday: fixture.matchday ?? '',
             predictions: fixture.predictionCount || fixture.prediction_count || 0,
             hot: fixture.isFeatured || fixture.isCeBeFeatured || fixture.isCommunityFeatured || false,
+            isCeBeFeatured: fixture.isCeBeFeatured || false,
             isCommunityFeatured: fixture.isCommunityFeatured || false,
             cmdId: cmdId,
             cmdName: cmdName,
@@ -277,14 +282,13 @@ const FixturesPage = () => {
           scheduled: s.scheduled ?? 0,
           published: s.published ?? 0,
           live: s.live ?? 0,
-          resultPending: s.resultPending ?? 0,
           completed: s.completed ?? 0,
         });
       } else {
-        setStats({ scheduled: 0, published: 0, live: 0, resultPending: 0, completed: 0 });
+        setStats({ scheduled: 0, published: 0, live: 0, completed: 0 });
       }
     }).catch(() => {
-      if (!cancelled) setStats({ scheduled: 0, published: 0, live: 0, resultPending: 0, completed: 0 });
+      if (!cancelled) setStats({ scheduled: 0, published: 0, live: 0, completed: 0 });
     });
     return () => { cancelled = true; };
   }, [selectedCmd, currentCmd]);
@@ -309,7 +313,7 @@ const FixturesPage = () => {
     getFixtureStatistics(params).then((result) => {
       if (result.success && result.data?.statistics) {
         const s = result.data.statistics;
-        setStats({ scheduled: s.scheduled ?? 0, published: s.published ?? 0, live: s.live ?? 0, resultPending: s.resultPending ?? 0, completed: s.completed ?? 0 });
+        setStats({ scheduled: s.scheduled ?? 0, published: s.published ?? 0, live: s.live ?? 0, completed: s.completed ?? 0 });
       }
     }).catch(() => {});
     navigate(location.pathname, { replace: true, state: {} });
@@ -370,9 +374,10 @@ const FixturesPage = () => {
             // This filter is for specifically locked fixtures (but they should also appear under published)
             return matchStatus === 'predictionLock' || matchStatus === 'predictionLocked' || fixtureStatus === 'locked';
           }
-          if (selectedStatus === 'resultsProcessing') {
-            // Result Processing includes resultsProcessing, resultPending (backward compat), and pending statuses
-            return fixtureStatus === 'resultsProcessing' || fixtureStatus === 'resultPending' || fixtureStatus === 'pending' || fixtureStatus === 'fullTimeProcessing';
+          if (selectedStatus === 'completed') {
+            // Completed tab shows both completed and result-pending (resultsProcessing/resultPending) fixtures
+            return fixtureStatus === 'completed' || fixtureStatus === 'resultsProcessing' || fixtureStatus === 'resultPending' || fixtureStatus === 'pending' || fixtureStatus === 'fullTimeProcessing' ||
+              matchStatus === 'completed' || matchStatus === 'resultsProcessing' || matchStatus === 'resultPending' || matchStatus === 'pending';
           }
           // For other statuses, check both fixture status and match status
           return fixtureStatus === selectedStatus || matchStatus === selectedStatus;
@@ -885,11 +890,71 @@ const FixturesPage = () => {
     page * rowsPerPage + rowsPerPage
   );
 
+  // --- Fixture/Result LIST view: group by Matchday / Round ---
+  const getMatchdayKey = (f) => {
+    if (f.matchday != null && String(f.matchday).trim() !== '') return `md_${f.matchday}`;
+    if (f.cmdName && String(f.cmdName).trim() !== '') return `cmd_${f.cmdId || f.cmdName}`;
+    const d = f.kickoffTime?.toDate ? f.kickoffTime.toDate() : new Date(f.kickoffTime);
+    return Number.isNaN(d.getTime()) ? 'other' : `date_${format(d, 'yyyy-MM-dd')}`;
+  };
+  const getMatchdayLabel = (f) => {
+    if (f.matchday != null && String(f.matchday).trim() !== '') return `MATCHDAY ${f.matchday}`;
+    if (f.cmdName && String(f.cmdName).trim() !== '') return f.cmdName;
+    const d = f.kickoffTime?.toDate ? f.kickoffTime.toDate() : new Date(f.kickoffTime);
+    return Number.isNaN(d.getTime()) ? 'Other' : format(d, 'EEE, d MMM yyyy');
+  };
+  const groupByMatchday = (list) => {
+    const byKey = {};
+    list.forEach((f) => {
+      const key = getMatchdayKey(f);
+      if (!byKey[key]) byKey[key] = { key, label: getMatchdayLabel(f), fixtures: [] };
+      byKey[key].fixtures.push(f);
+    });
+    const groups = Object.values(byKey);
+    groups.sort((a, b) => {
+      const firstA = a.fixtures[0];
+      const firstB = b.fixtures[0];
+      const dateA = firstA?.kickoffTime?.toDate ? firstA.kickoffTime.toDate() : new Date(firstA?.kickoffTime);
+      const dateB = firstB?.kickoffTime?.toDate ? firstB.kickoffTime.toDate() : new Date(firstB?.kickoffTime);
+      return dateA - dateB;
+    });
+    return groups;
+  };
+  const listStatusLabel = (status, matchStatus) => {
+    const s = String(matchStatus || status || 'scheduled').toLowerCase();
+    if (s === 'halftime') return 'HT';
+    if (s === 'live') return 'Live';
+    if (s === 'completed') return 'Full Time';
+    if (s === 'resultpending' || s === 'result_pending') return 'Result Pending';
+    if (s === 'resultsprocessing' || s === 'results_processing') return 'Results Processing';
+    if (s === 'pending') return 'Pending';
+    if (s === 'scheduled') return 'Scheduled';
+    return 'Not Started';
+  };
+  const listLogoSize = 44;
+  const getListChipStyle = (statusLabel) => {
+    const isLive = statusLabel === 'Live' || statusLabel === 'HT';
+    if (isLive) return { bgcolor: `${colors.brandRed}12`, color: colors.brandRed, border: `1px solid ${colors.brandRed}30` };
+    if (statusLabel === 'Full Time') return { bgcolor: `${colors.success}12`, color: colors.success, border: `1px solid ${colors.success}30` };
+    if (statusLabel === 'Result Pending') return { bgcolor: '#FFF3E0', color: '#E65100', border: '1px solid #FFE0B2' };
+    if (statusLabel === 'Results Processing') return { bgcolor: '#E3F2FD', color: '#1565C0', border: '1px solid #BBDEFB' };
+    if (statusLabel === 'Pending') return { bgcolor: '#F3E5F5', color: '#7B1FA2', border: '1px solid #E1BEE7' };
+    return { bgcolor: '#F5F5F5', color: colors.textSecondary };
+  };
+  // Match app layout: group by CMD/Matchday first, then under each CMD show "CeBee Featured Match" and "Community Featured Match"
+  const matchdayGroups = groupByMatchday(filteredFixtures);
+  const cmdSections = matchdayGroups.map((group) => ({
+    key: group.key,
+    label: group.label,
+    ceBeeFixtures: group.fixtures.filter((f) => f.isCeBeFeatured),
+    communityFixtures: group.fixtures.filter((f) => f.isCommunityFeatured),
+    otherFixtures: group.fixtures.filter((f) => !f.isCeBeFeatured && !f.isCommunityFeatured),
+  }));
+
   const statusFilters = [
     { value: 'scheduled', label: 'Scheduled', icon: AccessTime, color: '#9E9E9E' },
     { value: 'published', label: 'Published', icon: Visibility, color: '#1976d2' },
     { value: 'live', label: 'Live', icon: PlayArrow, color: colors.brandRed },
-    { value: 'resultsProcessing', label: 'Result Pending', icon: Edit, color: '#FF9800' },
     { value: 'completed', label: 'Completed', icon: CheckCircle, color: colors.success },
   ];
 
@@ -947,25 +1012,13 @@ const FixturesPage = () => {
         </Grid>
         <Grid item xs={6} md={3}>
           <StatCard
-            title="Result Pending"
-            value={String(stats.resultPending)}
-            subtitle="Action Required"
-            icon={Edit}
-            color="#FF9800"
-            isPrimary={false}
-            delay={300}
-          />
-        </Grid>
-        {/* Bottom Row - 1 Card on Left */}
-        <Grid item xs={6} md={3}>
-          <StatCard
             title="Completed"
             value={String(stats.completed)}
             subtitle="SP Distributed"
             icon={CheckCircle}
             color={colors.success}
             isPrimary={false}
-            delay={400}
+            delay={300}
           />
         </Grid>
       </Grid>
@@ -1248,7 +1301,7 @@ const FixturesPage = () => {
         </Button>
       </Box>
 
-      {/* Fixtures List Header */}
+      {/* Fixtures List Header + Category Tabs */}
       <Card
         sx={{
           padding: 2.5,
@@ -1259,7 +1312,7 @@ const FixturesPage = () => {
           boxShadow: `0 4px 12px ${colors.shadow}14`,
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
           <Box
             sx={{
               padding: 1.5,
@@ -1283,22 +1336,207 @@ const FixturesPage = () => {
         </Box>
       </Card>
 
-      {/* Data Table */}
-      <DataTable
-        columns={columns}
-        data={paginatedFixtures}
-        loading={loading}
-        page={page}
-        rowsPerPage={rowsPerPage}
-        totalCount={filteredFixtures.length}
-        onPageChange={(e, newPage) => setPage(newPage)}
-        onRowsPerPageChange={(e) => {
-          setRowsPerPage(parseInt(e.target.value, 10));
-          setPage(0);
-        }}
-        onRowClick={(row) => navigate(`/fixtures/details/${row.id}`)}
-        emptyMessage="No fixtures found"
-      />
+      {/* Fixture / Result LIST — grouped by Matchday. Priority: 1) Teams, 2) Time, 3) Status */}
+      {loading ? (
+        <Card sx={{ p: 4, textAlign: 'center', borderRadius: '16px' }}>
+          <Typography variant="body2" sx={{ color: colors.textSecondary }}>Loading fixtures…</Typography>
+        </Card>
+      ) : cmdSections.length === 0 ? (
+        <Card sx={{ p: 4, textAlign: 'center', borderRadius: '16px', border: `1px solid ${colors.divider}` }}>
+          <Typography variant="body2" sx={{ color: colors.textSecondary }}>No fixtures found</Typography>
+        </Card>
+      ) : (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {cmdSections.map((cmd) => (
+            <Box key={cmd.key}>
+              {/* CMD / Matchday header — like app "CeBee Matchday 01 (CMD01)" */}
+              <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, color: colors.brandBlack }}>
+                {cmd.label}
+              </Typography>
+
+              {/* CeBee Featured Match section */}
+              {cmd.ceBeeFixtures.length > 0 && (
+                <Box sx={{ mb: 2.5 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700, color: colors.brandRed, mb: 1.5, textTransform: 'none' }}>
+                    CeBee Featured Match{cmd.ceBeeFixtures.length > 1 ? 'es' : ''}
+                  </Typography>
+                  <Box sx={{ borderRadius: '16px', overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: `1px solid ${colors.divider}` }}>
+                    {cmd.ceBeeFixtures.map((row) => {
+                      const kickoffDate = row.kickoffTime?.toDate ? row.kickoffTime.toDate() : new Date(row.kickoffTime);
+                      const kickoffStr = Number.isNaN(kickoffDate.getTime()) ? '—' : format(kickoffDate, 'EEE d MMM • HH:mm');
+                      const statusLabel = listStatusLabel(row.status, row.matchStatus);
+                      const isLive = statusLabel === 'Live' || statusLabel === 'HT';
+                      return (
+                        <Box
+                          key={row.id}
+                          onClick={() => navigate(`/fixtures/details/${row.id}`)}
+                          sx={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            px: 2.5,
+                            py: 2,
+                            cursor: 'pointer',
+                            borderBottom: `1px solid ${colors.divider}`,
+                            transition: 'background-color 0.2s ease',
+                            '&:last-of-type': { borderBottom: 'none' },
+                            '&:hover': { backgroundColor: isLive ? `${colors.brandRed}06` : '#FAFAFA' },
+                          }}
+                        >
+                          <Typography variant="caption" sx={{ color: colors.textSecondary, fontSize: 11, letterSpacing: '0.02em', mb: 1, display: 'block' }}>
+                            {kickoffStr}
+                          </Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, minWidth: 0 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1, minWidth: 0 }}>
+                              <Box sx={{ width: listLogoSize, height: listLogoSize, borderRadius: '50%', bgcolor: '#FAFAFA', border: '1px solid #EEEEEE', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                                {row.homeTeamLogo ? (
+                                  <Box component="img" src={row.homeTeamLogo} alt="" sx={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                                ) : (
+                                  <SportsSoccer sx={{ fontSize: 22, color: '#BDBDBD' }} />
+                                )}
+                              </Box>
+                              <Typography variant="body1" sx={{ fontWeight: 700, color: colors.brandBlack, fontSize: 15 }} noWrap>{row.homeTeam || 'TBD'}</Typography>
+                              <Typography variant="body2" sx={{ color: colors.textSecondary, fontWeight: 500, flexShrink: 0, fontSize: 13 }}>vs</Typography>
+                              <Typography variant="body1" sx={{ fontWeight: 700, color: colors.brandBlack, fontSize: 15 }} noWrap>{row.awayTeam || 'TBD'}</Typography>
+                              <Box sx={{ width: listLogoSize, height: listLogoSize, borderRadius: '50%', bgcolor: '#FAFAFA', border: '1px solid #EEEEEE', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                                {row.awayTeamLogo ? (
+                                  <Box component="img" src={row.awayTeamLogo} alt="" sx={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                                ) : (
+                                  <SportsSoccer sx={{ fontSize: 22, color: '#BDBDBD' }} />
+                                )}
+                              </Box>
+                            </Box>
+                            <Chip label={statusLabel} size="small" sx={{ fontWeight: 600, fontSize: 11, height: 24, ...getListChipStyle(statusLabel) }} />
+                          </Box>
+                        </Box>
+                      );
+                    })}
+                  </Box>
+                </Box>
+              )}
+
+              {/* Community Featured Match section */}
+              {cmd.communityFixtures.length > 0 && (
+                <Box sx={{ mb: 2.5 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#1565C0', mb: 1.5, textTransform: 'none' }}>
+                    Community Featured Match{cmd.communityFixtures.length > 1 ? 'es' : ''}
+                  </Typography>
+                  <Box sx={{ borderRadius: '16px', overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: `1px solid ${colors.divider}` }}>
+                    {cmd.communityFixtures.map((row) => {
+                      const kickoffDate = row.kickoffTime?.toDate ? row.kickoffTime.toDate() : new Date(row.kickoffTime);
+                      const kickoffStr = Number.isNaN(kickoffDate.getTime()) ? '—' : format(kickoffDate, 'EEE d MMM • HH:mm');
+                      const statusLabel = listStatusLabel(row.status, row.matchStatus);
+                      const isLive = statusLabel === 'Live' || statusLabel === 'HT';
+                      return (
+                        <Box
+                          key={row.id}
+                          onClick={() => navigate(`/fixtures/details/${row.id}`)}
+                          sx={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            px: 2.5,
+                            py: 2,
+                            cursor: 'pointer',
+                            borderBottom: `1px solid ${colors.divider}`,
+                            transition: 'background-color 0.2s ease',
+                            '&:last-of-type': { borderBottom: 'none' },
+                            '&:hover': { backgroundColor: isLive ? `${colors.brandRed}06` : '#FAFAFA' },
+                          }}
+                        >
+                          <Typography variant="caption" sx={{ color: colors.textSecondary, fontSize: 11, letterSpacing: '0.02em', mb: 1, display: 'block' }}>
+                            {kickoffStr}
+                          </Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, minWidth: 0 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1, minWidth: 0 }}>
+                              <Box sx={{ width: listLogoSize, height: listLogoSize, borderRadius: '50%', bgcolor: '#FAFAFA', border: '1px solid #EEEEEE', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                                {row.homeTeamLogo ? (
+                                  <Box component="img" src={row.homeTeamLogo} alt="" sx={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                                ) : (
+                                  <SportsSoccer sx={{ fontSize: 22, color: '#BDBDBD' }} />
+                                )}
+                              </Box>
+                              <Typography variant="body1" sx={{ fontWeight: 700, color: colors.brandBlack, fontSize: 15 }} noWrap>{row.homeTeam || 'TBD'}</Typography>
+                              <Typography variant="body2" sx={{ color: colors.textSecondary, fontWeight: 500, flexShrink: 0, fontSize: 13 }}>vs</Typography>
+                              <Typography variant="body1" sx={{ fontWeight: 700, color: colors.brandBlack, fontSize: 15 }} noWrap>{row.awayTeam || 'TBD'}</Typography>
+                              <Box sx={{ width: listLogoSize, height: listLogoSize, borderRadius: '50%', bgcolor: '#FAFAFA', border: '1px solid #EEEEEE', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                                {row.awayTeamLogo ? (
+                                  <Box component="img" src={row.awayTeamLogo} alt="" sx={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                                ) : (
+                                  <SportsSoccer sx={{ fontSize: 22, color: '#BDBDBD' }} />
+                                )}
+                              </Box>
+                            </Box>
+                            <Chip label={statusLabel} size="small" sx={{ fontWeight: 600, fontSize: 11, height: 24, ...getListChipStyle(statusLabel) }} />
+                          </Box>
+                        </Box>
+                      );
+                    })}
+                  </Box>
+                </Box>
+              )}
+
+              {/* Other (no category) — only if any */}
+              {cmd.otherFixtures.length > 0 && (
+                <Box sx={{ mb: 2.5 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700, color: colors.textSecondary, mb: 1.5, textTransform: 'none' }}>
+                    Other
+                  </Typography>
+                  <Box sx={{ borderRadius: '16px', overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: `1px solid ${colors.divider}` }}>
+                    {cmd.otherFixtures.map((row) => {
+                      const kickoffDate = row.kickoffTime?.toDate ? row.kickoffTime.toDate() : new Date(row.kickoffTime);
+                      const kickoffStr = Number.isNaN(kickoffDate.getTime()) ? '—' : format(kickoffDate, 'EEE d MMM • HH:mm');
+                      const statusLabel = listStatusLabel(row.status, row.matchStatus);
+                      const isLive = statusLabel === 'Live' || statusLabel === 'HT';
+                      return (
+                        <Box
+                          key={row.id}
+                          onClick={() => navigate(`/fixtures/details/${row.id}`)}
+                          sx={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            px: 2.5,
+                            py: 2,
+                            cursor: 'pointer',
+                            borderBottom: `1px solid ${colors.divider}`,
+                            transition: 'background-color 0.2s ease',
+                            '&:last-of-type': { borderBottom: 'none' },
+                            '&:hover': { backgroundColor: isLive ? `${colors.brandRed}06` : '#FAFAFA' },
+                          }}
+                        >
+                          <Typography variant="caption" sx={{ color: colors.textSecondary, fontSize: 11, letterSpacing: '0.02em', mb: 1, display: 'block' }}>
+                            {kickoffStr}
+                          </Typography>
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, minWidth: 0 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1, minWidth: 0 }}>
+                              <Box sx={{ width: listLogoSize, height: listLogoSize, borderRadius: '50%', bgcolor: '#FAFAFA', border: '1px solid #EEEEEE', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                                {row.homeTeamLogo ? (
+                                  <Box component="img" src={row.homeTeamLogo} alt="" sx={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                                ) : (
+                                  <SportsSoccer sx={{ fontSize: 22, color: '#BDBDBD' }} />
+                                )}
+                              </Box>
+                              <Typography variant="body1" sx={{ fontWeight: 700, color: colors.brandBlack, fontSize: 15 }} noWrap>{row.homeTeam || 'TBD'}</Typography>
+                              <Typography variant="body2" sx={{ color: colors.textSecondary, fontWeight: 500, flexShrink: 0, fontSize: 13 }}>vs</Typography>
+                              <Typography variant="body1" sx={{ fontWeight: 700, color: colors.brandBlack, fontSize: 15 }} noWrap>{row.awayTeam || 'TBD'}</Typography>
+                              <Box sx={{ width: listLogoSize, height: listLogoSize, borderRadius: '50%', bgcolor: '#FAFAFA', border: '1px solid #EEEEEE', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
+                                {row.awayTeamLogo ? (
+                                  <Box component="img" src={row.awayTeamLogo} alt="" sx={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                                ) : (
+                                  <SportsSoccer sx={{ fontSize: 22, color: '#BDBDBD' }} />
+                                )}
+                              </Box>
+                            </Box>
+                            <Chip label={statusLabel} size="small" sx={{ fontWeight: 600, fontSize: 11, height: 24, ...getListChipStyle(statusLabel) }} />
+                          </Box>
+                        </Box>
+                      );
+                    })}
+                  </Box>
+                </Box>
+              )}
+            </Box>
+          ))}
+        </Box>
+      )}
 
       {/* Enter Match Results Modal */}
       <Dialog

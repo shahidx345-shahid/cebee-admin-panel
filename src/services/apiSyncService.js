@@ -120,11 +120,11 @@ export const syncTeamsFromApi = async (league, season, allSeasons = false) => {
 /** Players from database (with pagination). team = API team id or CeBee team _id. Optional page, limit. */
 export const getApiPlayers = async (team, params = {}) => {
   if (team == null || team === '') return { success: false, error: 'Team ID is required', data: { players: [], pagination: {} } };
-  const { page = 1, limit = 25 } = params;
+  const { page = 1, limit = 50 } = params;
   const res = await apiGet(`${BASE}/players`, { team, page, limit });
   const raw = res.data?.players ?? res.data ?? [];
   const list = Array.isArray(raw) ? raw : [];
-  const pagination = res.data?.pagination ?? { page: 1, limit: 25, total: list.length, pages: 1 };
+  const pagination = res.data?.pagination ?? { page: 1, limit: 50, total: list.length, pages: 1 };
   return res.success ? { success: true, data: { players: list, pagination } } : { success: false, error: res.error, data: { players: [], pagination: {} } };
 };
 
