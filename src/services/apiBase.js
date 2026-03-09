@@ -1,7 +1,7 @@
 /**
  * Base API Utility
  * Common functions for all API calls including error handling, token management, and request handling
- * Last Updated: 2026-03-06
+ * Last Updated: 2026-03-09
  */
 
 // Live backend. For local dev set REACT_APP_API_URL=http://localhost:3001 in .env
