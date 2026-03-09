@@ -217,7 +217,7 @@ const LeagueFormPage = () => {
         alert(result.message || `League ${isEditMode ? 'updated' : 'created'} successfully!`);
         
         // Navigate back to leagues list
-        navigate('/leagues');
+        navigate(constants.routes.leagues);
       } else {
         setError(result.error || `Failed to ${isEditMode ? 'update' : 'create'} league`);
       }
@@ -242,7 +242,7 @@ const LeagueFormPage = () => {
       {/* Header with Buttons */}
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
         <IconButton
-          onClick={() => navigate('/leagues')}
+          onClick={() => navigate(constants.routes.leagues)}
           sx={{
             backgroundColor: colors.brandRed,
             color: colors.brandWhite,
@@ -621,7 +621,7 @@ const LeagueFormPage = () => {
               <Button
                 variant="outlined"
                 startIcon={<Close />}
-                onClick={() => navigate('/leagues')}
+                onClick={() => navigate(constants.routes.leagues)}
                 sx={{
                   borderColor: colors.textSecondary,
                   color: colors.textSecondary,

@@ -598,7 +598,7 @@ const PredictionsPage = () => {
           <Button
             variant="contained"
             size="small"
-            onClick={() => navigate(`/predictions/details/${encodeURIComponent(firstPredictionId)}`)}
+            onClick={() => navigate(constants.routes.predictionsDetails.replace(':id', encodeURIComponent(firstPredictionId)))}
             sx={{
               minWidth: 'auto',
               padding: '6px 12px',
@@ -1305,7 +1305,7 @@ const PredictionsPage = () => {
           const firstPredictionId = row.predictions && row.predictions.length > 0
             ? row.predictions[0].id
             : row.id;
-          navigate(`/predictions/details/${encodeURIComponent(firstPredictionId)}`);
+          navigate(constants.routes.predictionsDetails.replace(':id', encodeURIComponent(firstPredictionId)));
         }}
         emptyMessage="No predictions found"
       />

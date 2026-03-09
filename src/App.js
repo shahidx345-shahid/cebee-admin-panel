@@ -78,37 +78,37 @@ function App() {
                 <Routes>
                   <Route path={constants.routes.dashboard} element={<DashboardPage />} />
                   <Route path={constants.routes.users} element={<UsersPage />} />
-                  <Route path={`${constants.routes.users}/details/:id`} element={<UserDetailsPage />} />
+                  <Route path={constants.routes.usersDetails} element={<UserDetailsPage />} />
                   <Route path={constants.routes.fixtures} element={<FixturesPage />} />
-                  <Route path="/fixtures/add" element={<FixtureFormPage />} />
-                  <Route path="/fixtures/edit/:id" element={<FixtureFormPage />} />
-                  <Route path="/fixtures/details/:id" element={<FixtureDetailsPage />} />
-                  <Route path="/leagues" element={<LeaguesPage />} />
-                  <Route path="/leagues/add" element={<LeagueFormPage />} />
-                  <Route path="/leagues/edit/:id" element={<LeagueFormPage />} />
-                  <Route path="/teams" element={<TeamsPage />} />
-                  <Route path="/teams/history/:teamId" element={<TeamHistoryPage />} />
-                  <Route path="/teams/:teamId/players" element={<PlayersPage />} />
+                  <Route path={constants.routes.fixturesAdd} element={<FixtureFormPage />} />
+                  <Route path={constants.routes.fixturesEdit} element={<FixtureFormPage />} />
+                  <Route path={constants.routes.fixturesDetails} element={<FixtureDetailsPage />} />
+                  <Route path={constants.routes.leagues} element={<LeaguesPage />} />
+                  <Route path={constants.routes.leaguesAdd} element={<LeagueFormPage />} />
+                  <Route path={constants.routes.leaguesEdit} element={<LeagueFormPage />} />
+                  <Route path={constants.routes.teams} element={<TeamsPage />} />
+                  <Route path={constants.routes.teamsHistory} element={<TeamHistoryPage />} />
+                  <Route path={constants.routes.teamsPlayers} element={<PlayersPage />} />
                   <Route path={constants.routes.predictions} element={<PredictionsPage />} />
-                  <Route path="/predictions/details/:id" element={<PredictionDetailsPage />} />
+                  <Route path={constants.routes.predictionsDetails} element={<PredictionDetailsPage />} />
                   <Route path={constants.routes.leaderboard} element={<LeaderboardPage />} />
-                  <Route path="/leaderboard/details/:id" element={<LeaderboardDetailsPage />} />
+                  <Route path={constants.routes.leaderboardDetails} element={<LeaderboardDetailsPage />} />
                   <Route path={constants.routes.rewards} element={<RewardsPage />} />
-                  <Route path="/rewards/add" element={<RewardFormPage />} />
-                  <Route path="/rewards/edit/:id" element={<RewardFormPage />} />
-                  <Route path="/rewards/details/:id" element={<RewardDetailsPage />} />
-                  <Route path="/notifications/create" element={<NotificationFormPage />} />
-                  <Route path="/notifications/edit/:id" element={<NotificationFormPage />} />
-                  <Route path="/notifications/details/:id" element={<PlaceholderPage title="Notification Details" />} />
+                  <Route path={constants.routes.rewardsAdd} element={<RewardFormPage />} />
+                  <Route path={constants.routes.rewardsEdit} element={<RewardFormPage />} />
+                  <Route path={constants.routes.rewardsDetails} element={<RewardDetailsPage />} />
+                  <Route path={constants.routes.notificationsCreate} element={<NotificationFormPage />} />
+                  <Route path={constants.routes.notificationsEdit} element={<NotificationFormPage />} />
+                  <Route path={constants.routes.notificationsDetails} element={<PlaceholderPage title="Notification Details" />} />
                   <Route path={constants.routes.notifications} element={<NotificationsPage />} />
                   <Route path={constants.routes.content} element={<ContentUpdatesPage />} />
-                  <Route path="/content-updates/faq/add" element={<FaqFormPage />} />
-                  <Route path="/content-updates/faq/edit/:id" element={<FaqFormPage />} />
+                  <Route path={constants.routes.contentFaqAdd} element={<FaqFormPage />} />
+                  <Route path={constants.routes.contentFaqEdit} element={<FaqFormPage />} />
                   <Route path={constants.routes.polls} element={<PollsPage />} />
-                  <Route path="/polls/add" element={<PollFormPage />} />
-                  <Route path="/polls/edit/:id" element={<PollFormPage />} />
+                  <Route path={constants.routes.pollsAdd} element={<PollFormPage />} />
+                  <Route path={constants.routes.pollsEdit} element={<PollFormPage />} />
                   <Route path={constants.routes.referrals} element={<ReferralsPage />} />
-                  <Route path="/referrals/details/:id" element={<PlaceholderPage title="Referral Details" />} />
+                  <Route path={constants.routes.referralsDetails} element={<PlaceholderPage title="Referral Details" />} />
                   <Route path={constants.routes.logs} element={<SystemLogsPage />} />
                   <Route path={constants.routes.settings} element={<SettingsPage />} />
                   <Route path="*" element={<Navigate to={constants.routes.dashboard} />} />

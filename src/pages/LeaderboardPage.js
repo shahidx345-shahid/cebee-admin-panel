@@ -1306,7 +1306,7 @@ const LeaderboardPage = () => {
         }}
         onRowClick={(row) => {
           const realId = row.id?.toString().replace('_monthly', '') || row.userId || row.id;
-          navigate(`/leaderboard/details/${realId}?period=${selectedPeriod}`);
+          navigate(constants.routes.leaderboardDetails.replace(':id', realId) + `?period=${selectedPeriod}`);
         }}
         emptyMessage="No leaderboard entries found"
       />
@@ -1333,7 +1333,7 @@ const LeaderboardPage = () => {
           onClick={() => {
             if (selectedEntry) {
               const realId = selectedEntry.id?.toString().replace('_monthly', '') || selectedEntry.userId || selectedEntry.id;
-              navigate(`/leaderboard/details/${realId}?period=${selectedPeriod}`);
+              navigate(constants.routes.leaderboardDetails.replace(':id', realId) + `?period=${selectedPeriod}`);
             }
             handleActionsClose();
           }}

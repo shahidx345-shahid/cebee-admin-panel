@@ -38,7 +38,7 @@ import {
   Info,
   People,
 } from '@mui/icons-material';
-import { colors } from '../config/theme';
+import { colors, constants } from '../config/theme';
 import SearchBar from '../components/common/SearchBar';
 import DataTable from '../components/common/DataTable';
 import { format } from 'date-fns';
@@ -961,7 +961,7 @@ const TeamsPage = () => {
         )}
         <MenuItem
           onClick={() => {
-            navigate(`/teams/${selectedTeam.team_id || selectedTeam.id}/players`);
+            navigate(constants.routes.teamsPlayers.replace(':teamId', selectedTeam.team_id || selectedTeam.id));
             handleMenuClose();
           }}
           sx={{
@@ -978,7 +978,7 @@ const TeamsPage = () => {
         </MenuItem>
         <MenuItem
           onClick={() => {
-            navigate(`/teams/history/${selectedTeam.team_id || selectedTeam.id}`);
+            navigate(constants.routes.teamsHistory.replace(':teamId', selectedTeam.team_id || selectedTeam.id));
             handleMenuClose();
           }}
           sx={{

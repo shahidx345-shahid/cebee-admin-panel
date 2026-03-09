@@ -37,7 +37,7 @@ import {
   Restore,
   CalendarToday,
 } from '@mui/icons-material';
-import { colors } from '../config/theme';
+import { colors, constants } from '../config/theme';
 import SearchBar from '../components/common/SearchBar';
 import DataTable from '../components/common/DataTable';
 import { format } from 'date-fns';
@@ -620,7 +620,7 @@ const PlayersPage = () => {
         </Alert>
         <Button
           startIcon={<ArrowBack />}
-          onClick={() => navigate('/teams')}
+          onClick={() => navigate(constants.routes.teams)}
           sx={{ textTransform: 'none' }}
         >
           Back to Teams
@@ -635,7 +635,7 @@ const PlayersPage = () => {
       <Box sx={{ mb: 3 }}>
         <Button
           startIcon={<ArrowBack />}
-          onClick={() => navigate('/teams')}
+          onClick={() => navigate(constants.routes.teams)}
           sx={{
             mb: 2,
             textTransform: 'none',
@@ -756,7 +756,7 @@ const PlayersPage = () => {
               <Button
                 variant="outlined"
                 startIcon={<Groups />}
-                onClick={() => navigate(`/teams/history/${team.team_id}`)}
+                onClick={() => navigate(constants.routes.teamsHistory.replace(':teamId', team.team_id))}
                 sx={{
                   textTransform: 'none',
                   fontWeight: 600,

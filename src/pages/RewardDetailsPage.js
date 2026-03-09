@@ -562,7 +562,7 @@ const RewardDetailsPage = () => {
                                 size="small"
                                 variant="outlined"
                                 startIcon={<Visibility />}
-                                onClick={() => navigate(`${constants.routes.users}/${reward.userId}`)}
+                                onClick={() => navigate(constants.routes.usersDetails.replace(':id', reward.userId))}
                                 sx={{ 
                                     borderRadius: '8px', 
                                     textTransform: 'none',
@@ -721,7 +721,7 @@ const RewardDetailsPage = () => {
                                 size="small"
                                 variant="outlined"
                                 startIcon={<Visibility />}
-                                onClick={() => navigate(`${constants.routes.users}/${reward.userId}`)}
+                                onClick={() => navigate(constants.routes.usersDetails.replace(':id', reward.userId))}
                                 sx={{ borderRadius: '8px', textTransform: 'none', fontWeight: 600 }}
                             >
                                 View KYC Profile

@@ -495,7 +495,7 @@ const LeaguesPage = () => {
         <Button
           variant="contained"
           startIcon={<Add />}
-          onClick={() => navigate('/leagues/add')}
+          onClick={() => navigate(constants.routes.leaguesAdd)}
           sx={{
             background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
             borderRadius: '12px',
@@ -819,7 +819,7 @@ const LeaguesPage = () => {
         <MenuItem
           onClick={() => {
             if (selectedLeague) {
-              navigate(`/leagues/edit/${selectedLeague.id}`);
+              navigate(constants.routes.leaguesEdit.replace(':id', selectedLeague.id));
             }
             handleMenuClose();
           }}

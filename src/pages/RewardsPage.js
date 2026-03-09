@@ -1249,7 +1249,7 @@ const RewardsPage = () => {
               const rewardId = row.id || row._id || row.reward_id || row.rewardId;
               console.log('Navigating to reward details with ID:', rewardId, 'Full row:', row);
               if (rewardId) {
-                navigate(`/rewards/details/${rewardId}`);
+                navigate(constants.routes.rewardsDetails.replace(':id', rewardId));
               } else {
                 console.error('Reward ID is missing from row:', row);
                 alert('Unable to open reward details: ID is missing');
@@ -1281,7 +1281,7 @@ const RewardsPage = () => {
                 const rewardId = selectedReward?.id || selectedReward?._id || selectedReward?.reward_id || selectedReward?.rewardId;
                 console.log('Navigating to reward details from menu with ID:', rewardId, 'Full reward:', selectedReward);
                 if (rewardId) {
-                  navigate(`/rewards/details/${rewardId}`);
+                  navigate(constants.routes.rewardsDetails.replace(':id', rewardId));
                 } else {
                   console.error('Reward ID is missing from selectedReward:', selectedReward);
                   alert('Unable to open reward details: ID is missing');

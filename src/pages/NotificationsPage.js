@@ -40,7 +40,7 @@ import {
   ChevronRight,
   Warning as WarningIcon,
 } from '@mui/icons-material';
-import { colors } from '../config/theme';
+import { colors, constants } from '../config/theme';
 import DataTable from '../components/common/DataTable';
 import { format } from 'date-fns';
 import { getNotifications, getNotificationStatistics } from '../services/notificationsService';
@@ -903,7 +903,7 @@ const NotificationsPage = () => {
             <Button
               variant="contained"
               startIcon={<Add />}
-              onClick={() => navigate('/notifications/create')}
+              onClick={() => navigate(constants.routes.notificationsCreate)}
               sx={{
                 background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
                 borderRadius: '25px',

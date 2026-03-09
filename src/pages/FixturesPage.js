@@ -800,7 +800,7 @@ const FixturesPage = () => {
                     });
                     setResultsModalOpen(true);
                   } else {
-                    navigate(`/fixtures/details/${row.id}`);
+                    navigate(constants.routes.fixturesDetails.replace(':id', row.id));
                   }
                 }}
                 sx={{
@@ -1304,7 +1304,7 @@ const FixturesPage = () => {
         <Button
           variant="contained"
           startIcon={<Add />}
-          onClick={() => navigate('/fixtures/add')}
+          onClick={() => navigate(constants.routes.fixturesAdd)}
           sx={{
             background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
             borderRadius: '12px',
@@ -1366,7 +1366,7 @@ const FixturesPage = () => {
           setRowsPerPage(parseInt(e.target.value, 10));
           setPage(0);
         }}
-        onRowClick={(row) => navigate(`/fixtures/details/${row.id}`)}
+        onRowClick={(row) => navigate(constants.routes.fixturesDetails.replace(':id', row.id))}
         emptyMessage="No fixtures found"
       />
 
@@ -1653,7 +1653,7 @@ const FixturesPage = () => {
         <MenuItem
           onClick={() => {
             if (menuFixture) {
-              navigate(`/fixtures/details/${menuFixture.id}`);
+              navigate(constants.routes.fixturesDetails.replace(':id', menuFixture.id));
             }
             setActionMenuAnchor(null);
             setMenuFixture(null);
@@ -1689,7 +1689,7 @@ const FixturesPage = () => {
         <MenuItem
           onClick={() => {
             if (menuFixture) {
-              navigate(`/fixtures/edit/${menuFixture.id}`);
+              navigate(constants.routes.fixturesEdit.replace(':id', menuFixture.id));
             }
             setActionMenuAnchor(null);
             setMenuFixture(null);

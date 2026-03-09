@@ -35,7 +35,7 @@ import {
   Groups,
   Info,
 } from '@mui/icons-material';
-import { colors } from '../config/theme';
+import { colors, constants } from '../config/theme';
 import { format } from 'date-fns';
 
 const TeamHistoryPage = () => {
@@ -234,7 +234,7 @@ const TeamHistoryPage = () => {
         </Alert>
         <Button
           startIcon={<ArrowBack />}
-          onClick={() => navigate('/teams')}
+          onClick={() => navigate(constants.routes.teams)}
           sx={{ textTransform: 'none' }}
         >
           Back to Teams
@@ -249,7 +249,7 @@ const TeamHistoryPage = () => {
       <Box sx={{ mb: 3 }}>
         <Button
           startIcon={<ArrowBack />}
-          onClick={() => navigate('/teams')}
+          onClick={() => navigate(constants.routes.teams)}
           sx={{
             mb: 2,
             textTransform: 'none',

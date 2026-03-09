@@ -35,7 +35,7 @@ import {
   HighlightOff,
   Description,
 } from '@mui/icons-material';
-import { colors } from '../config/theme';
+import { colors, constants } from '../config/theme';
 import SearchBar from '../components/common/SearchBar';
 import DataTable from '../components/common/DataTable';
 import { getPolls, closePoll } from '../services/pollsService';
@@ -151,7 +151,7 @@ const PollsPage = () => {
       alert('Maximum 5 active polls reached. Close a poll to create a new one.');
       return;
     }
-    navigate('/polls/add');
+    navigate(constants.routes.pollsAdd);
   };
 
   const handleMenuOpen = (event, poll) => {
@@ -723,7 +723,7 @@ const PollsPage = () => {
         <MenuItem
           onClick={() => {
             if (selectedPoll) {
-              navigate(`/polls/edit/${selectedPoll.id}`);
+              navigate(constants.routes.pollsEdit.replace(':id', selectedPoll.id));
             }
             handleMenuClose();
           }}

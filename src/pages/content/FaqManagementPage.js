@@ -14,7 +14,7 @@ import {
   Alert,
 } from '@mui/material';
 import { Add, Help, MoreVert, List as ListIcon, ArrowDropDown, Search as SearchIcon } from '@mui/icons-material';
-import { colors } from '../../config/theme';
+import { colors, constants } from '../../config/theme';
 import DataTable from '../../components/common/DataTable';
 import { useNavigate } from 'react-router-dom';
 import { getFaqs, deleteFaq } from '../../services/faqService';
@@ -442,7 +442,7 @@ const FaqManagementPage = () => {
 
   const handleEdit = () => {
     if (selectedFaq) {
-      navigate(`/content-updates/faq/edit/${selectedFaq.id}`);
+      navigate(constants.routes.contentFaqEdit.replace(':id', selectedFaq.id));
     }
     handleMenuClose();
   };
@@ -600,7 +600,7 @@ const FaqManagementPage = () => {
         <Button
           variant="contained"
           startIcon={<Add sx={{ fontSize: 20 }} />}
-          onClick={() => navigate('/content-updates/faq/add')}
+          onClick={() => navigate(constants.routes.contentFaqAdd)}
           sx={{
             backgroundColor: colors.brandRed,
             borderRadius: '20px',
