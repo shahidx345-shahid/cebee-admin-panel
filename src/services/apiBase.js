@@ -4,10 +4,12 @@
  * Last Updated: 2026-03-09
  */
 
-// Production: relative /api (Vercel rewrites). Local dev: use local backend only.
+// Live backend. For local dev set REACT_APP_API_URL=http://localhost:3001 in .env
+// Use relative path '/api' in production to leverage Vercel rewrites (fixes CORS)
+// For local dev, use REACT_APP_API_URL from .env or fallback to the live site
 const API_BASE_URL = (
   process.env.REACT_APP_API_URL ||
-  (process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:3001/api')
+  (process.env.NODE_ENV === 'production' ? '/api' : 'https://api.cebeepredict.com/api')
 ).replace(/\/$/, '');
 
 // Log API URL in development for easier debugging
