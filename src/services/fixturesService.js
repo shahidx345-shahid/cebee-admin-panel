@@ -212,17 +212,19 @@ export const createFixture = async (fixtureData) => {
 };
 
 /**
- * Get upcoming fixtures from Football API for a league/season (for CeBee Featured – select fixture then auto-fill).
+ * Get upcoming fixtures for a league/season (for CeBee Featured – select fixture then auto-fill).
+ * Uses synced data from DB (API Data & Sync) by default; pass source: 'api' to fetch from Football API.
  * @param {string} leagueId - League ID (Football API id or CeBee league _id)
  * @param {number|string} season - Season year (e.g. 2026)
+ * @param {object} options - Optional { source: 'db'|'api' } (default 'db' = synced fixtures)
  * @returns {Promise<{success: boolean, data?: { fixtures: array }, error?: string}>}
  */
-export const getUpcomingFixturesByLeague = async (leagueId, season) => {
+export const getUpcomingFixturesByLeague = async (leagueId, season, options = {}) => {
   try {
     if (!leagueId || season == null) {
       return { success: false, error: 'leagueId and season are required', data: { fixtures: [] } };
     }
-    const response = await apiGet('/fixtures/upcoming-by-league', { leagueId, season });
+    const response = await apiGet('/fixtures/upcoming-by-league', { leagueId, season, source: options.source || 'db' });
     if (response.success && response.data) {
       return {
         success: true,

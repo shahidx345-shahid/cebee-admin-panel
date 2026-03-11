@@ -393,9 +393,9 @@ export default function DataBrowserFixtureDetailPage() {
         {/* League + round | Status */}
         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1.5, mb: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-            {leagueLogo ? (
+          {leagueLogo ? (
               <Box component="img" src={leagueLogo} alt="" referrerPolicy="no-referrer" sx={{ width: 36, height: 36, objectFit: 'contain' }} />
-            ) : null}
+          ) : null}
             <Typography
               sx={{
                 fontSize: themeTypo.fontSize.bodySmall,
@@ -442,7 +442,7 @@ export default function DataBrowserFixtureDetailPage() {
               }}
             >
               {kickoffStr}
-            </Typography>
+          </Typography>
           )}
         </Box>
 
@@ -560,7 +560,7 @@ export default function DataBrowserFixtureDetailPage() {
         </Box>
 
         {/* Half-time */}
-        {halfTime != null && (halfTime.home != null || halfTime.away != null) && (
+          {halfTime != null && (halfTime.home != null || halfTime.away != null) && (
           <Box sx={{ textAlign: 'center', py: 2 }}>
             <Typography
               sx={{
@@ -573,7 +573,7 @@ export default function DataBrowserFixtureDetailPage() {
               <Box component="span" sx={{ fontWeight: themeTypo.fontWeight.bold, color: colors.textPrimary }}>Half-time:</Box> {halfTime.home ?? 0} — {halfTime.away ?? 0}
             </Typography>
           </Box>
-        )}
+          )}
 
         {/* Goals */}
         {(goalEvents.length > 0) && (
@@ -872,7 +872,7 @@ export default function DataBrowserFixtureDetailPage() {
                 );
               })}
             </Box>
-          </Box>
+            </Box>
         )}
       </Paper>
     </Box>

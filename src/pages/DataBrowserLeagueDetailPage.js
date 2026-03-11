@@ -59,6 +59,7 @@ import {
 } from '../services/apiSyncService';
 import { colors } from '../config/theme';
 import { constants } from '../config/theme';
+import { formatSeasonLabel } from '../utils/seasonFormat';
 
 const TAB_OVERVIEW = 'overview';
 const TAB_TEAMS = 'teams';
@@ -72,7 +73,10 @@ const SEASON_MIN = 2020;
 const SEASON_MAX = currentSeason + 1;
 const seasonOptions = [
   { value: 'all', label: 'All data' },
-  ...Array.from({ length: SEASON_MAX - SEASON_MIN + 1 }, (_, i) => ({ value: SEASON_MAX - i, label: String(SEASON_MAX - i) }))
+  ...Array.from({ length: SEASON_MAX - SEASON_MIN + 1 }, (_, i) => {
+    const y = SEASON_MAX - i;
+    return { value: y, label: formatSeasonLabel(y) };
+  })
 ];
 
 function statusShort(status) {
@@ -265,6 +269,8 @@ export default function DataBrowserLeagueDetailPage() {
   const [selectedSeason, setSelectedSeason] = useState(
     initialTab === TAB_TEAMS || initialTab === TAB_STANDINGS ? DEFAULT_SEASON_TEAMS_AND_STANDINGS : currentSeason
   );
+  // Optional second season: view 2 seasons at a time (e.g. 25-26 & 26-27)
+  const [selectedSeason2, setSelectedSeason2] = useState('');
   // Filters (per-tab) for easier data viewing
   const [searchQuery, setSearchQuery] = useState('');
   const [fixtureStatusFilter, setFixtureStatusFilter] = useState('all'); // all | scheduled | live | ht
@@ -275,6 +281,7 @@ export default function DataBrowserLeagueDetailPage() {
   const [sortFixtures, setSortFixtures] = useState('date-asc');
   const [sortResults, setSortResults] = useState('date-desc');
   const [sortStandings, setSortStandings] = useState('position-asc');
+  const [standingsGroup, setStandingsGroup] = useState('all'); // all | group name
   // Pagination per tab
   const [pageTeams, setPageTeams] = useState(0);
   const [rowsPerPageTeams, setRowsPerPageTeams] = useState(25);
@@ -301,18 +308,69 @@ export default function DataBrowserLeagueDetailPage() {
   const apiLeagueId = detail?.league?.apiLeagueId;
   const seasonFilter = selectedSeason === 'all' ? 'all' : selectedSeason;
   const isAllSeasons = selectedSeason === 'all';
+  const season2Num = selectedSeason2 !== '' && selectedSeason2 != null ? Number(selectedSeason2) : null;
+  const allowedSeasons = selectedSeason === 'all'
+    ? null
+    : season2Num != null && !Number.isNaN(season2Num)
+      ? [String(selectedSeason), String(season2Num)]
+      : [String(selectedSeason)];
 
-  // Filter by selected season in UI (instant switch, no refetch)
-  const teamsForSeason = selectedSeason === 'all' ? teams : teams.filter((t) => String(t.season_tag ?? t.season ?? '') === String(selectedSeason));
+  // Filter by selected season(s) in UI – 1 or 2 seasons at a time
+  const teamsForSeason = allowedSeasons == null
+    ? teams
+    : teams.filter((t) => allowedSeasons.includes(String(t.season_tag ?? t.season ?? '')));
   const getFixtureSeason = (f) => { const k = getFixtureKickoff(f); return f.season ?? (k ? new Date(k).getFullYear() : null); };
-  const fixturesForSeason = selectedSeason === 'all' ? fixtures : fixtures.filter((f) => { const y = getFixtureSeason(f); return y != null && String(y) === String(selectedSeason); });
-  const standingsForSeason = selectedSeason === 'all' ? standings : standings.filter((r) => String(r._season ?? '') === String(selectedSeason));
+  const fixturesForSeason = allowedSeasons == null
+    ? fixtures
+    : fixtures.filter((f) => { const y = getFixtureSeason(f); return y != null && allowedSeasons.includes(String(y)); });
+  const standingsForSeason = allowedSeasons == null
+    ? standings
+    : standings.filter((r) => {
+        const seasonValue = r._season != null ? r._season : (r.season != null ? r.season : '');
+        return allowedSeasons.includes(String(seasonValue));
+      });
+
+  // Distinct standings groups (e.g. MLS Western/Eastern Conference)
+  const standingsGroups = Array.from(new Set(
+    standingsForSeason
+      .map((r) => (r.group != null ? String(r.group).trim() : ''))
+      .filter((g) => g !== '')
+  ));
+
+  const standingsForSeasonAndGroup = standingsGroup === 'all'
+    ? standingsForSeason
+    : standingsForSeason.filter((r) => String(r.group || '').trim() === standingsGroup);
+
+  // Map team name -> conference/group based on standings (so Teams tab can use same Western/Eastern split)
+  const teamGroupByName = (() => {
+    const map = new Map();
+    standingsForSeason.forEach((r) => {
+      const groupName = r.group != null ? String(r.group).trim() : '';
+      const teamName = r.team && r.team.name ? String(r.team.name).trim().toLowerCase() : '';
+      if (groupName && teamName && !map.has(teamName)) {
+        map.set(teamName, groupName);
+      }
+    });
+    return map;
+  })();
+
+  const teamsForSeasonWithGroup = teamsForSeason.map((t) => {
+    const nameKey = String(t.team_name ?? t.name ?? '').trim().toLowerCase();
+    const groupName = nameKey ? teamGroupByName.get(nameKey) || null : null;
+    return groupName && !t.group
+      ? { ...t, group: groupName }
+      : t;
+  });
+
+  const teamsForSeasonAndGroup = standingsGroup === 'all'
+    ? teamsForSeasonWithGroup
+    : teamsForSeasonWithGroup.filter((t) => String(t.group || '').trim() === standingsGroup);
 
   const fixturesOnly = fixturesForSeason.filter((f) => !isFixtureCompleted(f));
   const resultsOnly = fixturesForSeason.filter(isFixtureCompleted);
 
   // Apply filters for each tab (search, status, date)
-  const teamsFiltered = teamsForSeason.filter((t) => matchesSearch(t.team_name ?? t.name, searchQuery));
+  const teamsFiltered = teamsForSeasonAndGroup.filter((t) => matchesSearch(t.team_name ?? t.name, searchQuery));
   const fixturesOnlyFiltered = fixturesOnly.filter((f) => {
     const teamsObj = f.teams || {};
     const home = teamsObj.home?.name ?? f.homeTeam ?? '';
@@ -338,7 +396,7 @@ export default function DataBrowserLeagueDetailPage() {
     }
     return true;
   });
-  const standingsFiltered = standingsForSeason.filter((r) => matchesSearch(r.team?.name, searchQuery));
+  const standingsFiltered = standingsForSeasonAndGroup.filter((r) => matchesSearch(r.team?.name, searchQuery));
 
   // Apply sort (A–Z, Z–A, most recent, etc.)
   const teamsSorted = [...teamsFiltered].sort((a, b) => {
@@ -589,6 +647,8 @@ export default function DataBrowserLeagueDetailPage() {
 
   const league = detail.league || {};
   const teamCount = detail.teamCount ?? 0;
+  const activeTeamCount = detail.activeTeamCount ?? teamCount;
+  const inactiveTeamCount = detail.inactiveTeamCount ?? 0;
   const useInApp = league.useInApp !== false;
 
   return (
@@ -640,7 +700,7 @@ export default function DataBrowserLeagueDetailPage() {
                 <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, fontWeight: 500 }}>{league.country || '—'}</Typography>
               </Box>
             </Box>
-            <FormControl size="small" sx={{ minWidth: 168, flexShrink: 0, '& .MuiOutlinedInput-root': { borderRadius: 2, bgcolor: 'background.paper', fontWeight: 500 } }}>
+            <FormControl size="small" sx={{ minWidth: 100, flexShrink: 0, '& .MuiOutlinedInput-root': { borderRadius: 2, bgcolor: 'background.paper', fontWeight: 500 } }}>
               <InputLabel id="season-label">Season</InputLabel>
               <Select
                 labelId="season-label"
@@ -649,6 +709,7 @@ export default function DataBrowserLeagueDetailPage() {
                 onChange={(e) => {
                   const v = e.target.value;
                   setSelectedSeason(v === 'all' ? 'all' : Number(v));
+                  if (v === 'all') setSelectedSeason2('');
                 }}
                 sx={{ fontSize: '0.875rem' }}
               >
@@ -657,6 +718,23 @@ export default function DataBrowserLeagueDetailPage() {
                 ))}
               </Select>
             </FormControl>
+            {selectedSeason !== 'all' && (
+              <FormControl size="small" sx={{ minWidth: 100, flexShrink: 0, '& .MuiOutlinedInput-root': { borderRadius: 2, bgcolor: 'background.paper', fontWeight: 500 } }}>
+                <InputLabel id="season2-label">+ Season 2</InputLabel>
+                <Select
+                  labelId="season2-label"
+                  label="+ Season 2"
+                  value={selectedSeason2}
+                  onChange={(e) => setSelectedSeason2(e.target.value === '' ? '' : Number(e.target.value))}
+                  sx={{ fontSize: '0.875rem' }}
+                >
+                  <MenuItem value="">None</MenuItem>
+                  {seasonOptions.filter((opt) => opt.value !== 'all' && opt.value !== selectedSeason).map((opt) => (
+                    <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
           </Box>
         </CardContent>
       </Card>
@@ -706,8 +784,8 @@ export default function DataBrowserLeagueDetailPage() {
                 {[
                   { label: 'League name', value: league.name_display || league.league_name || '—' },
                   { label: 'Country', value: league.country || '—' },
-                  { label: 'Display', value: isAllSeasons ? 'All data' : `Season ${seasonFilter}` },
-                  { label: 'Number of teams', value: String(teamCount) },
+                  { label: 'Display', value: isAllSeasons ? 'All data' : (allowedSeasons && allowedSeasons.length === 2 ? `${formatSeasonLabel(allowedSeasons[0])} & ${formatSeasonLabel(allowedSeasons[1])}` : `Season ${formatSeasonLabel(seasonFilter)}`) },
+                  { label: 'Number of teams', value: teamCount === 0 ? '0' : (inactiveTeamCount > 0 ? `${teamCount} (${activeTeamCount} active, ${inactiveTeamCount} inactive)` : `${teamCount} (${activeTeamCount} active)`) },
                 ].map(({ label, value }) => (
                   <Box key={label} sx={{ py: 1.5, borderBottom: 1, borderColor: 'divider', '&:last-of-type': { borderBottom: 0 } }}>
                     <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.8, fontWeight: 600, fontSize: '0.7rem' }}>{label}</Typography>
@@ -760,7 +838,7 @@ export default function DataBrowserLeagueDetailPage() {
         <Box sx={{ border: 1, borderColor: 'divider', borderTop: 'none', borderRadius: '0 0 12px 12px', bgcolor: 'background.paper', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2, px: { xs: 2, sm: 3 }, py: 2, borderBottom: 1, borderColor: 'divider', bgcolor: 'grey.50' }}>
             <Box>
-              <Typography variant="subtitle1" fontWeight={700} sx={{ color: 'grey.800' }}>Teams in this league</Typography>
+            <Typography variant="subtitle1" fontWeight={700} sx={{ color: 'grey.800' }}>Teams in this league</Typography>
               <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25 }}>Sync Standings first (step 1). Only teams in current season standings are saved.</Typography>
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
@@ -779,6 +857,22 @@ export default function DataBrowserLeagueDetailPage() {
                   <MenuItem value="name-za">Name Z → A</MenuItem>
                 </Select>
               </FormControl>
+              {standingsGroups.length > 1 && (
+                <FormControl size="small" sx={{ minWidth: 170, bgcolor: 'background.paper', borderRadius: 2, '& .MuiOutlinedInput-root': { borderRadius: 2 } }}>
+                  <InputLabel id="group-teams-label">Conference</InputLabel>
+                  <Select
+                    labelId="group-teams-label"
+                    label="Conference"
+                    value={standingsGroup}
+                    onChange={(e) => setStandingsGroup(e.target.value)}
+                  >
+                    <MenuItem value="all">All conferences</MenuItem>
+                    {standingsGroups.map((g) => (
+                      <MenuItem key={g} value={g}>{g}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              )}
               <Button
                 startIcon={syncing === 'teams' ? <CircularProgress size={18} color="inherit" /> : <Sync />}
                 onClick={handleSyncTeams}
@@ -791,6 +885,32 @@ export default function DataBrowserLeagueDetailPage() {
               </Button>
             </Box>
           </Box>
+          {standingsGroups.length > 1 && !teamsLoading && teams.length > 0 && (
+            <Box sx={{ px: { xs: 2, sm: 3 }, pt: 1.5, pb: 0.5, display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
+              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>
+                Conference:
+              </Typography>
+              <Button
+                size="small"
+                variant={standingsGroup === 'all' ? 'contained' : 'outlined'}
+                onClick={() => setStandingsGroup('all')}
+                sx={{ textTransform: 'none', borderRadius: 999, px: 1.75, py: 0.25, fontSize: '0.72rem' }}
+              >
+                All
+              </Button>
+              {standingsGroups.map((g) => (
+                <Button
+                  key={g}
+                  size="small"
+                  variant={standingsGroup === g ? 'contained' : 'outlined'}
+                  onClick={() => setStandingsGroup(g)}
+                  sx={{ textTransform: 'none', borderRadius: 999, px: 1.75, py: 0.25, fontSize: '0.72rem' }}
+                >
+                  {g}
+                </Button>
+              ))}
+            </Box>
+          )}
           {teamsLoading ? (
             <Box sx={{ py: 6, textAlign: 'center' }}><CircularProgress sx={{ color: colors.brandRed }} /><Typography variant="body2" color="text.secondary" sx={{ mt: 1.5, fontWeight: 500 }}>Loading teams…</Typography></Box>
           ) : teams.length === 0 ? (
@@ -853,7 +973,7 @@ export default function DataBrowserLeagueDetailPage() {
         <Box sx={{ border: 1, borderColor: 'divider', borderTop: 'none', borderRadius: '0 0 12px 12px', bgcolor: 'background.paper', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2, px: { xs: 2, sm: 3 }, py: 2, borderBottom: 1, borderColor: 'divider', bgcolor: 'grey.50' }}>
             <Box>
-              <Typography variant="subtitle1" fontWeight={700} sx={{ color: 'grey.800' }}>Fixtures ({fixturesOnlyFiltered.length}{fixturesOnlyFiltered.length !== fixturesOnly.length ? ` of ${fixturesOnly.length}` : ''})</Typography>
+            <Typography variant="subtitle1" fontWeight={700} sx={{ color: 'grey.800' }}>Fixtures ({fixturesOnlyFiltered.length}{fixturesOnlyFiltered.length !== fixturesOnly.length ? ` of ${fixturesOnly.length}` : ''})</Typography>
               <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25 }}>Sync Standings first (step 1). Only fixtures with both teams in standings are saved.</Typography>
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
@@ -971,7 +1091,14 @@ export default function DataBrowserLeagueDetailPage() {
                                     ) : (
                                       <SportsSoccer sx={{ color: 'grey.300', fontSize: 40, mb: 0.5 }} />
                                     )}
-                                    <Typography variant="body2" fontWeight={600} textAlign="center" noWrap sx={{ maxWidth: 120 }}>{homeName}</Typography>
+                                    <Typography
+                                      variant="body2"
+                                      fontWeight={600}
+                                      textAlign="center"
+                                      sx={{ maxWidth: 150, px: 0.5, wordBreak: 'break-word', whiteSpace: 'normal' }}
+                                    >
+                                      {homeName}
+                                    </Typography>
                                   </Box>
                                   <Box sx={{ textAlign: 'center', px: 1.5, minWidth: 80 }}>
                                     <Typography variant="body2" color="text.secondary" fontWeight={600}>vs</Typography>
@@ -989,7 +1116,14 @@ export default function DataBrowserLeagueDetailPage() {
                                     ) : (
                                       <SportsSoccer sx={{ color: 'grey.300', fontSize: 40, mb: 0.5 }} />
                                     )}
-                                    <Typography variant="body2" fontWeight={600} textAlign="center" noWrap sx={{ maxWidth: 120 }}>{awayName}</Typography>
+                                    <Typography
+                                      variant="body2"
+                                      fontWeight={600}
+                                      textAlign="center"
+                                      sx={{ maxWidth: 150, px: 0.5, wordBreak: 'break-word', whiteSpace: 'normal' }}
+                                    >
+                                      {awayName}
+                                    </Typography>
                                   </Box>
                                 </Box>
                               </Paper>
@@ -1176,7 +1310,7 @@ export default function DataBrowserLeagueDetailPage() {
         <Box sx={{ border: 1, borderColor: 'divider', borderTop: 'none', borderRadius: '0 0 12px 12px', bgcolor: 'background.paper', boxShadow: '0 2px 8px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2, px: { xs: 2, sm: 3 }, py: 2, borderBottom: 1, borderColor: 'divider', bgcolor: 'grey.50' }}>
             <Box>
-              <Typography variant="subtitle1" fontWeight={700} sx={{ color: 'grey.800' }}>Standings ({standingsFiltered.length}{standingsFiltered.length !== standings.length ? ` of ${standings.length}` : ''})</Typography>
+            <Typography variant="subtitle1" fontWeight={700} sx={{ color: 'grey.800' }}>Standings ({standingsFiltered.length}{standingsFiltered.length !== standings.length ? ` of ${standings.length}` : ''})</Typography>
               <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.25 }}>Step 1 – sync this first. Then Teams, then Fixtures. Source of truth for official teams.</Typography>
             </Box>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
@@ -1211,6 +1345,32 @@ export default function DataBrowserLeagueDetailPage() {
               </Button>
             </Box>
           </Box>
+          {standingsGroups.length > 1 && !standingsLoading && standings.length > 0 && (
+            <Box sx={{ px: { xs: 2, sm: 3 }, pt: 1.5, pb: 0.5, display: 'flex', flexWrap: 'wrap', gap: 1.5 }}>
+              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>
+                Conference:
+              </Typography>
+              <Button
+                size="small"
+                variant={standingsGroup === 'all' ? 'contained' : 'outlined'}
+                onClick={() => setStandingsGroup('all')}
+                sx={{ textTransform: 'none', borderRadius: 999, px: 1.75, py: 0.25, fontSize: '0.72rem' }}
+              >
+                All
+              </Button>
+              {standingsGroups.map((g) => (
+                <Button
+                  key={g}
+                  size="small"
+                  variant={standingsGroup === g ? 'contained' : 'outlined'}
+                  onClick={() => setStandingsGroup(g)}
+                  sx={{ textTransform: 'none', borderRadius: 999, px: 1.75, py: 0.25, fontSize: '0.72rem' }}
+                >
+                  {g}
+                </Button>
+              ))}
+            </Box>
+          )}
           {standingsLoading ? (
             <Box sx={{ py: 6, textAlign: 'center' }}><CircularProgress sx={{ color: colors.brandRed }} /><Typography variant="body2" color="text.secondary" sx={{ mt: 1.5, fontWeight: 500 }}>Loading standings…</Typography></Box>
           ) : standings.length === 0 ? (

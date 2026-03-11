@@ -317,7 +317,7 @@ const FaqManagementPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
   const [pagination, setPagination] = useState({ total: 0, pages: 0 });
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedFaq, setSelectedFaq] = useState(null);

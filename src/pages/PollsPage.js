@@ -51,7 +51,7 @@ const PollsPage = () => {
   const [statusFilter, setStatusFilter] = useState('all');
   const [leagueFilter, setLeagueFilter] = useState('all');
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedPoll, setSelectedPoll] = useState(null);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);

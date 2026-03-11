@@ -56,7 +56,7 @@ const NotificationsPage = () => {
   const [audienceFilter, setAudienceFilter] = useState('all');
   const [selectedSort, setSelectedSort] = useState('dateNewest');
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
   const [rowsPerPageAnchor, setRowsPerPageAnchor] = useState(null);
   const [sortAnchor, setSortAnchor] = useState(null);
   const [actionAnchorEl, setActionAnchorEl] = useState(null);

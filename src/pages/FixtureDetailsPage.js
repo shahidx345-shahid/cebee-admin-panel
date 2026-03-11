@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams, useLocation, Link } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -52,7 +52,12 @@ import { getFixture, getFixturePredictions, updateFixtureStatus, endMatch, updat
 
 const FixtureDetailsPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { id } = useParams();
+  const backToFixturesState = {
+    selectedStatus: location.state?.fromStatus ?? 'scheduled',
+    selectedCmd: location.state?.fromCmd ?? 'current',
+  };
   const [fixture, setFixture] = useState(null);
   const [predictions, setPredictions] = useState([]);
   const [filteredPredictions, setFilteredPredictions] = useState([]);
@@ -891,7 +896,7 @@ const FixtureDetailsPage = () => {
       <Box sx={{ p: 3 }}>
         <Button
           startIcon={<ArrowBack />}
-          onClick={() => navigate(constants.routes.fixtures)}
+          onClick={() => navigate(constants.routes.fixtures, { state: backToFixturesState })}
           sx={{
             mb: 3,
             color: colors.brandRed,
@@ -916,7 +921,7 @@ const FixtureDetailsPage = () => {
         </Typography>
         <Button
           variant="contained"
-          onClick={() => navigate(constants.routes.fixtures)}
+          onClick={() => navigate(constants.routes.fixtures, { state: backToFixturesState })}
           sx={{
             background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
             borderRadius: '12px',
@@ -1342,7 +1347,7 @@ const FixtureDetailsPage = () => {
     <Box sx={{ width: '100%', maxWidth: 900, pb: 4 }}>
       <Button
         startIcon={<ArrowBack />}
-        onClick={() => navigate(constants.routes.fixtures)}
+        onClick={() => navigate(constants.routes.fixtures, { state: backToFixturesState })}
         sx={{ mb: 2, color: colors.brandRed, textTransform: 'none', fontWeight: 600, '&:hover': { bgcolor: `${colors.brandRed}0A` } }}
       >
         Back to Fixtures

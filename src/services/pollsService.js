@@ -216,7 +216,7 @@ export const updatePoll = async (pollId, pollData) => {
  * Get upcoming fixtures from Football API for a league/season (for poll creation). Supports pagination.
  * @param {string} leagueId - League ID (CeBee DB _id or Football API league id)
  * @param {number|string} season - Season year (e.g. 2025)
- * @param {object} options - Optional { page: 1, limit: 20 }
+ * @param {object} options - Optional { page: 1, limit: 20, source: 'db'|'api' } (default source=db = synced fixtures)
  * @returns {Promise<{success: boolean, data?: { fixtures: Array, pagination?: object }, error?: string}>}
  */
 export const getUpcomingFixtures = async (leagueId, season, options = {}) => {
@@ -231,6 +231,7 @@ export const getUpcomingFixtures = async (leagueId, season, options = {}) => {
     const params = {
       leagueId,
       season: String(season),
+      source: options.source || 'db',
       ...(options.page != null && { page: options.page }),
       ...(options.limit != null && { limit: options.limit }),
     };
@@ -260,12 +261,12 @@ export const getUpcomingFixtures = async (leagueId, season, options = {}) => {
 
 /**
  * Create poll from 5 Football API fixture IDs (new flow: league → select 5 fixtures → create).
- * @param {object} params - { leagueId, season, apiFixtureIds: number[], startTime, closeTime, status? }
+ * @param {object} params - { leagueId, season, apiFixtureIds: number[], featuredTeamSides?: string[], startTime, closeTime, status? }
  * @returns {Promise<{success: boolean, data?: object, error?: string, message?: string}>}
  */
 export const createPollFromApi = async (params) => {
   try {
-    const { leagueId, season, apiFixtureIds, startTime, closeTime, status } = params;
+    const { leagueId, season, apiFixtureIds, featuredTeamSides, startTime, closeTime, status } = params;
     if (!leagueId || season == null || !Array.isArray(apiFixtureIds) || apiFixtureIds.length !== 5) {
       return {
         success: false,
@@ -279,6 +280,9 @@ export const createPollFromApi = async (params) => {
       startTime: startTime instanceof Date ? startTime.toISOString() : startTime,
       closeTime: closeTime instanceof Date ? closeTime.toISOString() : closeTime,
     };
+    if (Array.isArray(featuredTeamSides) && featuredTeamSides.length === 5) {
+      body.featuredTeamSides = featuredTeamSides.map((s) => (s === 'B' ? 'B' : 'A'));
+    }
     if (status) body.status = status;
     const response = await apiPost('/polls/from-api', body);
     if (response.success) {

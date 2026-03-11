@@ -65,7 +65,7 @@ const FixturesPage = () => {
   const [filteredFixtures, setFilteredFixtures] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedStatus, setSelectedStatus] = useState('scheduled');
+  const [selectedStatus, setSelectedStatus] = useState('published');
   const [selectedSort, setSelectedSort] = useState('dateNewest');
   const [selectedCmd, setSelectedCmd] = useState('current'); // 'current', 'all', or specific cmd ID
   const [cmds, setCmds] = useState([]);
@@ -208,8 +208,8 @@ const FixturesPage = () => {
             cmdId: cmdId,
             cmdName: cmdName,
             venue: fixture.venue || '',
-            homeScore: fixture.homeScore || fixture.home_score || null,
-            awayScore: fixture.awayScore || fixture.away_score || null,
+            homeScore: fixture.homeScore != null ? fixture.homeScore : (fixture.home_score != null ? fixture.home_score : null),
+            awayScore: fixture.awayScore != null ? fixture.awayScore : (fixture.away_score != null ? fixture.away_score : null),
           };
         });
         setFixtures(formattedFixtures);
@@ -301,6 +301,16 @@ const FixturesPage = () => {
     }
     loadFixturesRef.current?.({ showLoading: false }); // Filter change: refetch list without full-page loading
   }, [selectedCmd, selectedStatus]); // One fixtures API call per filter change only (not on mount)
+
+  // Restore tab (status + CMd) when returning from fixture details
+  useEffect(() => {
+    const state = location.state;
+    if (state?.selectedStatus != null) setSelectedStatus(state.selectedStatus);
+    if (state?.selectedCmd != null) setSelectedCmd(state.selectedCmd);
+    if (state?.selectedStatus != null || state?.selectedCmd != null) {
+      navigate(location.pathname, { replace: true, state: state?.refresh ? { refresh: true } : {} });
+    }
+  }, [location.state, location.pathname, navigate]);
 
   // Reload fixtures and stats when navigating back from form page
   useEffect(() => {
@@ -732,7 +742,9 @@ const FixturesPage = () => {
               {showFeaturedTeam && (
                 <Chip label="Featured Team" size="small" component="span" sx={{ display: 'inline-flex', verticalAlign: 'middle', ml: 0.5, backgroundColor: `${colors.brandRed}22`, color: colors.brandRed, fontWeight: 700, fontSize: 9, height: 18 }} />
               )}
-              {' vs '}
+              {row.homeScore != null && row.awayScore != null
+                ? ` ${row.homeScore} – ${row.awayScore} `
+                : ' vs '}
               {row.awayTeam || 'TBD'}
             </Typography>
           </Box>
@@ -861,7 +873,7 @@ const FixturesPage = () => {
                     });
                     setResultsModalOpen(true);
                   } else {
-                    navigate(`/fixtures/details/${row.id}`);
+                    navigate(`/fixtures/details/${row.id}`, { state: { fromStatus: selectedStatus, fromCmd: selectedCmd } });
                   }
                 }}
                 sx={{
@@ -1352,7 +1364,7 @@ const FixturesPage = () => {
               {/* CMD / Matchday header — like app "CeBee Matchday 01 (CMD01)" */}
               <Typography variant="h6" sx={{ fontWeight: 700, mb: 2, color: colors.brandBlack }}>
                 {cmd.label}
-              </Typography>
+                </Typography>
 
               {/* CeBee Featured Match section */}
               {cmd.ceBeeFixtures.length > 0 && (
@@ -1360,42 +1372,44 @@ const FixturesPage = () => {
                   <Typography variant="subtitle2" sx={{ fontWeight: 700, color: colors.brandRed, mb: 1.5, textTransform: 'none' }}>
                     CeBee Featured Match{cmd.ceBeeFixtures.length > 1 ? 'es' : ''}
                   </Typography>
-                  <Box sx={{ borderRadius: '16px', overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: `1px solid ${colors.divider}` }}>
+              <Box sx={{ borderRadius: '16px', overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: `1px solid ${colors.divider}` }}>
                     {cmd.ceBeeFixtures.map((row) => {
-                      const kickoffDate = row.kickoffTime?.toDate ? row.kickoffTime.toDate() : new Date(row.kickoffTime);
-                      const kickoffStr = Number.isNaN(kickoffDate.getTime()) ? '—' : format(kickoffDate, 'EEE d MMM • HH:mm');
-                      const statusLabel = listStatusLabel(row.status, row.matchStatus);
-                      const isLive = statusLabel === 'Live' || statusLabel === 'HT';
-                      return (
-                        <Box
-                          key={row.id}
-                          onClick={() => navigate(`/fixtures/details/${row.id}`)}
-                          sx={{
-                            display: 'flex',
-                            flexDirection: 'column',
-                            px: 2.5,
-                            py: 2,
-                            cursor: 'pointer',
-                            borderBottom: `1px solid ${colors.divider}`,
-                            transition: 'background-color 0.2s ease',
-                            '&:last-of-type': { borderBottom: 'none' },
-                            '&:hover': { backgroundColor: isLive ? `${colors.brandRed}06` : '#FAFAFA' },
-                          }}
-                        >
+                  const kickoffDate = row.kickoffTime?.toDate ? row.kickoffTime.toDate() : new Date(row.kickoffTime);
+                  const kickoffStr = Number.isNaN(kickoffDate.getTime()) ? '—' : format(kickoffDate, 'EEE d MMM • HH:mm');
+                  const statusLabel = listStatusLabel(row.status, row.matchStatus);
+                  const isLive = statusLabel === 'Live' || statusLabel === 'HT';
+                  return (
+                    <Box
+                      key={row.id}
+                          onClick={() => navigate(`/fixtures/details/${row.id}`, { state: { fromStatus: selectedStatus, fromCmd: selectedCmd } })}
+                      sx={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        px: 2.5,
+                        py: 2,
+                        cursor: 'pointer',
+                        borderBottom: `1px solid ${colors.divider}`,
+                        transition: 'background-color 0.2s ease',
+                        '&:last-of-type': { borderBottom: 'none' },
+                        '&:hover': { backgroundColor: isLive ? `${colors.brandRed}06` : '#FAFAFA' },
+                      }}
+                    >
                           <Typography variant="caption" sx={{ color: colors.textSecondary, fontSize: 11, letterSpacing: '0.02em', mb: 1, display: 'block' }}>
-                            {kickoffStr}
-                          </Typography>
-                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, minWidth: 0 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1, minWidth: 0 }}>
+                        {kickoffStr}
+                      </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, minWidth: 0 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flex: 1, minWidth: 0 }}>
                               <Box sx={{ width: listLogoSize, height: listLogoSize, borderRadius: '50%', bgcolor: '#FAFAFA', border: '1px solid #EEEEEE', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
-                                {row.homeTeamLogo ? (
-                                  <Box component="img" src={row.homeTeamLogo} alt="" sx={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-                                ) : (
-                                  <SportsSoccer sx={{ fontSize: 22, color: '#BDBDBD' }} />
-                                )}
-                              </Box>
+                            {row.homeTeamLogo ? (
+                              <Box component="img" src={row.homeTeamLogo} alt="" sx={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                            ) : (
+                              <SportsSoccer sx={{ fontSize: 22, color: '#BDBDBD' }} />
+                            )}
+                          </Box>
                               <Typography variant="body1" sx={{ fontWeight: 700, color: colors.brandBlack, fontSize: 15 }} noWrap>{row.homeTeam || 'TBD'}</Typography>
-                              <Typography variant="body2" sx={{ color: colors.textSecondary, fontWeight: 500, flexShrink: 0, fontSize: 13 }}>vs</Typography>
+                              <Typography variant="body2" sx={{ color: colors.textSecondary, fontWeight: 500, flexShrink: 0, fontSize: 13 }}>
+                                {row.homeScore != null && row.awayScore != null ? `${row.homeScore} – ${row.awayScore}` : 'vs'}
+                          </Typography>
                               <Typography variant="body1" sx={{ fontWeight: 700, color: colors.brandBlack, fontSize: 15 }} noWrap>{row.awayTeam || 'TBD'}</Typography>
                               <Box sx={{ width: listLogoSize, height: listLogoSize, borderRadius: '50%', bgcolor: '#FAFAFA', border: '1px solid #EEEEEE', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
                                 {row.awayTeamLogo ? (
@@ -1419,7 +1433,7 @@ const FixturesPage = () => {
                 <Box sx={{ mb: 2.5 }}>
                   <Typography variant="subtitle2" sx={{ fontWeight: 700, color: '#1565C0', mb: 1.5, textTransform: 'none' }}>
                     Community Featured Match{cmd.communityFixtures.length > 1 ? 'es' : ''}
-                  </Typography>
+                          </Typography>
                   <Box sx={{ borderRadius: '16px', overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: `1px solid ${colors.divider}` }}>
                     {cmd.communityFixtures.map((row) => {
                       const kickoffDate = row.kickoffTime?.toDate ? row.kickoffTime.toDate() : new Date(row.kickoffTime);
@@ -1429,7 +1443,7 @@ const FixturesPage = () => {
                       return (
                         <Box
                           key={row.id}
-                          onClick={() => navigate(`/fixtures/details/${row.id}`)}
+                          onClick={() => navigate(`/fixtures/details/${row.id}`, { state: { fromStatus: selectedStatus, fromCmd: selectedCmd } })}
                           sx={{
                             display: 'flex',
                             flexDirection: 'column',
@@ -1455,16 +1469,18 @@ const FixturesPage = () => {
                                 )}
                               </Box>
                               <Typography variant="body1" sx={{ fontWeight: 700, color: colors.brandBlack, fontSize: 15 }} noWrap>{row.homeTeam || 'TBD'}</Typography>
-                              <Typography variant="body2" sx={{ color: colors.textSecondary, fontWeight: 500, flexShrink: 0, fontSize: 13 }}>vs</Typography>
+                              <Typography variant="body2" sx={{ color: colors.textSecondary, fontWeight: 500, flexShrink: 0, fontSize: 13 }}>
+                                {row.homeScore != null && row.awayScore != null ? `${row.homeScore} – ${row.awayScore}` : 'vs'}
+                              </Typography>
                               <Typography variant="body1" sx={{ fontWeight: 700, color: colors.brandBlack, fontSize: 15 }} noWrap>{row.awayTeam || 'TBD'}</Typography>
                               <Box sx={{ width: listLogoSize, height: listLogoSize, borderRadius: '50%', bgcolor: '#FAFAFA', border: '1px solid #EEEEEE', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
-                                {row.awayTeamLogo ? (
-                                  <Box component="img" src={row.awayTeamLogo} alt="" sx={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-                                ) : (
-                                  <SportsSoccer sx={{ fontSize: 22, color: '#BDBDBD' }} />
-                                )}
-                              </Box>
-                            </Box>
+                            {row.awayTeamLogo ? (
+                              <Box component="img" src={row.awayTeamLogo} alt="" sx={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                            ) : (
+                              <SportsSoccer sx={{ fontSize: 22, color: '#BDBDBD' }} />
+                            )}
+                          </Box>
+                        </Box>
                             <Chip label={statusLabel} size="small" sx={{ fontWeight: 600, fontSize: 11, height: 24, ...getListChipStyle(statusLabel) }} />
                           </Box>
                         </Box>
@@ -1489,7 +1505,7 @@ const FixturesPage = () => {
                       return (
                         <Box
                           key={row.id}
-                          onClick={() => navigate(`/fixtures/details/${row.id}`)}
+                          onClick={() => navigate(`/fixtures/details/${row.id}`, { state: { fromStatus: selectedStatus, fromCmd: selectedCmd } })}
                           sx={{
                             display: 'flex',
                             flexDirection: 'column',
@@ -1515,7 +1531,9 @@ const FixturesPage = () => {
                                 )}
                               </Box>
                               <Typography variant="body1" sx={{ fontWeight: 700, color: colors.brandBlack, fontSize: 15 }} noWrap>{row.homeTeam || 'TBD'}</Typography>
-                              <Typography variant="body2" sx={{ color: colors.textSecondary, fontWeight: 500, flexShrink: 0, fontSize: 13 }}>vs</Typography>
+                              <Typography variant="body2" sx={{ color: colors.textSecondary, fontWeight: 500, flexShrink: 0, fontSize: 13 }}>
+                                {row.homeScore != null && row.awayScore != null ? `${row.homeScore} – ${row.awayScore}` : 'vs'}
+                              </Typography>
                               <Typography variant="body1" sx={{ fontWeight: 700, color: colors.brandBlack, fontSize: 15 }} noWrap>{row.awayTeam || 'TBD'}</Typography>
                               <Box sx={{ width: listLogoSize, height: listLogoSize, borderRadius: '50%', bgcolor: '#FAFAFA', border: '1px solid #EEEEEE', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0, boxShadow: '0 1px 4px rgba(0,0,0,0.06)' }}>
                                 {row.awayTeamLogo ? (
@@ -1526,11 +1544,11 @@ const FixturesPage = () => {
                               </Box>
                             </Box>
                             <Chip label={statusLabel} size="small" sx={{ fontWeight: 600, fontSize: 11, height: 24, ...getListChipStyle(statusLabel) }} />
-                          </Box>
-                        </Box>
-                      );
-                    })}
-                  </Box>
+                      </Box>
+                    </Box>
+                  );
+                })}
+              </Box>
                 </Box>
               )}
             </Box>
@@ -1821,7 +1839,7 @@ const FixturesPage = () => {
         <MenuItem
           onClick={() => {
             if (menuFixture) {
-              navigate(`/fixtures/details/${menuFixture.id}`);
+              navigate(`/fixtures/details/${menuFixture.id}`, { state: { fromStatus: selectedStatus, fromCmd: selectedCmd } });
             }
             setActionMenuAnchor(null);
             setMenuFixture(null);

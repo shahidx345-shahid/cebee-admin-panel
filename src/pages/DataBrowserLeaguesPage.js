@@ -53,7 +53,7 @@ export default function DataBrowserLeaguesPage() {
   const [editingOrderId, setEditingOrderId] = useState(null);
   const [orderInput, setOrderInput] = useState('');
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
 
   // Debounce search and reset to first page when query changes
   useEffect(() => {
@@ -106,9 +106,12 @@ export default function DataBrowserLeaguesPage() {
     const res = await syncLeaguesFromApi(); // API → save to DB
     setSyncing(false);
     if (res.success) {
-      setMessage(res.message || 'Leagues synced. Refreshing from DB…');
+      setMessage(res.message || 'League sync started. List will auto-refresh in 1–2 min, or refresh the page.');
       refetchLeagues();
-    } else setError(res.error);
+      // Background upsert can take 1–2 min; auto-refresh so list updates when done
+      setTimeout(refetchLeagues, 90000);
+      setTimeout(refetchLeagues, 180000);
+    } else setError(res.error || 'Sync failed');
   };
 
   const openMenu = (event, league) => {

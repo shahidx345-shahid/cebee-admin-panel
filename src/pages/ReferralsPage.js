@@ -54,7 +54,7 @@ const ReferralsPage = () => {
   const [countryFilter, setCountryFilter] = useState('all');
   const [selectedSort, setSelectedSort] = useState('dateNewest');
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
   const [dateMenuAnchor, setDateMenuAnchor] = useState(null);
   const [statusMenuAnchor, setStatusMenuAnchor] = useState(null);
   const [countryMenuAnchor, setCountryMenuAnchor] = useState(null);

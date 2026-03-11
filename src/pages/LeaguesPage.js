@@ -7,14 +7,11 @@ import {
   Card,
   Grid,
   Chip,
-  Switch,
   Select,
+  Menu,
   MenuItem,
   FormControl,
   InputLabel,
-  IconButton,
-  Menu,
-  ListItemText,
   Alert,
   TextField,
 } from '@mui/material';
@@ -25,23 +22,17 @@ import {
   Stadium,
   AccessTime,
   List as ListIcon,
-  Lock,
-  MoreVert,
   ArrowDropDown,
   ArrowUpward,
   ArrowDownward,
-  Edit,
-  Delete,
-  KeyboardArrowRight,
 } from '@mui/icons-material';
 import { colors, constants } from '../config/theme';
 import SearchBar from '../components/common/SearchBar';
 import DataTable from '../components/common/DataTable';
 import { format } from 'date-fns';
-import { 
-  getLeagues, 
-  updateLeague, 
-  deactivateLeague,
+import {
+  getLeagues,
+  updateLeague,
   normalizeLeaguePriorities,
 } from '../services/leaguesService';
 
@@ -54,10 +45,8 @@ const LeaguesPage = () => {
   const [typeFilter, setTypeFilter] = useState('all');
   const [selectedSort, setSelectedSort] = useState(''); // No sort initially
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
   const [totalLeaguesCount, setTotalLeaguesCount] = useState(0);
-  const [anchorEl, setAnchorEl] = useState(null);
-  const [selectedLeague, setSelectedLeague] = useState(null);
   const [dateFilterAnchor, setDateFilterAnchor] = useState(null);
   const [typeFilterAnchor, setTypeFilterAnchor] = useState(null);
   const [error, setError] = useState('');
@@ -67,7 +56,7 @@ const LeaguesPage = () => {
   const [statistics, setStatistics] = useState({
     total: 0,
     active: 0,
-    maxActive: 5,
+    maxActive: 10,
     activeDisplay: 'Active: 0/5'
   });
 
@@ -182,12 +171,6 @@ const LeaguesPage = () => {
       'dateOldest': 'name-asc',
     };
     return sortMap[frontendSort] || 'name-asc';
-  };
-
-  // Leagues from Football API have numeric id (e.g. "39"); Edit/Deactivate require DB and are not supported for API leagues
-  const isLeagueFromApi = (league) => {
-    const id = String(league?.id ?? league?.league_id ?? '');
-    return /^\d+$/.test(id);
   };
 
   useEffect(() => {
@@ -366,16 +349,6 @@ const LeaguesPage = () => {
     }
   };
 
-  const handleMenuOpen = (event, league) => {
-    setAnchorEl(event.currentTarget);
-    setSelectedLeague(league);
-  };
-
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-    setSelectedLeague(null);
-  };
-
   const activeCount = leagues.filter((l) => l.isActive).length;
 
   const columns = [
@@ -504,23 +477,23 @@ const LeaguesPage = () => {
       label: 'Status',
       minWidth: 100,
       render: (_, row) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Switch
-            checked={row.isActive || false}
-            onChange={() => toggleLeagueStatus(row)}
-            size="small"
-            disabled={activeCount >= statistics.maxActive && !row.isActive}
-            sx={{
-              '& .MuiSwitch-switchBase.Mui-checked': {
-                color: colors.success,
-              },
-              '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                backgroundColor: colors.success,
-              },
-            }}
-          />
-          <Lock sx={{ fontSize: 16, color: colors.textSecondary }} />
-        </Box>
+        <Chip
+          label={row.isActive ? 'Active' : 'Inactive'}
+          size="small"
+          onClick={() => toggleLeagueStatus(row)}
+          sx={{
+            cursor: 'pointer',
+            backgroundColor: row.isActive ? `${colors.success}18` : '#F5F5F5',
+            color: row.isActive ? colors.success : colors.textSecondary,
+            fontWeight: 600,
+            fontSize: 11,
+            height: 24,
+            border: `1px solid ${row.isActive ? colors.success : colors.divider}`,
+            '&:hover': {
+              backgroundColor: row.isActive ? `${colors.success}28` : '#EEEEEE',
+            },
+          }}
+        />
       ),
     },
     {
@@ -545,31 +518,6 @@ const LeaguesPage = () => {
         const date = raw?.toDate ? raw.toDate() : new Date(raw);
         return format(date, 'MMM dd, yyyy');
       },
-    },
-    {
-      id: 'actions',
-      label: 'Actions',
-      minWidth: 72,
-      render: (_, row) => (
-        <IconButton
-          size="small"
-          onClick={(e) => {
-            e.stopPropagation();
-            handleMenuOpen(e, row);
-          }}
-          sx={{
-            backgroundColor: colors.brandRed,
-            color: colors.brandWhite,
-            width: 32,
-            height: 32,
-            '&:hover': {
-              backgroundColor: colors.brandDarkRed,
-            },
-          }}
-        >
-          <MoreVert sx={{ fontSize: 18 }} />
-        </IconButton>
-      ),
     },
   ];
 
@@ -627,7 +575,7 @@ const LeaguesPage = () => {
                 fontSize: 13,
               }}
             >
-              Manage leagues and competitions (Max 5 active)
+              Manage leagues and competitions (Max 10 active)
             </Typography>
           </Box>
         </Box>
@@ -968,111 +916,6 @@ const LeaguesPage = () => {
         emptyMessage="No leagues found"
       />
 
-      {/* Actions Menu */}
-      <Menu
-        anchorEl={anchorEl}
-        open={Boolean(anchorEl)}
-        onClose={handleMenuClose}
-        PaperProps={{
-          sx: {
-            borderRadius: '12px',
-            minWidth: 220,
-            boxShadow: '0 4px 16px rgba(0, 0, 0, 0.15)',
-            padding: 0.5,
-          },
-        }}
-        transformOrigin={{ horizontal: 'right', vertical: 'top' }}
-        anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
-      >
-        <MenuItem
-          disabled={selectedLeague && isLeagueFromApi(selectedLeague)}
-          onClick={() => {
-            if (selectedLeague && !isLeagueFromApi(selectedLeague)) {
-              navigate(`/leagues/edit/${selectedLeague.id}`);
-            }
-            handleMenuClose();
-          }}
-          sx={{
-            px: 2,
-            py: 1.5,
-            borderRadius: '8px',
-            display: 'flex',
-            alignItems: 'center',
-            '&:hover': {
-              backgroundColor: `${colors.warning}0D`,
-            },
-          }}
-          title={selectedLeague && isLeagueFromApi(selectedLeague) ? 'Read-only (Football API)' : ''}
-        >
-          <Box
-            sx={{
-              width: 32,
-              height: 32,
-              borderRadius: '8px',
-              backgroundColor: '#FFF3E0',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              mr: 1.5,
-            }}
-          >
-            <Edit sx={{ fontSize: 18, color: '#FF9800' }} />
-          </Box>
-          <Typography sx={{ flex: 1, fontWeight: 600, color: colors.brandBlack }}>
-            Edit League {selectedLeague && isLeagueFromApi(selectedLeague) ? '(read-only)' : ''}
-          </Typography>
-          <KeyboardArrowRight sx={{ fontSize: 18, color: colors.textSecondary }} />
-        </MenuItem>
-        <MenuItem
-          disabled={selectedLeague && isLeagueFromApi(selectedLeague)}
-          onClick={async () => {
-            handleMenuClose();
-            if (selectedLeague && isLeagueFromApi(selectedLeague)) return;
-            if (window.confirm(`Are you sure you want to deactivate "${selectedLeague?.name}"? This will also deactivate all teams in this league.`)) {
-              try {
-                const result = await deactivateLeague(selectedLeague?.id);
-                if (result.success) {
-                  alert(result.message || 'League deactivated successfully');
-                  await loadLeagues(); // Reload leagues
-                } else {
-                  alert(result.error || 'Failed to deactivate league');
-                }
-              } catch (error) {
-                console.error('Error deactivating league:', error);
-                alert('An unexpected error occurred');
-              }
-            }
-          }}
-          sx={{
-            px: 2,
-            py: 1.5,
-            borderRadius: '8px',
-            display: 'flex',
-            alignItems: 'center',
-            '&:hover': {
-              backgroundColor: `${colors.error}0D`,
-            },
-          }}
-          title={selectedLeague && isLeagueFromApi(selectedLeague) ? 'Read-only (Football API)' : ''}
-        >
-          <Box
-            sx={{
-              width: 32,
-              height: 32,
-              borderRadius: '8px',
-              backgroundColor: '#FFEBEE',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              mr: 1.5,
-            }}
-          >
-            <Delete sx={{ fontSize: 18, color: colors.error }} />
-          </Box>
-          <Typography sx={{ flex: 1, fontWeight: 600, color: colors.brandBlack }}>Delete League</Typography>
-          <KeyboardArrowRight sx={{ fontSize: 18, color: colors.textSecondary }} />
-        </MenuItem>
-      </Menu>
     </Box>
   );
 };

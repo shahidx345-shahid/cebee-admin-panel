@@ -67,7 +67,7 @@ const RewardsPage = () => {
   const [rankFilter, setRankFilter] = useState('all');
   const [selectedSort, setSelectedSort] = useState('rankLowest');
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
   const [rankAnchor, setRankAnchor] = useState(null);
   const [consentAnchor, setConsentAnchor] = useState(null);
   const [monthAnchor, setMonthAnchor] = useState(null);

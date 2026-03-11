@@ -21,6 +21,9 @@ import {
   Divider,
   Autocomplete,
   TextField,
+  Radio,
+  RadioGroup,
+  FormControlLabel,
 } from '@mui/material';
 import {
   ArrowBack,
@@ -40,6 +43,7 @@ import { colors, constants } from '../config/theme';
 import { DateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { format, differenceInHours, differenceInDays } from 'date-fns';
+import { formatSeasonLabel } from '../utils/seasonFormat';
 import { getPolls, getPoll, createPoll, updatePoll, getUpcomingFixtures, createPollFromApi } from '../services/pollsService';
 import { getLeagues } from '../services/leaguesService';
 import { getTeams } from '../services/teamsService';
@@ -67,6 +71,7 @@ const PollFormPage = () => {
   const [loadingFixtures, setLoadingFixtures] = useState(false);
   const [fixturesError, setFixturesError] = useState('');
   const [selectedApiFixtureIds, setSelectedApiFixtureIds] = useState([null, null, null, null, null]); // exactly 5 slots for new create flow
+  const [featuredTeamSidePerSlot, setFeaturedTeamSidePerSlot] = useState(['', '', '', '', '']); // '' = not chosen, 'A' = home, 'B' = away per slot
   const [selectedFixtures, setSelectedFixtures] = useState([
     { matchNum: 1, teamA: '', teamB: '' },
     { matchNum: 2, teamA: '', teamB: '' },
@@ -271,7 +276,7 @@ const PollFormPage = () => {
           setFixturesTotal(pag.total ?? 0);
           setFixturesPage(1);
           setFixturesTotalPages(pag.total_pages ?? 1);
-          if (!(res.data.fixtures || []).length) setFixturesError('No upcoming fixtures for this league/season.');
+          if (!(res.data.fixtures || []).length) setFixturesError('No upcoming fixtures for this league/season. Sync fixtures in API Data & Sync (Fixtures tab) for this league/season, then try again.');
         } else {
           setFixturesError(res.error || 'Failed to load upcoming fixtures.');
         }
@@ -349,6 +354,27 @@ const PollFormPage = () => {
     setSelectedApiFixtureIds((prev) => {
       const next = [...prev];
       next[slotIndex] = apiFixtureId === '' ? null : Number(apiFixtureId);
+      return next;
+    });
+    setFeaturedTeamSidePerSlot((prev) => {
+      const next = [...prev];
+      next[slotIndex] = ''; // admin must pick featured team; no auto-select
+      return next;
+    });
+  };
+
+  // Next fixture slot is only enabled when previous slot has fixture + featured team selected
+  const isFixtureSlotDisabled = (slotIndex) => {
+    if (slotIndex === 0) return false;
+    const prevHasFixture = selectedApiFixtureIds[slotIndex - 1] != null;
+    const prevHasFeatured = featuredTeamSidePerSlot[slotIndex - 1] === 'A' || featuredTeamSidePerSlot[slotIndex - 1] === 'B';
+    return !prevHasFixture || !prevHasFeatured;
+  };
+
+  const handleFeaturedTeamSideSelect = (slotIndex, side) => {
+    setFeaturedTeamSidePerSlot((prev) => {
+      const next = [...prev];
+      next[slotIndex] = side === 'B' ? 'B' : 'A';
       return next;
     });
   };
@@ -466,6 +492,11 @@ const PollFormPage = () => {
       alert('Each fixture can only be selected once. Please choose 5 different fixtures.');
       return;
     }
+    const allFeaturedPicked = featuredTeamSidePerSlot.every((s) => s === 'A' || s === 'B');
+    if (!allFeaturedPicked) {
+      alert('Please select the featured team for each of the 5 fixtures before creating the poll.');
+      return;
+    }
 
     try {
       setSaving(true);
@@ -473,6 +504,7 @@ const PollFormPage = () => {
         leagueId: formData.leagueId,
         season: formData.season,
         apiFixtureIds: selectedApiFixtureIds,
+        featuredTeamSides: featuredTeamSidePerSlot.map((s) => (s === 'B' ? 'B' : 'A')),
         startTime,
         closeTime,
       });
@@ -740,27 +772,28 @@ const PollFormPage = () => {
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                     <CalendarToday sx={{ fontSize: 18, color: colors.brandRed }} />
                     <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack, fontSize: 14 }}>
-                      Season (year)
+                      Season
                     </Typography>
                     <Typography component="span" sx={{ color: colors.brandRed, ml: 0.5 }}>*</Typography>
                   </Box>
-                  <TextField
-                    fullWidth
-                    type="number"
-                    value={formData.season ?? ''}
-                    onChange={(e) => {
-                      const v = e.target.value ? parseInt(e.target.value, 10) : 2025;
-                      handleChange('season', Number.isNaN(v) ? 2025 : v);
-                    }}
-                    inputProps={{ min: 2020, max: 2030 }}
-                    sx={{
-                      '& .MuiOutlinedInput-root': {
+                  <FormControl fullWidth size="small">
+                    <InputLabel id="poll-season-label">Season</InputLabel>
+                    <Select
+                      labelId="poll-season-label"
+                      label="Season"
+                      value={formData.season ?? 2025}
+                      onChange={(e) => handleChange('season', Number(e.target.value))}
+                      sx={{
                         borderRadius: '14px',
                         backgroundColor: `${colors.backgroundLight}80`,
-                        '& fieldset': { borderColor: `${colors.divider}66` },
-                      },
-                    }}
-                  />
+                        '& .MuiOutlinedInput-notchedOutline': { borderColor: `${colors.divider}66` },
+                      }}
+                    >
+                      {[new Date().getFullYear() + 1, new Date().getFullYear(), new Date().getFullYear() - 1, new Date().getFullYear() - 2].map((y) => (
+                        <MenuItem key={y} value={y}>{formatSeasonLabel(y)}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
                 </Box>
               </Grid>
             )}
@@ -802,11 +835,11 @@ const PollFormPage = () => {
                         Choose one fixture per slot. No duplicate fixtures.
                       </Typography>
                       <Typography variant="caption" sx={{ mb: 0.5, color: colors.textSecondary, fontStyle: 'italic' }}>
-                        {leagueFixtures.length} fixtures loaded in each dropdown — scroll inside the list to see all. Use &quot;Load more fixtures&quot; below to load more (e.g. 100+).
+                        All fixtures are available for the poll. Choose one per slot; no duplicate fixtures. Scroll to see all; use &quot;Load more&quot; for more.
                       </Typography>
                       {[0, 1, 2, 3, 4].map((slotIndex) => (
+                        <Box key={slotIndex} sx={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
                         <FormControl
-                          key={slotIndex}
                           fullWidth
                           size="small"
                           sx={{
@@ -818,6 +851,7 @@ const PollFormPage = () => {
                             value={selectedApiFixtureIds[slotIndex] ?? ''}
                             onChange={(e) => handleApiFixtureSelect(slotIndex, e.target.value)}
                             label={`Fixture ${slotIndex + 1}`}
+                            disabled={isFixtureSlotDisabled(slotIndex)}
                             MenuProps={{
                               disableScrollLock: true,
                               PaperProps: {
@@ -861,18 +895,81 @@ const PollFormPage = () => {
                               <em>Select a match</em>
                       </MenuItem>
                             {leagueFixtures.map((f) => {
-                              const alreadyUsed =
+                              const alreadyUsedInOtherSlot =
                                 selectedApiFixtureIds.some((id, i) => i !== slotIndex && id === f.apiFixtureId);
+                              const disabled = alreadyUsedInOtherSlot;
                               const label = `${f.homeTeamName} vs ${f.awayTeamName}${f.kickoff ? ' – ' + format(new Date(f.kickoff), 'PPp') : ''}`;
                               return (
-                                <MenuItem key={f.apiFixtureId} value={f.apiFixtureId} disabled={alreadyUsed}>
+                                <MenuItem key={f.apiFixtureId} value={f.apiFixtureId} disabled={disabled} sx={disabled ? { opacity: 0.7 } : undefined}>
                                   {label}
-                                  {alreadyUsed && <Typography component="span" variant="caption" sx={{ ml: 1, color: 'text.secondary' }}>(selected)</Typography>}
+                                  {alreadyUsedInOtherSlot && <Typography component="span" variant="caption" sx={{ ml: 1, color: 'text.secondary' }}>(selected in another slot)</Typography>}
                                 </MenuItem>
                               );
                             })}
                   </Select>
                 </FormControl>
+                        {isFixtureSlotDisabled(slotIndex) && slotIndex > 0 && (
+                          <Typography variant="caption" sx={{ mt: 0.5, color: colors.textSecondary, fontStyle: 'italic' }}>
+                            Select Fixture {slotIndex} and pick its featured team to unlock.
+                          </Typography>
+                        )}
+                        {selectedApiFixtureIds[slotIndex] != null && (() => {
+                          const sel = leagueFixtures.find((f) => f.apiFixtureId === selectedApiFixtureIds[slotIndex]);
+                          const homeName = sel?.homeTeamName ?? 'Home';
+                          const awayName = sel?.awayTeamName ?? 'Away';
+                          return (
+                            <Box
+                              sx={{
+                                mt: 1.5,
+                                p: 1.5,
+                                borderRadius: 1,
+                                border: `1px solid ${colors.divider}`,
+                                borderTop: `3px solid ${colors.brandRed}`,
+                                bgcolor: `${colors.backgroundLight}80`,
+                              }}
+                            >
+                              <Typography
+                                variant="body2"
+                                sx={{
+                                  fontWeight: 700,
+                                  color: colors.brandBlack,
+                                  mb: 0.5,
+                                  letterSpacing: '0.02em',
+                                }}
+                              >
+                                Fixture: {homeName} vs {awayName}
+                              </Typography>
+                              <Box
+                                sx={{
+                                  height: 1,
+                                  borderBottom: `1px solid ${colors.divider}`,
+                                  my: 1,
+                                }}
+                              />
+                              <Typography variant="caption" sx={{ fontWeight: 600, color: colors.textSecondary, display: 'block', mb: 1 }}>
+                                Select Featured Team (required)
+                              </Typography>
+                              <RadioGroup
+                                row
+                                value={featuredTeamSidePerSlot[slotIndex] ?? ''}
+                                onChange={(e) => handleFeaturedTeamSideSelect(slotIndex, e.target.value)}
+                                sx={{ gap: 2 }}
+                              >
+                                <FormControlLabel
+                                  value="A"
+                                  control={<Radio size="small" sx={{ color: colors.brandRed, '&.Mui-checked': { color: colors.brandRed } }} />}
+                                  label={<Typography variant="body2" sx={{ fontWeight: 500 }}>{homeName} (Home)</Typography>}
+                                />
+                                <FormControlLabel
+                                  value="B"
+                                  control={<Radio size="small" sx={{ color: colors.brandRed, '&.Mui-checked': { color: colors.brandRed } }} />}
+                                  label={<Typography variant="body2" sx={{ fontWeight: 500 }}>{awayName} (Away)</Typography>}
+                                />
+                              </RadioGroup>
+                            </Box>
+                          );
+                        })()}
+                        </Box>
                       ))}
                       {fixturesTotal > 0 && (
                         <Box
@@ -1449,7 +1546,7 @@ const PollFormPage = () => {
               !rules.maxFiveActive ||
               !rules.closeAfterStart ||
               !rules.durationValid ||
-              (isEditMode ? !validateFixtures() : selectedApiFixtureIds.filter((id) => id != null).length !== 5)
+              (isEditMode ? !validateFixtures() : selectedApiFixtureIds.filter((id) => id != null).length !== 5 || !featuredTeamSidePerSlot.every((s) => s === 'A' || s === 'B'))
             }
             sx={{
               background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,

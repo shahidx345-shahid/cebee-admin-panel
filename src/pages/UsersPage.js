@@ -49,7 +49,7 @@ const UsersPage = () => {
   const [selectedStatus, setSelectedStatus] = useState('active');
   const [selectedSort, setSelectedSort] = useState('spHigh');
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
   const [spFilterAnchor, setSpFilterAnchor] = useState(null);
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);

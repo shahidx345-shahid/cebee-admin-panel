@@ -46,12 +46,26 @@ export const setLeagueOrder = async (leagueId, order) => {
   return res.success ? { success: true, data: res.data } : { success: false, error: res.error || res.message };
 };
 
-/** Standings from database only. Pass season='all' to get all seasons (returns { data: [{ season, rows }, ...] }). */
+/** Standings from database only. Pass season='all' to get all seasons.
+ * Normalises backend response so callers always receive a **flat list of rows**:
+ * - When season='all': [{ ...row, _season }] for every season
+ * - When single season: raw rows array
+ */
 export const getApiStandings = async (league, season) => {
   if (!league) return { success: false, error: 'League ID is required', data: [] };
   const res = await apiGet(`${BASE}/standings`, { league, season: season ?? 'all' });
   const raw = res.data?.standings ?? res.data;
-  const list = Array.isArray(raw) ? raw : [];
+
+  let list = [];
+  if (Array.isArray(raw) && raw.length > 0) {
+    // Shape from backend for season='all': [{ season, rows: [...] }, ...]
+    if (raw[0].season != null && Array.isArray(raw[0].rows)) {
+      list = raw.flatMap((s) => (s.rows || []).map((r) => ({ ...r, _season: s.season })));
+    } else {
+      list = raw;
+    }
+  }
+
   return res.success ? { success: true, data: list } : { success: false, error: res.error, data: [] };
 };
 

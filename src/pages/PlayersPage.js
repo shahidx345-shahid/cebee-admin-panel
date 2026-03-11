@@ -61,7 +61,7 @@ const PlayersPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
   const [playersTotalCount, setPlayersTotalCount] = useState(0);
   const [playersActiveTotal, setPlayersActiveTotal] = useState(0);
   const [playersInactiveTempTotal, setPlayersInactiveTempTotal] = useState(0);

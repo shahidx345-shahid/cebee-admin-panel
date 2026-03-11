@@ -40,6 +40,7 @@ import { colors, constants } from '../config/theme';
 import { DateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { format } from 'date-fns';
+import { formatSeasonLabel } from '../utils/seasonFormat';
 import { getLeagues } from '../services/leaguesService';
 import { getCmds, getCurrentCmd, createCmd, updateCmdStatus } from '../services/cmdsService';
 import { getTeams } from '../services/teamsService';
@@ -75,7 +76,7 @@ const FixtureFormPage = () => {
   });
 
   const [featureType, setFeatureType] = useState('cebee'); // 'cebee' or 'community'
-  const [cebeeSeason, setCebeeSeason] = useState(new Date().getFullYear());
+  const [cebeeSeason, setCebeeSeason] = useState(2025);
   const [upcomingFixtures, setUpcomingFixtures] = useState([]);
   const [loadingUpcoming, setLoadingUpcoming] = useState(false);
   const [selectedApiFixture, setSelectedApiFixture] = useState(null);
@@ -1019,8 +1020,8 @@ const FixtureFormPage = () => {
             >
               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
                 <Typography variant="body1" sx={{ fontWeight: 700, color: colors.brandBlack }}>
-                  Create New CMd
-                </Typography>
+                Create New CMd
+              </Typography>
                 <IconButton
                   size="small"
                   onClick={() => setShowNewCmdForm(false)}
@@ -1132,10 +1133,10 @@ const FixtureFormPage = () => {
         <Card sx={{ padding: 3, borderRadius: '16px', mb: 3 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1, mb: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Star sx={{ fontSize: 20, color: colors.brandRed }} />
-              <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                Feature Type
-              </Typography>
+            <Star sx={{ fontSize: 20, color: colors.brandRed }} />
+            <Typography variant="h6" sx={{ fontWeight: 700 }}>
+              Feature Type
+            </Typography>
             </Box>
             <Chip
               label={`Category: ${featureType === 'cebee' ? 'CeBee Featured' : 'Community Featured'}`}
@@ -1263,8 +1264,8 @@ const FixtureFormPage = () => {
               overflow: 'hidden',
             }}
           >
-            <Box
-              sx={{
+              <Box
+                sx={{
                 display: 'flex',
                 alignItems: 'center',
                 gap: 1.5,
@@ -1392,28 +1393,25 @@ const FixtureFormPage = () => {
                 <Typography variant="caption" sx={{ display: 'block', mb: 0.75, color: colors.textSecondary, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                   Step 2 — Season
                 </Typography>
-                <Autocomplete
-                  fullWidth
-                  value={cebeeSeason}
-                  onChange={(_, newVal) => { setCebeeSeason(newVal != null ? Number(newVal) : new Date().getFullYear()); setSelectedApiFixture(null); }}
-                  options={[new Date().getFullYear() + 1, new Date().getFullYear(), new Date().getFullYear() - 1, new Date().getFullYear() - 2]}
-                  getOptionLabel={(y) => String(y)}
-                  renderInput={(params) => (
-                    <TextField
-                      {...params}
+                <FormControl fullWidth>
+                  <InputLabel id="fixture-season-label">Season (year)</InputLabel>
+                  <Select
+                    labelId="fixture-season-label"
                       label="Season (year)"
-                      placeholder="Search year..."
+                    value={cebeeSeason}
+                    onChange={(e) => { setCebeeSeason(Number(e.target.value)); setSelectedApiFixture(null); }}
                       sx={{
-                        '& .MuiOutlinedInput-root': {
                           borderRadius: '12px',
                           backgroundColor: colors.brandWhite,
                           '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: colors.brandRed },
                           '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderWidth: 2, borderColor: colors.brandRed },
-                        },
-                      }}
-                    />
-                  )}
-                />
+                    }}
+                  >
+                    {[new Date().getFullYear() + 1, new Date().getFullYear(), new Date().getFullYear() - 1, new Date().getFullYear() - 2].map((y) => (
+                      <MenuItem key={y} value={y}>{formatSeasonLabel(y)}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
               </Grid>
               <Grid item xs={12} md={6}>
                 <Typography variant="caption" sx={{ display: 'block', mb: 0.75, color: colors.textSecondary, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
@@ -1433,7 +1431,20 @@ const FixtureFormPage = () => {
                       }));
                     }
                   }}
-                  options={loadingUpcoming ? [] : upcomingFixtures}
+                  options={loadingUpcoming ? [] : (() => {
+                    const list = upcomingFixtures || [];
+                    const selected = selectedApiFixture;
+                    if (selected && !list.some((f) => f && Number(f.apiFixtureId) === Number(selected.apiFixtureId))) {
+                      return [selected, ...list];
+                    }
+                    return list;
+                  })()}
+                  getOptionDisabled={(f) => {
+                    if (!f) return false;
+                    const inUse = Boolean(f.inUse);
+                    const isCurrentSelection = selectedApiFixture && Number(selectedApiFixture.apiFixtureId) === Number(f.apiFixtureId);
+                    return inUse && !isCurrentSelection;
+                  }}
                   getOptionLabel={(f) => f ? `${f.homeTeamName} vs ${f.awayTeamName} – ${f.kickoff ? format(new Date(f.kickoff), 'EEE d MMM, HH:mm') : ''}` : ''}
                   isOptionEqualToValue={(opt, val) => opt && val && Number(opt.apiFixtureId) === Number(val.apiFixtureId)}
                   disabled={loadingUpcoming || !formData.leagueId || !cebeeSeason}
@@ -1441,7 +1452,7 @@ const FixtureFormPage = () => {
                   renderInput={(params) => (
                     <TextField
                       {...params}
-                      label="Select fixture (optional)"
+                      label="Select fixture"
                       placeholder="Search fixtures..."
                       sx={{
                         '& .MuiOutlinedInput-root': {
@@ -1453,17 +1464,21 @@ const FixtureFormPage = () => {
                       }}
                     />
                   )}
-                  renderOption={(props, f) => (
-                    <Box component="li" {...props} sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                  renderOption={(props, f) => {
+                    const used = Boolean(f && f.inUse);
+                    return (
+                      <Box component="li" {...props} sx={{ display: 'flex', alignItems: 'center', gap: 1.5, ...(used && { opacity: 0.7 }) }}>
                       <CalendarToday sx={{ fontSize: 18, color: colors.textSecondary }} />
-                      <Box>
+                        <Box sx={{ flex: 1 }}>
                         <Typography sx={{ fontWeight: 600 }}>{f.homeTeamName} vs {f.awayTeamName}</Typography>
                         <Typography variant="caption" sx={{ color: colors.textSecondary }}>
                           {f.kickoff ? format(new Date(f.kickoff), 'EEE d MMM · HH:mm') : ''}
+                            {used && <span style={{ marginLeft: 4, fontStyle: 'italic' }}>(Already Used)</span>}
                         </Typography>
                       </Box>
                     </Box>
-                  )}
+                    );
+                  }}
                   slotProps={{
                     paper: {
                       sx: {
@@ -1482,14 +1497,14 @@ const FixtureFormPage = () => {
                     <Typography variant="caption" sx={{ color: colors.textSecondary }}>Loading fixtures…</Typography>
                   </Box>
                 )}
-                {!loadingUpcoming && upcomingFixtures.length > 0 && !selectedApiFixture && (
+                {!loadingUpcoming && upcomingFixtures.length > 0 && (
                   <Typography variant="caption" sx={{ display: 'block', mt: 0.75, color: colors.textSecondary }}>
-                    {upcomingFixtures.length} upcoming fixture{upcomingFixtures.length !== 1 ? 's' : ''} available – search or clear to select manually
+                    {(upcomingFixtures || []).filter((f) => !f.inUse).length} selectable · {(upcomingFixtures || []).filter((f) => f.inUse).length} already used
                   </Typography>
                 )}
                 {!loadingUpcoming && upcomingFixtures.length === 0 && formData.leagueId && cebeeSeason && (
                   <Typography variant="caption" sx={{ display: 'block', mt: 0.75, color: colors.textSecondary }}>
-                    No upcoming fixtures for this league/season
+                    No upcoming fixtures for this league/season. Sync fixtures in API Data & Sync (Fixtures tab) for this league/season, then try again.
                   </Typography>
                 )}
               </Grid>
@@ -1534,8 +1549,8 @@ const FixtureFormPage = () => {
             </Box>
             <Box>
               <Typography variant="h6" sx={{ fontWeight: 700, color: colors.brandBlack, letterSpacing: '-0.02em' }}>
-                Team Details
-              </Typography>
+              Team Details
+            </Typography>
               <Typography variant="body2" sx={{ color: colors.textSecondary, mt: 0.25 }}>
                 Teams, matchday & venue
               </Typography>
@@ -1569,7 +1584,7 @@ const FixtureFormPage = () => {
             {featureType === 'cebee' && selectedApiFixture ? (
               <Grid item xs={12}>
                 <Box
-                  sx={{
+                sx={{
                     p: 2.5,
                     borderRadius: '16px',
                     backgroundColor: `${colors.success}0C`,
@@ -1819,21 +1834,21 @@ const FixtureFormPage = () => {
               <TextField
                 fullWidth
                 required
-                label="Matchday *"
+                  label="Matchday *"
                 value={featureType === 'cebee'
                   ? (currentCmd?.name || cmds.find((c) => (c.id || c._id) === formData.cmdId)?.name || '')
                   : (formData.matchday || '')}
                 InputProps={{
-                  readOnly: true,
-                }}
+                    readOnly: true,
+                  }}
                 sx={{
-                  borderRadius: '12px',
+                    borderRadius: '12px',
                   '& .MuiOutlinedInput-root': {
                     borderRadius: '12px',
-                    backgroundColor: colors.brandWhite,
-                  },
-                  '& .MuiInputBase-input': {
-                    cursor: 'default',
+                      backgroundColor: colors.brandWhite,
+                    },
+                    '& .MuiInputBase-input': {
+                      cursor: 'default',
                   },
                 }}
               />
@@ -1879,18 +1894,18 @@ const FixtureFormPage = () => {
             border: `1px solid ${colors.divider || '#eee'}`,
           }}
         >
-          <Box
-            sx={{
-              display: 'flex',
-              alignItems: 'center',
+                <Box
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
               gap: 1.5,
               mb: 2.5,
               pb: 2,
               borderBottom: `2px solid ${colors.brandRed ? `${colors.brandRed}20` : '#f0f0f0'}`,
             }}
           >
-            <Box
-              sx={{
+                        <Box
+                          sx={{
                 width: 44,
                 height: 44,
                 borderRadius: '12px',
@@ -1902,11 +1917,11 @@ const FixtureFormPage = () => {
               }}
             >
               <CalendarToday sx={{ fontSize: 24, color: colors.brandWhite }} />
-            </Box>
+                </Box>
             <Box>
               <Typography variant="h6" sx={{ fontWeight: 700, color: colors.brandBlack, letterSpacing: '-0.02em' }}>
-                Schedule
-              </Typography>
+              Schedule
+            </Typography>
               <Typography variant="body2" sx={{ color: colors.textSecondary, mt: 0.25 }}>
                 Publish & kickoff times
               </Typography>

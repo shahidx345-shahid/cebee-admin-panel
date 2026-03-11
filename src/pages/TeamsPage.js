@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -44,9 +44,9 @@ import { colors, constants } from '../config/theme';
 import SearchBar from '../components/common/SearchBar';
 import DataTable from '../components/common/DataTable';
 import { format } from 'date-fns';
-import { 
-  getTeams, 
-  createTeam, 
+import {
+  getTeams,
+  createTeam,
   updateTeam,
   activateTeam,
   inactivateTeam,
@@ -54,6 +54,12 @@ import {
   relegateTeam
 } from '../services/teamsService';
 import { getLeagues } from '../services/leaguesService';
+import { formatSeasonLabel } from '../utils/seasonFormat';
+
+function getDefaultFootballSeasonYear() {
+  // For Team Management, default season should match the main data browser (e.g. 2025)
+  return 2025;
+}
 
 const TeamsPage = () => {
   const navigate = useNavigate();
@@ -67,12 +73,14 @@ const TeamsPage = () => {
   const [leaguesLoadingMore, setLeaguesLoadingMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
+  // Default to Active so Team Management shows current official teams by default
+  const [statusFilter, setStatusFilter] = useState('Active');
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
   const [teamsTotalCount, setTeamsTotalCount] = useState(0); // total from API for pagination
   const [teamsActiveTotal, setTeamsActiveTotal] = useState(0); // total active (selected league, no pagination)
   const [teamsInactiveTotal, setTeamsInactiveTotal] = useState(0); // total inactive (selected league, no pagination)
+  const [season, setSeason] = useState(getDefaultFootballSeasonYear());
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedTeam, setSelectedTeam] = useState(null);
   const [dialogTeam, setDialogTeam] = useState(null); // Store team for dialog operations
@@ -96,6 +104,7 @@ const TeamsPage = () => {
   const [teamEntryType, setTeamEntryType] = useState('Original');
 
   const LEAGUES_PAGE_SIZE = 50;
+  const hasSetDefaultLeague = useRef(false);
 
   const loadLeagues = async () => {
     try {
@@ -162,6 +171,7 @@ const TeamsPage = () => {
         search: searchQuery?.trim() || undefined, // Trim whitespace and only send if not empty
         league_id: selectedLeague !== 'all' ? selectedLeague : undefined,
         status: statusFilter !== 'all' ? statusFilter : undefined,
+        season,
         skipSync: true, // Team Management: DB only, only teams from Use leagues
       };
 
@@ -234,6 +244,14 @@ const TeamsPage = () => {
     loadLeagues();
   }, []);
 
+  // Default to first league (and its teams) instead of All Leagues when page first loads
+  useEffect(() => {
+    if (leagues.length > 0 && selectedLeague === 'all' && !hasSetDefaultLeague.current) {
+      hasSetDefaultLeague.current = true;
+      setSelectedLeague(leagues[0].id);
+    }
+  }, [leagues, selectedLeague]);
+
   // Reset page to 0 when search query changes
   useEffect(() => {
     setPage(0);
@@ -261,14 +279,16 @@ const TeamsPage = () => {
       filtered = filtered.filter((team) => team.league_id === selectedLeague);
     }
 
-    // Search filter
+    // Search filter (name, team_id, league_name, apiTeamId)
     if (searchQuery) {
-      const query = searchQuery.toLowerCase();
+      const query = searchQuery.toLowerCase().trim();
+      const queryNum = query ? parseInt(query, 10) : NaN;
       filtered = filtered.filter(
         (team) =>
           team.team_name?.toLowerCase().includes(query) ||
           team.team_id?.toLowerCase().includes(query) ||
-          team.league_name?.toLowerCase().includes(query)
+          team.league_name?.toLowerCase().includes(query) ||
+          (team.apiTeamId != null && !Number.isNaN(queryNum) && team.apiTeamId === queryNum)
       );
     }
 
@@ -544,12 +564,7 @@ const TeamsPage = () => {
       label: 'Team ID',
       render: (value, row) => (
         <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandRed, fontSize: 13 }}>
-          {row.team_id || row.id || 'N/A'}
-          {row.apiTeamId != null && (
-            <Typography component="span" variant="caption" sx={{ display: 'block', color: colors.textSecondary, fontWeight: 400 }}>
-              API: {row.apiTeamId}
-            </Typography>
-          )}
+          {row.apiTeamId != null ? row.apiTeamId : '—'}
         </Typography>
       ),
     },
@@ -565,10 +580,11 @@ const TeamsPage = () => {
     {
       id: 'league_name',
       label: 'League',
-      render: (value, row) => (
-        <Box>
+      render: (value) => {
+        const nameOnly = (value || '').replace(/\s*\(API\s*\d+\)\s*$/i, '').trim() || value || '—';
+        return (
           <Chip
-            label={value || '—'}
+            label={nameOnly}
             size="small"
             sx={{
               backgroundColor: '#FEE2E2',
@@ -578,13 +594,8 @@ const TeamsPage = () => {
               height: 24,
             }}
           />
-          {row.league_id != null && (
-            <Typography variant="caption" sx={{ display: 'block', color: colors.textSecondary, mt: 0.25 }}>
-              ID: {row.league_id}
-            </Typography>
-          )}
-        </Box>
-      ),
+        );
+      },
     },
     {
       id: 'status',
@@ -604,15 +615,6 @@ const TeamsPage = () => {
       id: 'entry_type',
       label: 'Entry Type',
       render: (_, row) => getEntryTypeChip(row.entry_type),
-    },
-    {
-      id: 'country',
-      label: 'Country',
-      render: (value) => (
-        <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13 }}>
-          {value ?? '—'}
-        </Typography>
-      ),
     },
     {
       id: 'created_at',
@@ -821,10 +823,10 @@ const TeamsPage = () => {
               </Typography>
               <Autocomplete
                 size="small"
-                options={[{ id: 'all', name: 'All Leagues', country: null }, ...leagues]}
-                getOptionLabel={(opt) => (opt.id === 'all' ? 'All Leagues' : opt.country ? `${opt.name} (${opt.country})` : opt.name || '')}
-                value={selectedLeague === 'all' ? { id: 'all', name: 'All Leagues', country: null } : leagues.find((l) => l.id === selectedLeague) || null}
-                onChange={(_, newValue) => setSelectedLeague(newValue?.id ?? 'all')}
+                options={leagues}
+                getOptionLabel={(opt) => opt.name || ''}
+                value={leagues.find((l) => l.id === selectedLeague) || null}
+                onChange={(_, newValue) => setSelectedLeague(newValue?.id ?? leagues[0]?.id ?? '')}
                 isOptionEqualToValue={(opt, val) => opt.id === val?.id}
                 renderInput={(params) => (
                   <TextField
@@ -850,8 +852,36 @@ const TeamsPage = () => {
               <SearchBar
                 value={searchQuery}
                 onChange={setSearchQuery}
-                placeholder="Search teams by name or ID..."
+                placeholder="Search by name or ID (e.g. 42)..."
               />
+            </Box>
+            {/* Season selector */}
+            <Box sx={{ flex: '0 0 160px', minWidth: 160 }}>
+              <Typography variant="caption" sx={{ color: colors.textSecondary, fontWeight: 600, mb: 0.5, display: 'block' }}>
+                Season
+              </Typography>
+              <FormControl fullWidth size="small">
+                <Select
+                  value={season}
+                  onChange={(e) => {
+                    setSeason(Number(e.target.value));
+                    setPage(0);
+                  }}
+                  sx={{
+                    borderRadius: '10px',
+                    backgroundColor: colors.brandWhite,
+                  }}
+                >
+                  {Array.from({ length: (new Date().getFullYear() + 1) - 2020 + 1 }, (_, i) => {
+                    const y = (new Date().getFullYear() + 1) - i;
+                    return y >= 2020 ? (
+                      <MenuItem key={y} value={y}>
+                        {formatSeasonLabel(y)}
+                      </MenuItem>
+                    ) : null;
+                  })}
+                </Select>
+              </FormControl>
             </Box>
             {/* Add Team button - commented out
             <Box sx={{ alignSelf: 'flex-end' }}>
@@ -860,7 +890,7 @@ const TeamsPage = () => {
                 size="medium"
                 startIcon={<Add />}
                 onClick={() => setAddDialogOpen(true)}
-                disabled={selectedLeague === 'all'}
+                disabled={!selectedLeague || selectedLeague === 'all'}
                 sx={{
                   background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
                   borderRadius: '12px',
@@ -1383,7 +1413,7 @@ const TeamsPage = () => {
                   <Typography variant="body1" sx={{ fontWeight: 700, color: colors.brandBlack, fontSize: 16 }}>
                     {(() => {
                       const L = leagues.find((l) => l.id === selectedLeague);
-                      return L ? (L.country ? `${L.name} (${L.country})` : L.name) : 'No league selected';
+                      return L ? L.name : 'No league selected';
                     })()}
                   </Typography>
                 </Box>
@@ -1391,7 +1421,7 @@ const TeamsPage = () => {
               <Autocomplete
                 fullWidth
                 options={leagues}
-                getOptionLabel={(opt) => (opt.country ? `${opt.name} (${opt.country})` : opt.name || '')}
+                getOptionLabel={(opt) => opt.name || ''}
                 value={leagues.find((l) => l.id === selectedLeague) || null}
                 onChange={(_, newValue) => newValue && setSelectedLeague(newValue.id)}
                 isOptionEqualToValue={(opt, val) => opt.id === val?.id}
