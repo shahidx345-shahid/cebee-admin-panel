@@ -4,11 +4,11 @@
  * Last Updated: 2026-03-09
  */
 
-// Production: relative /api (Vercel rewrites). Local dev: use local backend only.
+// Use ngrok public URL for backend (set REACT_APP_API_URL in .env). No local port.
 const API_BASE_URL = (
   process.env.REACT_APP_API_URL ||
-  (process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:3001/api')
-).replace(/\/$/, '');
+  (process.env.NODE_ENV === 'production' ? '/api' : '')
+).replace(/\/$/, '') || 'https://your-tunnel.ngrok-free.app/api';
 
 // Log API URL in development for easier debugging
 if (process.env.NODE_ENV === 'development') {
@@ -84,6 +84,7 @@ export const apiRequest = async (endpoint, options = {}) => {
 
   const defaultHeaders = {
     'Content-Type': 'application/json',
+    'ngrok-skip-browser-warning': 'true', // required for ngrok free tier so API calls don't hit interstitial
   };
 
   // Add authorization header if token exists

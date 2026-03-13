@@ -312,31 +312,6 @@ const PollFormPage = () => {
 
   const handleChange = (field, value) => {
     console.log('handleChange called:', { field, value, currentFormData: formData });
-    
-    // Ensure closeTime is always after startTime
-    if (field === 'startTime' && value) {
-      const newStartTime = value instanceof Date ? value : new Date(value);
-      const currentCloseTime = formData.closeTime instanceof Date ? formData.closeTime : new Date(formData.closeTime);
-      
-      // If new start time is after or equal to close time, adjust close time to be 24 hours after start
-      if (newStartTime >= currentCloseTime) {
-        const newCloseTime = new Date(newStartTime.getTime() + 24 * 60 * 60 * 1000); // 24 hours later
-        setFormData({ ...formData, startTime: newStartTime, closeTime: newCloseTime });
-        return;
-      }
-    }
-    
-    if (field === 'closeTime' && value) {
-      const newCloseTime = value instanceof Date ? value : new Date(value);
-      const currentStartTime = formData.startTime instanceof Date ? formData.startTime : new Date(formData.startTime);
-      
-      // Ensure close time is at least 1 hour after start time
-      if (newCloseTime <= currentStartTime) {
-        alert('Close time must be after start time. Please select a later date/time.');
-        return;
-      }
-    }
-    
     setFormData({ ...formData, [field]: value });
   };
 
@@ -435,16 +410,7 @@ const PollFormPage = () => {
     }
 
       const startTime = formData.startTime instanceof Date ? formData.startTime : new Date(formData.startTime);
-      let closeTime = formData.closeTime instanceof Date ? formData.closeTime : new Date(formData.closeTime);
-      if (closeTime <= startTime) {
-        alert('Close time must be after start time. Please adjust the dates.');
-        return;
-      }
-      const minCloseTime = new Date(startTime.getTime() + 24 * 60 * 60 * 1000);
-      if (closeTime < minCloseTime) {
-        alert('Poll duration must be at least 24 hours. Close time will be adjusted to 24 hours after start time.');
-        closeTime = minCloseTime;
-      }
+      const closeTime = formData.closeTime instanceof Date ? formData.closeTime : new Date(formData.closeTime);
 
     if (isEditMode) {
       if (!validateFixtures()) {
@@ -1459,23 +1425,6 @@ const PollFormPage = () => {
             </ListItem>
             <ListItem sx={{ px: 0, py: 1 }}>
               <ListItemIcon sx={{ minWidth: 32 }}>
-                {rules.durationValid ? (
-                  <CheckCircle sx={{ fontSize: 20, color: colors.success }} />
-                ) : (
-                  <RadioButtonUnchecked sx={{ fontSize: 20, color: colors.textSecondary }} />
-                )}
-              </ListItemIcon>
-              <ListItemText
-                primary="Poll duration: 24 hours - 30 days"
-                primaryTypographyProps={{
-                  fontSize: 14,
-                  color: colors.brandBlack,
-                  fontWeight: 500,
-                }}
-              />
-            </ListItem>
-            <ListItem sx={{ px: 0, py: 1 }}>
-              <ListItemIcon sx={{ minWidth: 32 }}>
                 <CheckCircle sx={{ fontSize: 20, color: colors.success }} />
               </ListItemIcon>
               <ListItemText
@@ -1488,29 +1437,6 @@ const PollFormPage = () => {
               />
             </ListItem>
           </List>
-
-          {/* Duration Display */}
-          {formData.startTime && formData.closeTime && (
-            <Alert
-              severity={rules.durationValid ? 'info' : 'error'}
-              icon={<Schedule />}
-              sx={{
-                mt: 2,
-                borderRadius: '12px',
-                backgroundColor: rules.durationValid ? `${colors.info}1A` : `${colors.error}1A`,
-                color: rules.durationValid ? colors.info : colors.error,
-                '& .MuiAlert-icon': {
-                  color: rules.durationValid ? colors.info : colors.error,
-                },
-                '& .MuiAlert-message': {
-                  fontWeight: 600,
-                  fontSize: 14,
-                },
-              }}
-            >
-              Duration: {rules.durationHours} hours ({rules.durationDays} day{rules.durationDays !== 1 ? 's' : ''})
-            </Alert>
-          )}
         </Card>
 
         {/* Action Buttons */}
@@ -1543,10 +1469,7 @@ const PollFormPage = () => {
               saving ||
               !formData.leagueId ||
               !rules.onePollPerLeague ||
-              !rules.maxFiveActive ||
-              !rules.closeAfterStart ||
-              !rules.durationValid ||
-              (isEditMode ? !validateFixtures() : selectedApiFixtureIds.filter((id) => id != null).length !== 5 || !featuredTeamSidePerSlot.every((s) => s === 'A' || s === 'B'))
+              !rules.maxFiveActive
             }
             sx={{
               background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,

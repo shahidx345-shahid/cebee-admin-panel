@@ -64,6 +64,7 @@ const FixtureFormPage = () => {
   const [teams, setTeams] = useState([]);
   const [loadingTeams, setLoadingTeams] = useState(false);
   const [featuredFixtures, setFeaturedFixtures] = useState([]);
+  const [featuredTeamId, setFeaturedTeamId] = useState(null); // Poll winner team id from API (which team is "Featured Team")
   const [availableTeams, setAvailableTeams] = useState([]); // Teams available based on selection
   const [matchdays, setMatchdays] = useState([]);
   const [loadingMatchdays, setLoadingMatchdays] = useState(false);
@@ -112,6 +113,27 @@ const FixtureFormPage = () => {
     if (v.includes('anfield')) return 'anfield';
     if (v.includes('stamford bridge')) return 'stamford_bridge';
     return 'other';
+  };
+
+  // Map home team name to stadium value for auto-fill (Match Ground / Stadium)
+  const getStadiumValueFromTeamName = (teamName) => {
+    if (!teamName || typeof teamName !== 'string') return 'other';
+    const n = teamName.toLowerCase().trim();
+    if (n.includes('manchester united') || n.includes('man utd')) return 'old_trafford';
+    if (n.includes('liverpool')) return 'anfield';
+    if (n.includes('chelsea')) return 'stamford_bridge';
+    if (n.includes('tottenham') || n.includes('spurs')) return 'wembley';
+    return 'other';
+  };
+
+  // Default schedule: kickoff = next day 19:00, publish = 24h before kickoff
+  const getDefaultSchedule = () => {
+    const now = new Date();
+    const kickoff = new Date(now);
+    kickoff.setDate(kickoff.getDate() + 1);
+    kickoff.setHours(19, 0, 0, 0);
+    const publish = new Date(kickoff.getTime() - 24 * 60 * 60 * 1000);
+    return { kickoffTime: kickoff, publishDateTime: publish };
   };
 
   useEffect(() => {
@@ -224,6 +246,7 @@ const FixtureFormPage = () => {
         setTeams([]);
         setAvailableTeams([]);
         setFeaturedFixtures([]);
+        setFeaturedTeamId(null);
         return;
       }
 
@@ -235,33 +258,41 @@ const FixtureFormPage = () => {
           
           if (fixturesResult.success && fixturesResult.data?.featuredFixture) {
             const featuredFixture = fixturesResult.data.featuredFixture;
-            // Store the featured fixture data for later use
+            // Store the featured fixture data and which team is the poll winner (Featured Team)
             setFeaturedFixtures([featuredFixture]);
+            const rawWinnerId = fixturesResult.data.winner?.winning_team_id ?? fixturesResult.data.poll?.poll_winner_team_id ?? featuredFixture.teamA?._id ?? null;
+            const winnerId = rawWinnerId && typeof rawWinnerId === 'object' && rawWinnerId._id != null ? rawWinnerId._id : rawWinnerId;
+            const winnerIdStr = winnerId ? String(winnerId) : null;
+            setFeaturedTeamId(winnerIdStr);
             
-            // Extract teams from featured fixture (teamA and teamB)
+            // Extract teams from featured fixture (teamA and teamB); mark which one is the poll winner (Featured Team)
             const teams = [];
             
             if (featuredFixture.teamA && featuredFixture.teamA._id) {
+              const id = featuredFixture.teamA._id;
               teams.push({
-                id: featuredFixture.teamA._id,
-                team_id: featuredFixture.teamA._id,
+                id,
+                team_id: id,
                 name: featuredFixture.teamA.name,
                 team_name: featuredFixture.teamA.name,
                 logo: featuredFixture.teamA.logo,
                 isTeamA: true,
+                isFeaturedTeam: winnerIdStr ? String(id) === winnerIdStr : true,
                 opponentId: featuredFixture.teamB?._id,
                 opponentName: featuredFixture.teamB?.name,
               });
             }
             
             if (featuredFixture.teamB && featuredFixture.teamB._id) {
+              const id = featuredFixture.teamB._id;
               teams.push({
-                id: featuredFixture.teamB._id,
-                team_id: featuredFixture.teamB._id,
+                id,
+                team_id: id,
                 name: featuredFixture.teamB.name,
                 team_name: featuredFixture.teamB.name,
                 logo: featuredFixture.teamB.logo,
                 isTeamA: false,
+                isFeaturedTeam: winnerIdStr ? String(id) === winnerIdStr : false,
                 opponentId: featuredFixture.teamA?._id,
                 opponentName: featuredFixture.teamA?.name,
               });
@@ -269,10 +300,35 @@ const FixtureFormPage = () => {
             
             setTeams(teams);
             setAvailableTeams(teams);
+            // Auto-fill home, away, stadium (from home team), and schedule; user can change any field manually
+            const defaultSchedule = getDefaultSchedule();
+            if (teams.length >= 2) {
+              setFormData(prev => ({
+                ...prev,
+                homeTeam: teams[0].id ?? '',
+                awayTeam: teams[1].id ?? '',
+                venue: getStadiumValueFromTeamName(teams[0].name ?? teams[0].team_name),
+                kickoffTime: defaultSchedule.kickoffTime,
+                publishDateTime: defaultSchedule.publishDateTime,
+              }));
+            } else if (teams.length === 1) {
+              setFormData(prev => ({
+                ...prev,
+                homeTeam: teams[0].id ?? '',
+                awayTeam: '',
+                venue: getStadiumValueFromTeamName(teams[0].name ?? teams[0].team_name),
+                kickoffTime: defaultSchedule.kickoffTime,
+                publishDateTime: defaultSchedule.publishDateTime,
+              }));
+            } else {
+              setFormData(prev => ({ ...prev, homeTeam: '', awayTeam: '' }));
+            }
           } else {
             setTeams([]);
             setAvailableTeams([]);
             setFeaturedFixtures([]);
+            setFeaturedTeamId(null);
+            setFormData(prev => ({ ...prev, homeTeam: '', awayTeam: '' }));
           }
         } else {
           // For CeBee Featured: Show all teams from the league
@@ -310,6 +366,7 @@ const FixtureFormPage = () => {
           } else {
             setTeams([]);
             setAvailableTeams([]);
+            setFormData(prev => ({ ...prev, homeTeam: '', awayTeam: '' }));
           }
         }
       } catch (error) {
@@ -317,6 +374,8 @@ const FixtureFormPage = () => {
         setTeams([]);
         setAvailableTeams([]);
         setFeaturedFixtures([]);
+        setFeaturedTeamId(null);
+        setFormData(prev => ({ ...prev, homeTeam: '', awayTeam: '' }));
       } finally {
         setLoadingTeams(false);
       }
@@ -434,17 +493,21 @@ const FixtureFormPage = () => {
         setUpcomingFixtures([]);
       }
     } else if (field === 'homeTeam' || field === 'awayTeam') {
+      // When Community Featured and user changes home team, auto-update venue from new home team name
+      const homeTeamForVenue = field === 'homeTeam' && value && featureType === 'community'
+        ? teams.find(t => String(t.id) === String(value))
+        : null;
+      const venueUpdate = homeTeamForVenue
+        ? { venue: getStadiumValueFromTeamName(homeTeamForVenue.name || homeTeamForVenue.team_name) }
+        : {};
       // Allow both teams to be selected independently
       // Only clear if selecting the same team in the other field (prevent duplicate selection)
       if (field === 'homeTeam' && value === formData.awayTeam) {
-        // If selecting home team that's already selected as away team, clear away team
-        setFormData(prev => ({ ...prev, [field]: value, awayTeam: '' }));
+        setFormData(prev => ({ ...prev, [field]: value, awayTeam: '', ...venueUpdate }));
       } else if (field === 'awayTeam' && value === formData.homeTeam) {
-        // If selecting away team that's already selected as home team, clear home team
         setFormData(prev => ({ ...prev, [field]: value, homeTeam: '' }));
       } else {
-        // Normal selection - keep both teams
-        setFormData(prev => ({ ...prev, [field]: value }));
+        setFormData(prev => ({ ...prev, [field]: value, ...venueUpdate }));
       }
     } else {
     setFormData({ ...formData, [field]: value });
@@ -457,6 +520,7 @@ const FixtureFormPage = () => {
     setFormData(prev => ({ ...prev, homeTeam: '', awayTeam: '' }));
     setAvailableTeams([]);
     setFeaturedFixtures([]);
+    setFeaturedTeamId(null);
     setSelectedApiFixture(null);
     setUpcomingFixtures([]);
   };
@@ -1761,7 +1825,7 @@ const FixtureFormPage = () => {
                   <Box component="li" {...props} sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                     {(team.isFeatured || featureType === 'community') && <Star sx={{ fontSize: 16, color: colors.brandRed }} />}
                     <Typography sx={{ flex: 1 }}>{team.name || team.team_name}</Typography>
-                    {featureType === 'community' && team.isTeamA && (
+                    {featureType === 'community' && (team.isFeaturedTeam === true) && (
                       <Chip label="Featured Team" size="small" sx={{ backgroundColor: `${colors.brandRed}22`, color: colors.brandRed, fontWeight: 700, fontSize: 10, height: 20 }} />
                     )}
                     {(team.isFeatured || featureType === 'community') && (
@@ -1813,13 +1877,13 @@ const FixtureFormPage = () => {
                   <Box component="li" {...props} sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                     {(team.isFeatured || featureType === 'community') && <Star sx={{ fontSize: 16, color: colors.brandRed }} />}
                     <Typography sx={{ flex: 1 }}>{team.name || team.team_name}</Typography>
-                          {featureType === 'community' && team.isTeamA && (
+                    {featureType === 'community' && (team.isFeaturedTeam === true) && (
                       <Chip label="Featured Team" size="small" sx={{ backgroundColor: `${colors.brandRed}22`, color: colors.brandRed, fontWeight: 700, fontSize: 10, height: 20 }} />
-                          )}
-                          {(team.isFeatured || featureType === 'community') && (
+                    )}
+                    {(team.isFeatured || featureType === 'community') && (
                       <Chip label={featureType === 'community' ? 'Featured Fixture' : 'Featured'} size="small" sx={{ backgroundColor: `${colors.brandRed}15`, color: colors.brandRed, fontWeight: 600, fontSize: 10, height: 20 }} />
-                          )}
-                        </Box>
+                    )}
+                  </Box>
                 )}
                 slotProps={{ paper: { sx: { borderRadius: '12px', mt: 1, boxShadow: '0 4px 16px rgba(0,0,0,0.15)' } } }}
               />
@@ -1829,6 +1893,21 @@ const FixtureFormPage = () => {
                 </Typography>
               )}
             </Grid>
+            {featureType === 'community' && (formData.homeTeam || formData.awayTeam) && (() => {
+              const list = availableTeams.length ? availableTeams : teams;
+              const featuredTeam = featuredTeamId
+                ? list.find(t => String(t.id || t._id || t.team_id) === String(featuredTeamId))
+                : list.find(t => String(t.id || t._id || t.team_id) === String(formData.homeTeam));
+              const name = featuredTeam ? (featuredTeam.name || featuredTeam.team_name) : null;
+              return name ? (
+                <Grid item xs={12}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mt: 0.5, p: 1.5, borderRadius: 2, backgroundColor: `${colors.brandRed}12`, border: `1px solid ${colors.brandRed}40` }}>
+                    <Typography variant="caption" sx={{ color: colors.textSecondary, fontWeight: 600 }}>Featured Team</Typography>
+                    <Chip label={name} size="small" sx={{ backgroundColor: colors.brandRed, color: colors.brandWhite, fontWeight: 700 }} />
+                  </Box>
+                </Grid>
+              ) : null;
+            })()}
             {(featureType === 'cebee' || featureType === 'community') && (
             <Grid item xs={12} md={6}>
               <TextField
