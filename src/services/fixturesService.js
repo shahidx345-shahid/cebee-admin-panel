@@ -149,6 +149,9 @@ export const createFixture = async (fixtureData) => {
       
       if (fixtureData.isCeBeFeatured) {
         requestBody.isCeBeFeatured = true;
+        if (fixtureData.featuredTeamSide === 'A' || fixtureData.featuredTeamSide === 'B') {
+          requestBody.featuredTeamSide = fixtureData.featuredTeamSide;
+        }
       }
     }
 
@@ -268,6 +271,9 @@ export const createFixtureFromApi = async (params) => {
         ? publishDateTime.toISOString()
         : publishDateTime;
     }
+    if (params.featuredTeamSide === 'A' || params.featuredTeamSide === 'B') {
+      body.featuredTeamSide = params.featuredTeamSide;
+    }
     const response = await apiPost('/fixtures/from-api', body);
     if (response.success) {
       return {
@@ -334,6 +340,10 @@ export const updateFixture = async (fixtureId, fixtureData) => {
 
     if (fixtureData.matchStatus) {
       requestBody.matchStatus = fixtureData.matchStatus;
+    }
+
+    if (fixtureData.featuredTeamSide === 'A' || fixtureData.featuredTeamSide === 'B') {
+      requestBody.featuredTeamSide = fixtureData.featuredTeamSide;
     }
 
     const response = await apiPut(`/fixtures/${fixtureId}`, requestBody);

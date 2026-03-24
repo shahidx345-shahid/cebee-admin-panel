@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   Box,
@@ -9,14 +9,19 @@ import {
   Select,
   MenuItem,
   FormControl,
+  FormControlLabel,
+  FormHelperText,
   InputLabel,
   Grid,
+  Radio,
+  RadioGroup,
   Alert,
   CircularProgress,
   Chip,
   InputAdornment,
   Autocomplete,
   IconButton,
+  Stack,
 } from '@mui/material';
 import {
   Save,
@@ -81,6 +86,9 @@ const FixtureFormPage = () => {
   const [upcomingFixtures, setUpcomingFixtures] = useState([]);
   const [loadingUpcoming, setLoadingUpcoming] = useState(false);
   const [selectedApiFixture, setSelectedApiFixture] = useState(null);
+  /** CeBee featured side: '' until admin chooses; 'A' = home, 'B' = away (matches backend featuredTeamSide) */
+  const [cebeeFeaturedSide, setCebeeFeaturedSide] = useState('');
+  const [featuredTeamSelectionError, setFeaturedTeamSelectionError] = useState(false);
   const [apiVenues, setApiVenues] = useState([]);
   const [loadingVenues, setLoadingVenues] = useState(false);
   const [formData, setFormData] = useState({
@@ -102,6 +110,10 @@ const FixtureFormPage = () => {
     { value: 'old_trafford', label: 'Old Trafford' },
     { value: 'anfield', label: 'Anfield' },
     { value: 'stamford_bridge', label: 'Stamford Bridge' },
+    { value: 'camp_nou', label: 'Camp Nou' },
+    { value: 'santiago_bernabeu', label: 'Santiago Bernabéu' },
+    { value: 'metropolitano', label: 'Cívitas Metropolitano' },
+    { value: 'san_mames', label: 'San Mamés' },
   ];
 
   // Map API venue name to form dropdown value for auto-fill
@@ -112,6 +124,10 @@ const FixtureFormPage = () => {
     if (v.includes('old trafford')) return 'old_trafford';
     if (v.includes('anfield')) return 'anfield';
     if (v.includes('stamford bridge')) return 'stamford_bridge';
+    if (v.includes('camp nou') || v.includes('spotify camp nou')) return 'camp_nou';
+    if (v.includes('bernabéu') || v.includes('bernabeu') || v.includes('santiago bernabeu')) return 'santiago_bernabeu';
+    if (v.includes('metropolitano') || v.includes('wanda metropolitano')) return 'metropolitano';
+    if (v.includes('san mamés') || v.includes('san mames')) return 'san_mames';
     return 'other';
   };
 
@@ -123,7 +139,30 @@ const FixtureFormPage = () => {
     if (n.includes('liverpool')) return 'anfield';
     if (n.includes('chelsea')) return 'stamford_bridge';
     if (n.includes('tottenham') || n.includes('spurs')) return 'wembley';
+    if (n.includes('barcelona')) return 'camp_nou';
+    if (n.includes('real madrid') && !n.includes('mallorca')) return 'santiago_bernabeu';
+    if (n.includes('atlético madrid') || n.includes('atletico madrid')) return 'metropolitano';
+    if (n.includes('athletic') && n.includes('bilbao')) return 'san_mames';
     return 'other';
+  };
+
+  /** Prefer API venue string; map to known slug or use full name for DB when unmapped */
+  const resolveVenueValueForForm = (apiVenueName, homeTeamName) => {
+    if (apiVenueName && String(apiVenueName).trim()) {
+      const mapped = mapApiVenueToFormValue(apiVenueName);
+      if (mapped !== 'other') return mapped;
+      return String(apiVenueName).trim();
+    }
+    return getStadiumValueFromTeamName(homeTeamName || '');
+  };
+
+  const applyFeaturedFixtureSchedule = (ff) => {
+    const fallback = getDefaultSchedule();
+    if (!ff || !ff.kickoff) return fallback;
+    const kick = new Date(ff.kickoff);
+    if (Number.isNaN(kick.getTime())) return fallback;
+    const publish = new Date(kick.getTime() - 24 * 60 * 60 * 1000);
+    return { kickoffTime: kick, publishDateTime: publish };
   };
 
   // Default schedule: kickoff = next day 19:00, publish = 24h before kickoff
@@ -239,6 +278,18 @@ const FixtureFormPage = () => {
     initialize();
   }, [id, isEditMode]);
 
+  useEffect(() => {
+    if (featureType !== 'cebee') return;
+    setCebeeFeaturedSide('');
+    setFeaturedTeamSelectionError(false);
+  }, [featureType, selectedApiFixture?.apiFixtureId, formData.leagueId, cebeeSeason, formData.homeTeam, formData.awayTeam]);
+
+  useEffect(() => {
+    if (cebeeFeaturedSide === 'A' || cebeeFeaturedSide === 'B') {
+      setFeaturedTeamSelectionError(false);
+    }
+  }, [cebeeFeaturedSide]);
+
   // Load teams when league is selected
   useEffect(() => {
     const loadTeams = async () => {
@@ -300,25 +351,27 @@ const FixtureFormPage = () => {
             
             setTeams(teams);
             setAvailableTeams(teams);
-            // Auto-fill home, away, stadium (from home team), and schedule; user can change any field manually
-            const defaultSchedule = getDefaultSchedule();
+            // Auto-fill home, away, stadium + kickoff from API/sync when available (Community Featured)
+            const sched = applyFeaturedFixtureSchedule(featuredFixture);
+            const homeName = teams[0]?.name ?? teams[0]?.team_name ?? '';
+            const venueVal = resolveVenueValueForForm(featuredFixture.venue, homeName);
             if (teams.length >= 2) {
               setFormData(prev => ({
                 ...prev,
                 homeTeam: teams[0].id ?? '',
                 awayTeam: teams[1].id ?? '',
-                venue: getStadiumValueFromTeamName(teams[0].name ?? teams[0].team_name),
-                kickoffTime: defaultSchedule.kickoffTime,
-                publishDateTime: defaultSchedule.publishDateTime,
+                venue: venueVal,
+                kickoffTime: sched.kickoffTime,
+                publishDateTime: sched.publishDateTime,
               }));
             } else if (teams.length === 1) {
               setFormData(prev => ({
                 ...prev,
                 homeTeam: teams[0].id ?? '',
                 awayTeam: '',
-                venue: getStadiumValueFromTeamName(teams[0].name ?? teams[0].team_name),
-                kickoffTime: defaultSchedule.kickoffTime,
-                publishDateTime: defaultSchedule.publishDateTime,
+                venue: venueVal,
+                kickoffTime: sched.kickoffTime,
+                publishDateTime: sched.publishDateTime,
               }));
             } else {
               setFormData(prev => ({ ...prev, homeTeam: '', awayTeam: '' }));
@@ -493,13 +546,19 @@ const FixtureFormPage = () => {
         setUpcomingFixtures([]);
       }
     } else if (field === 'homeTeam' || field === 'awayTeam') {
-      // When Community Featured and user changes home team, auto-update venue from new home team name
+      // Community: if featured fixture has API kickoff/venue, keep schedule/stadium; else infer stadium from home team
       const homeTeamForVenue = field === 'homeTeam' && value && featureType === 'community'
         ? teams.find(t => String(t.id) === String(value))
         : null;
-      const venueUpdate = homeTeamForVenue
-        ? { venue: getStadiumValueFromTeamName(homeTeamForVenue.name || homeTeamForVenue.team_name) }
-        : {};
+      const ff0 = featureType === 'community' && featuredFixtures[0];
+      const hasApiVenueOrKickoff =
+        ff0 &&
+        ((ff0.kickoff && !Number.isNaN(new Date(ff0.kickoff).getTime())) ||
+          (ff0.venue && String(ff0.venue).trim()));
+      const venueUpdate =
+        !hasApiVenueOrKickoff && homeTeamForVenue
+          ? { venue: getStadiumValueFromTeamName(homeTeamForVenue.name || homeTeamForVenue.team_name) }
+          : {};
       // Allow both teams to be selected independently
       // Only clear if selecting the same team in the other field (prevent duplicate selection)
       if (field === 'homeTeam' && value === formData.awayTeam) {
@@ -524,6 +583,27 @@ const FixtureFormPage = () => {
     setSelectedApiFixture(null);
     setUpcomingFixtures([]);
   };
+
+  const stadiumOptionsForForm = useMemo(() => {
+    const opts = [...STADIUM_OPTIONS];
+    const v = formData.venue;
+    if (v && typeof v === 'string' && String(v).trim() && !opts.some((o) => o.value === v)) {
+      opts.unshift({ value: v, label: v });
+    }
+    return opts;
+  }, [formData.venue]);
+
+  /** Read-only venue line for CeBee API fixture summary (API name or chosen override label) */
+  const apiFixtureVenueDisplay = useMemo(() => {
+    if (!selectedApiFixture) return '–';
+    if (selectedApiFixture.venue && String(selectedApiFixture.venue).trim()) {
+      return String(selectedApiFixture.venue).trim();
+    }
+    const v = formData.venue;
+    if (!v) return '–';
+    const opt = stadiumOptionsForForm.find((o) => o.value === v);
+    return opt ? opt.label : String(v);
+  }, [selectedApiFixture, formData.venue, stadiumOptionsForForm]);
 
   const loadMoreLeagues = async () => {
     if (leaguesLoadingMore || leaguesPage >= leaguesTotalPages) return;
@@ -752,6 +832,15 @@ const FixtureFormPage = () => {
       return;
     }
 
+    const ceBeeNeedsFeaturedSide =
+      featureType === 'cebee' &&
+      (Boolean(selectedApiFixture) || (Boolean(formData.homeTeam) && Boolean(formData.awayTeam)));
+    if (ceBeeNeedsFeaturedSide && cebeeFeaturedSide !== 'A' && cebeeFeaturedSide !== 'B') {
+      setFeaturedTeamSelectionError(true);
+      alert('Please pick the featured team (home or away) for this CeBee Featured fixture.');
+      return;
+    }
+
     try {
       setSaving(true);
 
@@ -789,6 +878,7 @@ const FixtureFormPage = () => {
         // CeBee from API: teams come from API, no form team IDs needed
         if (featureType === 'cebee' && selectedApiFixture) {
           fixtureData.isCeBeFeatured = true;
+          fixtureData.featuredTeamSide = cebeeFeaturedSide;
         } else {
           // CeBee manual or Regular: requires home_team_id and away_team_id
         if (!formData.homeTeam || !formData.awayTeam) {
@@ -800,6 +890,7 @@ const FixtureFormPage = () => {
         fixtureData.away_team_id = formData.awayTeam;
         if (featureType === 'cebee') {
           fixtureData.isCeBeFeatured = true;
+          fixtureData.featuredTeamSide = cebeeFeaturedSide;
           }
         }
       }
@@ -814,6 +905,7 @@ const FixtureFormPage = () => {
           apiFixtureId: selectedApiFixture.apiFixtureId,
           leagueId: formData.leagueId,
           publishDateTime: formData.publishDateTime,
+          featuredTeamSide: cebeeFeaturedSide,
         };
         if (!selectedApiFixture.venue && formData.venue && String(formData.venue).trim()) {
           fromApiPayload.venue = String(formData.venue).trim();
@@ -1358,12 +1450,13 @@ const FixtureFormPage = () => {
                   Competition & Fixture
                 </Typography>
                 <Typography variant="body2" sx={{ color: colors.textSecondary, mt: 0.25 }}>
-                  League → Season → Pick a match to auto-fill details
+                  Step 1 — League · Step 2 — Season · Step 3 — Fixture · Step 4 — Pick featured team (CeBee)
                 </Typography>
               </Box>
             </Box>
-            <Grid container spacing={3} sx={{ mt: 0.5 }}>
+            <Grid container spacing={3} sx={{ mt: 0.5, alignItems: 'flex-start' }}>
               <Grid item xs={12} md={6}>
+                <Stack spacing={2}>
                 <Typography variant="caption" sx={{ display: 'block', mb: 0.75, color: colors.textSecondary, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                   Step 1 — League
                 </Typography>
@@ -1381,9 +1474,9 @@ const FixtureFormPage = () => {
                       flexWrap: 'wrap',
                     }}
                   >
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flex: '1 1 auto', minWidth: 0 }}>
                       <Box sx={{ px: 1.5, py: 0.5, borderRadius: '10px', backgroundColor: colors.brandWhite, border: `1px solid ${colors.brandRed}30`, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-                        <Typography variant="body2" sx={{ fontWeight: 700, color: colors.brandRed }}>
+                        <Typography variant="body2" sx={{ fontWeight: 700, color: colors.brandRed, lineHeight: 1.35 }}>
                           {leagues.length.toLocaleString()} / {leaguesTotal.toLocaleString()} leagues
                         </Typography>
                       </Box>
@@ -1409,6 +1502,7 @@ const FixtureFormPage = () => {
                         onClick={loadMoreLeagues}
                         disabled={leaguesLoadingMore}
                         sx={{
+                          flexShrink: 0,
                           textTransform: 'none',
                           fontWeight: 600,
                           borderRadius: '10px',
@@ -1435,10 +1529,14 @@ const FixtureFormPage = () => {
                       label="League *"
                       placeholder="Search leagues..."
                       required
+                      multiline
+                      minRows={1}
+                      maxRows={4}
                       sx={{
                         '& .MuiOutlinedInput-root': {
                           borderRadius: '12px',
                           backgroundColor: colors.brandWhite,
+                          alignItems: 'flex-start',
                           '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: colors.brandRed },
                           '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderWidth: 2, borderColor: colors.brandRed },
                         },
@@ -1452,32 +1550,6 @@ const FixtureFormPage = () => {
                     </Box>
                   )}
                 />
-              </Grid>
-              <Grid item xs={12} md={3}>
-                <Typography variant="caption" sx={{ display: 'block', mb: 0.75, color: colors.textSecondary, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                  Step 2 — Season
-                </Typography>
-                <FormControl fullWidth>
-                  <InputLabel id="fixture-season-label">Season (year)</InputLabel>
-                  <Select
-                    labelId="fixture-season-label"
-                      label="Season (year)"
-                    value={cebeeSeason}
-                    onChange={(e) => { setCebeeSeason(Number(e.target.value)); setSelectedApiFixture(null); }}
-                      sx={{
-                          borderRadius: '12px',
-                          backgroundColor: colors.brandWhite,
-                          '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: colors.brandRed },
-                          '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderWidth: 2, borderColor: colors.brandRed },
-                    }}
-                  >
-                    {[new Date().getFullYear() + 1, new Date().getFullYear(), new Date().getFullYear() - 1, new Date().getFullYear() - 2].map((y) => (
-                      <MenuItem key={y} value={y}>{formatSeasonLabel(y)}</MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12} md={6}>
                 <Typography variant="caption" sx={{ display: 'block', mb: 0.75, color: colors.textSecondary, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                   Step 3 — Fixture
                 </Typography>
@@ -1518,10 +1590,14 @@ const FixtureFormPage = () => {
                       {...params}
                       label="Select fixture"
                       placeholder="Search fixtures..."
+                      multiline
+                      minRows={1}
+                      maxRows={4}
                       sx={{
                         '& .MuiOutlinedInput-root': {
                           borderRadius: '12px',
                           backgroundColor: colors.brandWhite,
+                          alignItems: 'flex-start',
                           '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: colors.brandRed },
                           '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderWidth: 2, borderColor: colors.brandRed },
                         },
@@ -1562,15 +1638,198 @@ const FixtureFormPage = () => {
                   </Box>
                 )}
                 {!loadingUpcoming && upcomingFixtures.length > 0 && (
-                  <Typography variant="caption" sx={{ display: 'block', mt: 0.75, color: colors.textSecondary }}>
+                  <Typography variant="caption" sx={{ display: 'block', mt: 0.75, color: colors.textSecondary, lineHeight: 1.45 }}>
                     {(upcomingFixtures || []).filter((f) => !f.inUse).length} selectable · {(upcomingFixtures || []).filter((f) => f.inUse).length} already used
                   </Typography>
                 )}
                 {!loadingUpcoming && upcomingFixtures.length === 0 && formData.leagueId && cebeeSeason && (
-                  <Typography variant="caption" sx={{ display: 'block', mt: 0.75, color: colors.textSecondary }}>
+                  <Typography variant="caption" sx={{ display: 'block', mt: 0.75, color: colors.textSecondary, lineHeight: 1.45 }}>
                     No upcoming fixtures for this league/season. Sync fixtures in API Data & Sync (Fixtures tab) for this league/season, then try again.
                   </Typography>
                 )}
+                </Stack>
+              </Grid>
+              <Grid item xs={12} md={6} sx={{ width: '100%' }}>
+                <Stack spacing={2} sx={{ width: '100%' }}>
+                <Typography variant="caption" sx={{ display: 'block', mb: 0.75, color: colors.textSecondary, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Step 2 — Season
+                </Typography>
+                <FormControl fullWidth>
+                  <InputLabel id="fixture-season-label">Season (year)</InputLabel>
+                  <Select
+                    labelId="fixture-season-label"
+                      label="Season (year)"
+                    value={cebeeSeason}
+                    onChange={(e) => { setCebeeSeason(Number(e.target.value)); setSelectedApiFixture(null); }}
+                      sx={{
+                          borderRadius: '12px',
+                          backgroundColor: colors.brandWhite,
+                          '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: colors.brandRed },
+                          '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderWidth: 2, borderColor: colors.brandRed },
+                    }}
+                  >
+                    {[new Date().getFullYear() + 1, new Date().getFullYear(), new Date().getFullYear() - 1, new Date().getFullYear() - 2].map((y) => (
+                      <MenuItem key={y} value={y}>{formatSeasonLabel(y)}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <Typography variant="caption" sx={{ display: 'block', mb: 0.75, color: colors.textSecondary, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Step 4 — Pick featured team (CeBee) *
+                </Typography>
+                <Box sx={{ display: 'flex', flexDirection: 'column', width: '100%' }}>
+                  {selectedApiFixture ? (
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        p: 1.25,
+                        borderRadius: '12px',
+                        border: `1px solid ${colors.brandRed}22`,
+                        backgroundColor: colors.brandWhite,
+                        boxShadow: `0 1px 8px ${colors.brandRed}0C`,
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, width: '100%', minWidth: 0 }}>
+                        <Typography
+                          component="p"
+                          variant="caption"
+                          sx={{
+                            m: 0,
+                            color: colors.textSecondary,
+                            lineHeight: 1.45,
+                            fontSize: '0.7rem',
+                            width: '100%',
+                          }}
+                        >
+                          <Box component="span" sx={{ fontWeight: 700, color: colors.brandBlack }}>
+                            Required:
+                          </Box>{' '}
+                          Used to know the featured team during predictions. Pick featured team (home or away).
+                        </Typography>
+                        <FormControl component="fieldset" variant="standard" required error={featuredTeamSelectionError} sx={{ width: '100%', minWidth: 0, m: 0 }}>
+                          <RadioGroup
+                            row
+                            value={cebeeFeaturedSide}
+                            onChange={(e) => setCebeeFeaturedSide(e.target.value)}
+                            sx={{
+                              flexWrap: 'nowrap',
+                              gap: 0.75,
+                              width: '100%',
+                              minWidth: 0,
+                              overflowX: 'auto',
+                              WebkitOverflowScrolling: 'touch',
+                              scrollbarWidth: 'thin',
+                              '&::-webkit-scrollbar': { height: 4 },
+                            }}
+                          >
+                            <FormControlLabel
+                              value="A"
+                              control={<Radio size="small" sx={{ color: colors.brandRed, p: 0.25, flexShrink: 0, '&.Mui-checked': { color: colors.brandRed } }} />}
+                              label={`Home · ${selectedApiFixture.homeTeamName || 'Home'}`}
+                              sx={{
+                                m: 0,
+                                mr: 0,
+                                px: 0.75,
+                                py: 0.5,
+                                flex: '0 0 auto',
+                                boxSizing: 'border-box',
+                                borderRadius: '8px',
+                                border: `1px solid ${cebeeFeaturedSide === 'A' ? colors.brandRed : `${colors.brandRed}18`}`,
+                                bgcolor: cebeeFeaturedSide === 'A' ? `${colors.brandRed}0C` : 'transparent',
+                                transition: 'border-color 0.2s ease, background-color 0.2s ease',
+                                alignItems: 'center',
+                                '& .MuiFormControlLabel-label': {
+                                  fontSize: '0.75rem',
+                                  fontWeight: cebeeFeaturedSide === 'A' ? 600 : 500,
+                                  lineHeight: 1.25,
+                                  whiteSpace: 'nowrap',
+                                },
+                              }}
+                            />
+                            <FormControlLabel
+                              value="B"
+                              control={<Radio size="small" sx={{ color: colors.brandRed, p: 0.25, flexShrink: 0, '&.Mui-checked': { color: colors.brandRed } }} />}
+                              label={`Away · ${selectedApiFixture.awayTeamName || 'Away'}`}
+                              sx={{
+                                m: 0,
+                                mr: 0,
+                                px: 0.75,
+                                py: 0.5,
+                                flex: '0 0 auto',
+                                boxSizing: 'border-box',
+                                borderRadius: '8px',
+                                border: `1px solid ${cebeeFeaturedSide === 'B' ? colors.brandRed : `${colors.brandRed}18`}`,
+                                bgcolor: cebeeFeaturedSide === 'B' ? `${colors.brandRed}0C` : 'transparent',
+                                transition: 'border-color 0.2s ease, background-color 0.2s ease',
+                                alignItems: 'center',
+                                '& .MuiFormControlLabel-label': {
+                                  fontSize: '0.75rem',
+                                  fontWeight: cebeeFeaturedSide === 'B' ? 600 : 500,
+                                  lineHeight: 1.25,
+                                  whiteSpace: 'nowrap',
+                                },
+                              }}
+                            />
+                          </RadioGroup>
+                          {featuredTeamSelectionError && (
+                            <FormHelperText sx={{ mx: 0, mt: 0.25 }}>Pick home or away.</FormHelperText>
+                          )}
+                        </FormControl>
+                      </Box>
+                      {!(selectedApiFixture.venue && String(selectedApiFixture.venue).trim()) && (
+                        <Box sx={{ mt: 1.25, pt: 1.25, width: '100%', borderTop: `1px dashed ${colors.brandRed}28` }}>
+                          <Typography variant="caption" sx={{ display: 'block', mb: 0.5, color: colors.textSecondary, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                            Venue *
+                          </Typography>
+                          <Autocomplete
+                            fullWidth
+                            size="small"
+                            value={apiVenues.find((v) => v.name === formData.venue) || null}
+                            onChange={(_, newVal) => handleChange('venue', newVal?.name || '')}
+                            options={apiVenues}
+                            getOptionLabel={(v) => (v ? `${v.name}${v.city ? `, ${v.city}` : ''}` : '')}
+                            isOptionEqualToValue={(a, b) => a && b && a.id === b.id}
+                            disabled={loadingVenues}
+                            clearable
+                            renderInput={(params) => (
+                              <TextField
+                                {...params}
+                                label="Select venue"
+                                placeholder="Search venues..."
+                                sx={{ '& .MuiOutlinedInput-root': { borderRadius: '12px', backgroundColor: colors.brandWhite } }}
+                              />
+                            )}
+                            slotProps={{
+                              paper: { sx: { maxHeight: 280 } },
+                            }}
+                          />
+                          {loadingVenues && (
+                            <Typography variant="caption" sx={{ color: colors.textSecondary, mt: 0.5, display: 'block' }}>Loading venues…</Typography>
+                          )}
+                        </Box>
+                      )}
+                    </Box>
+                  ) : (
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        py: 1.5,
+                        px: 1.25,
+                        borderRadius: '12px',
+                        border: `1px dashed ${colors.textSecondary}30`,
+                        backgroundColor: `${colors.brandRed}06`,
+                        textAlign: 'center',
+                      }}
+                    >
+                      <Typography variant="caption" sx={{ color: colors.textSecondary, fontStyle: 'italic', lineHeight: 1.45 }}>
+                        Select a fixture first (Step 3).
+                      </Typography>
+                    </Box>
+                  )}
+                </Box>
+                </Stack>
               </Grid>
             </Grid>
           </Card>
@@ -1585,6 +1844,11 @@ const FixtureFormPage = () => {
             boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
             border: `1px solid ${colors.divider || '#eee'}`,
             overflow: 'hidden',
+            ...(featureType === 'cebee' && selectedApiFixture
+              ? {
+                  background: `linear-gradient(165deg, ${colors.brandWhite} 0%, ${colors.success}07 55%, ${colors.brandWhite} 100%)`,
+                }
+              : {}),
           }}
         >
           <Box
@@ -1616,103 +1880,215 @@ const FixtureFormPage = () => {
               Team Details
             </Typography>
               <Typography variant="body2" sx={{ color: colors.textSecondary, mt: 0.25 }}>
-                Teams, matchday & venue
+                {featureType === 'cebee' && selectedApiFixture
+                  ? 'Read-only summary from the selected fixture'
+                  : 'Teams, matchday & venue'}
               </Typography>
             </Box>
           </Box>
 
-          {/* Info Banner */}
-          <Alert
-            icon={<CheckCircle sx={{ color: colors.success }} />}
-            sx={{
-              mb: 3,
-              backgroundColor: `${colors.success}12`,
-              border: `1px solid ${colors.success}40`,
-              borderRadius: '12px',
-              boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
-              '& .MuiAlert-icon': {
-                color: colors.success,
-              },
-            }}
-          >
-            <Typography variant="body2" sx={{ color: colors.success, fontWeight: 600 }}>
-              {featureType === 'cebee'
-                ? (selectedApiFixture
-                  ? 'CeBee Featured – Fixture selected from API; teams, kickoff and venue are auto-filled.'
-                  : 'CeBee Featured – Select a fixture above to auto-fill, or choose teams manually below.')
-                : 'Community Featured - Match voted by community'}
-            </Typography>
-          </Alert>
+          {/* Info Banner — hidden for CeBee + API fixture (summary is self-explanatory) */}
+          {!(featureType === 'cebee' && selectedApiFixture) && (
+            <Alert
+              icon={<CheckCircle sx={{ color: colors.success }} />}
+              sx={{
+                mb: 3,
+                backgroundColor: `${colors.success}10`,
+                border: `1px solid ${colors.success}35`,
+                borderRadius: '14px',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                py: 1.25,
+                '& .MuiAlert-icon': {
+                  color: colors.success,
+                  alignItems: 'center',
+                },
+                '& .MuiAlert-message': { width: '100%' },
+              }}
+            >
+              <Typography variant="body2" sx={{ color: colors.success, fontWeight: 600, lineHeight: 1.5 }}>
+                {featureType === 'cebee'
+                  ? 'CeBee Featured – Select a fixture above to auto-fill, or choose teams manually below.'
+                  : 'Community Featured - Match voted by community'}
+              </Typography>
+            </Alert>
+          )}
 
           <Grid container spacing={3}>
             {featureType === 'cebee' && selectedApiFixture ? (
               <Grid item xs={12}>
                 <Box
-                sx={{
-                    p: 2.5,
-                    borderRadius: '16px',
-                    backgroundColor: `${colors.success}0C`,
-                    border: `1px solid ${colors.success}40`,
-                    boxShadow: '0 2px 12px rgba(0,0,0,0.04)',
+                  sx={{
+                    p: { xs: 2, sm: 2.5 },
+                    borderRadius: '18px',
+                    background: `linear-gradient(145deg, ${colors.brandWhite} 0%, ${colors.success}0A 40%, ${colors.success}06 100%)`,
+                    border: `1px solid ${colors.success}38`,
+                    boxShadow: `0 4px 20px ${colors.success}12, 0 1px 3px rgba(0,0,0,0.04)`,
                   }}
                 >
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
-                    <Box sx={{ width: 36, height: 36, borderRadius: '10px', backgroundColor: `${colors.success}25`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <CheckCircle sx={{ color: colors.success, fontSize: 20 }} />
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2.25 }}>
+                    <Box
+                      sx={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: '12px',
+                        backgroundColor: `${colors.success}20`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <CheckCircle sx={{ color: colors.success, fontSize: 22 }} />
                     </Box>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 700, color: colors.success }}>
-                      Auto-filled from selected fixture
-                    </Typography>
-                  </Box>
-                  <Grid container spacing={2}>
-                    <Grid item xs={12} sm={6} md={3}>
-                      <Typography variant="caption" sx={{ color: colors.textSecondary, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Home</Typography>
-                      <Typography sx={{ fontWeight: 600, mt: 0.25 }}>{selectedApiFixture.homeTeamName || '–'}</Typography>
-                    </Grid>
-                    <Grid item xs={12} sm={6} md={3}>
-                      <Typography variant="caption" sx={{ color: colors.textSecondary, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Away</Typography>
-                      <Typography sx={{ fontWeight: 600, mt: 0.25 }}>{selectedApiFixture.awayTeamName || '–'}</Typography>
-                    </Grid>
-                    <Grid item xs={12} sm={6} md={3}>
-                      <Typography variant="caption" sx={{ color: colors.textSecondary, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Kickoff</Typography>
-                      <Typography sx={{ fontWeight: 600, mt: 0.25 }}>
-                        {selectedApiFixture.kickoff ? format(new Date(selectedApiFixture.kickoff), 'PPp') : '–'}
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 700, color: colors.success, letterSpacing: '-0.01em' }}>
+                        Match summary
                       </Typography>
-                    </Grid>
-                    <Grid item xs={12} sm={6} md={3}>
-                      <Typography variant="caption" sx={{ color: colors.textSecondary, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Venue</Typography>
-                      {selectedApiFixture.venue && String(selectedApiFixture.venue).trim() ? (
-                        <Typography sx={{ fontWeight: 600, mt: 0.25 }}>{selectedApiFixture.venue}</Typography>
-                      ) : (
-                        <Box sx={{ mt: 0.5 }}>
-                          <Autocomplete
-                            fullWidth
-                              size="small"
-                            value={apiVenues.find((v) => v.name === formData.venue) || null}
-                            onChange={(_, newVal) => handleChange('venue', newVal?.name || '')}
-                            options={apiVenues}
-                            getOptionLabel={(v) => v ? `${v.name}${v.city ? `, ${v.city}` : ''}` : ''}
-                            isOptionEqualToValue={(a, b) => a && b && a.id === b.id}
-                            disabled={loadingVenues}
-                            clearable
-                            renderInput={(params) => (
-                              <TextField
-                                {...params}
-                                label="Select venue"
-                                placeholder="Search venues..."
-                                sx={{ '& .MuiOutlinedInput-root': { borderRadius: '8px' } }}
-                              />
-                            )}
-                            slotProps={{
-                              paper: { sx: { maxHeight: 280 } },
+                    </Box>
+                  </Box>
+                  <Grid container spacing={1.5} sx={{ alignItems: 'stretch' }}>
+                    <Grid item xs={12}>
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          flexWrap: 'wrap',
+                          gap: 1.5,
+                          p: 2,
+                          borderRadius: '14px',
+                          background: `linear-gradient(120deg, ${colors.brandRed}12 0%, ${colors.brandRed}06 100%)`,
+                          border: `1px solid ${colors.brandRed}30`,
+                          width: '100%',
+                          boxSizing: 'border-box',
+                        }}
+                      >
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, minWidth: 0, flex: '1 1 200px' }}>
+                          <Box
+                            sx={{
+                              width: 40,
+                              height: 40,
+                              borderRadius: '10px',
+                              bgcolor: `${colors.brandRed}18`,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              flexShrink: 0,
                             }}
-                          />
-                          {loadingVenues && (
-                            <Typography variant="caption" sx={{ color: colors.textSecondary, mt: 0.5 }}>Loading venues…</Typography>
-                          )}
+                          >
+                            <Star sx={{ color: colors.brandRed, fontSize: 22 }} />
+                          </Box>
+                          <Box sx={{ minWidth: 0 }}>
+                            <Typography
+                              variant="caption"
+                              sx={{
+                                color: colors.textSecondary,
+                                fontWeight: 600,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.55px',
+                                fontSize: '0.68rem',
+                              }}
+                            >
+                              Step 4 — Pick featured team (CeBee)
+                            </Typography>
+                            <Typography
+                              variant="subtitle1"
+                              sx={{
+                                fontWeight: 700,
+                                mt: 0.35,
+                                letterSpacing: '-0.02em',
+                                lineHeight: 1.3,
+                                color: cebeeFeaturedSide === 'A' || cebeeFeaturedSide === 'B' ? colors.brandBlack : colors.textSecondary,
+                              }}
+                            >
+                              {cebeeFeaturedSide === 'B'
+                                ? (selectedApiFixture.awayTeamName || 'Away')
+                                : cebeeFeaturedSide === 'A'
+                                  ? (selectedApiFixture.homeTeamName || 'Home')
+                                  : 'Pick featured team above (Step 4)'}
+                            </Typography>
+                          </Box>
                         </Box>
-                      )}
+                        <Chip
+                          label={
+                            cebeeFeaturedSide === 'B'
+                              ? 'Away pick'
+                              : cebeeFeaturedSide === 'A'
+                                ? 'Home pick'
+                                : 'Required'
+                          }
+                          size="small"
+                          sx={{
+                            borderRadius: '8px',
+                            fontWeight: 700,
+                            fontSize: '0.7rem',
+                            height: 26,
+                            border: `1px solid ${colors.brandRed}45`,
+                            bgcolor: colors.brandWhite,
+                            color: colors.brandRed,
+                            flexShrink: 0,
+                            ...(cebeeFeaturedSide !== 'A' && cebeeFeaturedSide !== 'B'
+                              ? { borderStyle: 'dashed', opacity: 0.85 }
+                              : {}),
+                          }}
+                        />
+                      </Box>
                     </Grid>
+                    {[
+                      { k: 'home', label: 'Home', value: selectedApiFixture.homeTeamName || '–' },
+                      { k: 'away', label: 'Away', value: selectedApiFixture.awayTeamName || '–' },
+                      {
+                        k: 'kick',
+                        label: 'Kickoff',
+                        value: selectedApiFixture.kickoff ? format(new Date(selectedApiFixture.kickoff), 'PPp') : '–',
+                      },
+                      { k: 'venue', label: 'Venue', value: apiFixtureVenueDisplay },
+                    ].map((cell) => (
+                      <Grid item xs={6} md={3} key={cell.k} sx={{ display: 'flex' }}>
+                        <Box
+                          sx={{
+                            p: 1.75,
+                            flex: 1,
+                            width: '100%',
+                            minWidth: 0,
+                            minHeight: { xs: 88, sm: 96 },
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'flex-start',
+                            borderRadius: '12px',
+                            bgcolor: colors.brandWhite,
+                            border: `1px solid ${colors.success}1F`,
+                            boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+                            boxSizing: 'border-box',
+                          }}
+                        >
+                          <Typography
+                            variant="caption"
+                            sx={{
+                              color: colors.textSecondary,
+                              fontWeight: 600,
+                              textTransform: 'uppercase',
+                              letterSpacing: '0.55px',
+                              fontSize: '0.68rem',
+                            }}
+                          >
+                            {cell.label}
+                          </Typography>
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              fontWeight: 700,
+                              mt: 0.75,
+                              lineHeight: 1.35,
+                              letterSpacing: '-0.02em',
+                              color: colors.brandBlack,
+                              wordBreak: 'break-word',
+                            }}
+                          >
+                            {cell.value}
+                          </Typography>
+                        </Box>
+                      </Grid>
+                    ))}
                   </Grid>
                 </Box>
               </Grid>
@@ -1893,6 +2269,89 @@ const FixtureFormPage = () => {
                 </Typography>
               )}
             </Grid>
+            {featureType === 'cebee' && !selectedApiFixture && formData.homeTeam && formData.awayTeam && (() => {
+              const homeT = teams.find((t) => String(t.id || t._id || t.team_id) === String(formData.homeTeam));
+              const awayT = teams.find((t) => String(t.id || t._id || t.team_id) === String(formData.awayTeam));
+              const homeName = homeT ? (homeT.name || homeT.team_name) : 'Home';
+              const awayName = awayT ? (awayT.name || awayT.team_name) : 'Away';
+              return (
+                <Grid item xs={12}>
+                  <Typography variant="caption" sx={{ display: 'block', mb: 1, color: colors.textSecondary, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.55px' }}>
+                    Step 4 — Pick featured team (CeBee) *
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.25, width: '100%', alignItems: 'stretch' }}>
+                    <Typography
+                      component="p"
+                      variant="body2"
+                      sx={{
+                        m: 0,
+                        width: '100%',
+                        color: colors.textSecondary,
+                        lineHeight: 1.45,
+                        fontSize: '0.8125rem',
+                      }}
+                    >
+                      <Box component="span" sx={{ fontWeight: 700, color: colors.brandBlack }}>
+                        Required:
+                      </Box>{' '}
+                      Used to know the featured team during predictions. Pick featured team (home or away).
+                    </Typography>
+                    <FormControl component="fieldset" variant="standard" required error={featuredTeamSelectionError} sx={{ width: '100%', m: 0 }}>
+                      <RadioGroup
+                        value={cebeeFeaturedSide}
+                        onChange={(e) => setCebeeFeaturedSide(e.target.value)}
+                        sx={{
+                          display: 'grid',
+                          gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+                          gap: 1,
+                          width: '100%',
+                        }}
+                      >
+                        <FormControlLabel
+                          value="A"
+                          control={<Radio size="small" sx={{ color: colors.brandRed, '&.Mui-checked': { color: colors.brandRed } }} />}
+                          label={`Home · ${homeName}`}
+                          sx={{
+                            m: 0,
+                            px: 1.25,
+                            py: 1,
+                            minHeight: 44,
+                            boxSizing: 'border-box',
+                            width: '100%',
+                            borderRadius: '10px',
+                            border: `1px solid ${cebeeFeaturedSide === 'A' ? colors.brandRed : `${colors.brandRed}18`}`,
+                            bgcolor: cebeeFeaturedSide === 'A' ? `${colors.brandRed}0C` : 'transparent',
+                            alignItems: 'center',
+                            '& .MuiFormControlLabel-label': { fontSize: '0.8125rem', fontWeight: cebeeFeaturedSide === 'A' ? 600 : 500, wordBreak: 'break-word' },
+                          }}
+                        />
+                        <FormControlLabel
+                          value="B"
+                          control={<Radio size="small" sx={{ color: colors.brandRed, '&.Mui-checked': { color: colors.brandRed } }} />}
+                          label={`Away · ${awayName}`}
+                          sx={{
+                            m: 0,
+                            px: 1.25,
+                            py: 1,
+                            minHeight: 44,
+                            boxSizing: 'border-box',
+                            width: '100%',
+                            borderRadius: '10px',
+                            border: `1px solid ${cebeeFeaturedSide === 'B' ? colors.brandRed : `${colors.brandRed}18`}`,
+                            bgcolor: cebeeFeaturedSide === 'B' ? `${colors.brandRed}0C` : 'transparent',
+                            alignItems: 'center',
+                            '& .MuiFormControlLabel-label': { fontSize: '0.8125rem', fontWeight: cebeeFeaturedSide === 'B' ? 600 : 500, wordBreak: 'break-word' },
+                          }}
+                        />
+                      </RadioGroup>
+                      {featuredTeamSelectionError && (
+                        <FormHelperText sx={{ mx: 0 }}>Pick home or away as the featured team.</FormHelperText>
+                      )}
+                    </FormControl>
+                  </Box>
+                </Grid>
+              );
+            })()}
             {featureType === 'community' && (formData.homeTeam || formData.awayTeam) && (() => {
               const list = availableTeams.length ? availableTeams : teams;
               const featuredTeam = featuredTeamId
@@ -1936,9 +2395,9 @@ const FixtureFormPage = () => {
             <Grid item xs={12} md={featureType === 'cebee' || featureType === 'community' ? 6 : 12}>
               <Autocomplete
                 fullWidth
-                value={STADIUM_OPTIONS.find((o) => o.value === (formData.venue || 'other')) || STADIUM_OPTIONS[0]}
+                value={stadiumOptionsForForm.find((o) => o.value === (formData.venue || 'other')) || stadiumOptionsForForm[0]}
                 onChange={(_, newVal) => handleChange('venue', newVal?.value ?? 'other')}
-                options={STADIUM_OPTIONS}
+                options={stadiumOptionsForForm}
                 getOptionLabel={(o) => o ? o.label : ''}
                 isOptionEqualToValue={(a, b) => a && b && a.value === b.value}
                 renderInput={(params) => (

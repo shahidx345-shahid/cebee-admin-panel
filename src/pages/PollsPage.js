@@ -42,6 +42,34 @@ import { getPolls, closePoll } from '../services/pollsService';
 
 import { format } from 'date-fns';
 
+/** Match stored names like "Bundesliga (API 78)" — show only the name in UI. */
+const leagueNameForDisplay = (name) => {
+  if (name == null || name === '') return 'Unknown League';
+  if (typeof name !== 'string') return String(name);
+  const stripped = name.replace(/\s*\(API\s+\d+\)\s*$/i, '').trim();
+  return stripped || name;
+};
+
+/** Same ordering rules as GET /api/polls: prefer apiFixtureIdsOrder (admin slots), else matchNum. */
+const sortFixturesForDisplay = (fixtures, apiFixtureIdsOrder) => {
+  if (!fixtures || !fixtures.length) return [];
+  const n = fixtures.length;
+  const order = Array.isArray(apiFixtureIdsOrder) && apiFixtureIdsOrder.length === n
+    ? apiFixtureIdsOrder.map((id) => Number(id))
+    : null;
+  const out = [...fixtures];
+  if (order) {
+    const rank = new Map(order.map((id, i) => [id, i]));
+    const allRanked = out.every((f) => f.apiFixtureId != null && rank.has(Number(f.apiFixtureId)));
+    if (allRanked) {
+      out.sort((a, b) => rank.get(Number(a.apiFixtureId)) - rank.get(Number(b.apiFixtureId)));
+      return out;
+    }
+  }
+  out.sort((a, b) => (Number(a.matchNum) || 0) - (Number(b.matchNum) || 0));
+  return out;
+};
+
 const PollsPage = () => {
   const navigate = useNavigate();
   const [polls, setPolls] = useState([]);
@@ -66,12 +94,47 @@ const PollsPage = () => {
 
         const result = await getPolls();
         if (result.success && result.data?.polls) {
+          const idStr = (x) => {
+            if (x == null || x === '') return '';
+            if (typeof x === 'object' && x._id != null) return String(x._id);
+            return String(x);
+          };
+          const mapFixturesToMatches = (fixtures, apiFixtureIdsOrder) => {
+            if (!fixtures || !fixtures.length) return [];
+            return sortFixturesForDisplay(fixtures, apiFixtureIdsOrder).map((f, i) => {
+              const homeTeam = f.teamAName || f.team_a_name || f.teamA?.team_name || 'Team A';
+              const awayTeam = f.teamBName || f.team_b_name || f.teamB?.team_name || 'Team B';
+              const teamAId = idStr(f.teamAId ?? f.teamA?._id);
+              const teamBId = idStr(f.teamBId ?? f.teamB?._id);
+              const ftId = idStr(f.featuredTeamId ?? f.featuredTeam?._id);
+              let featuredSide = 'A';
+              if (ftId && teamBId && ftId === teamBId) featuredSide = 'B';
+              else if (ftId && teamAId && ftId === teamAId) featuredSide = 'A';
+              return {
+                homeTeam,
+                awayTeam,
+                matchNum: f.matchNum ?? i + 1,
+                apiFixtureId: f.apiFixtureId,
+                featuredSide,
+                votes: f.votes,
+                votePercentage: f.votePercentage,
+              };
+            });
+          };
           // Format polls to match the expected structure
-          const formattedPolls = result.data.polls.map(poll => ({
+          const formattedPolls = result.data.polls.map(poll => {
+            const winnerTeam = poll.poll_winner_team_id;
+            const winnerTeamName =
+              (winnerTeam && typeof winnerTeam === 'object' && winnerTeam.team_name) ||
+              poll.winner?.winning_team?.team_name ||
+              '';
+            const apiOrder = poll.apiFixtureIdsOrder || poll.api_fixture_ids_order;
+            const matchesFromFixtures = mapFixturesToMatches(poll.fixtures, apiOrder);
+            return {
             id: poll._id || poll.poll_id || poll.id,
             pollId: poll.poll_id || poll.pollId || `POLL_${String(poll.order || 0).padStart(3, '0')}`,
             leagueId: poll.league_id || poll.leagueId,
-            leagueName: poll.league_name || poll.leagueName || 'Unknown League',
+            leagueName: leagueNameForDisplay(poll.league_name || poll.leagueName || 'Unknown League'),
             status: poll.status || poll.pollStatus || 'scheduled',
             pollStatus: poll.pollStatus || poll.status,
             voteCount: poll.vote_count || poll.voteCount || 0,
@@ -79,12 +142,24 @@ const PollsPage = () => {
             closeTime: poll.close_time ? new Date(poll.close_time) : poll.closeTime ? new Date(poll.closeTime) : new Date(),
             createdAt: poll.created_at ? new Date(poll.created_at) : new Date(),
             poll_winner_fixture_id: poll.poll_winner_fixture_id ?? poll.pollWinnerFixtureId ?? null,
-            matches: poll.fixtures ? poll.fixtures.map((f, i) => ({
-              homeTeam: f.team_a_name || f.teamAName || 'Team A',
-              awayTeam: f.team_b_name || f.teamBName || 'Team B',
-              matchNum: f.matchNum ?? i + 1,
-            })) : [],
-          }));
+            poll_winner_team_id: idStr(poll.poll_winner_team_id),
+            poll_winner_team_name: winnerTeamName,
+            poll_winner_vote_percentage: poll.poll_winner_vote_percentage ?? null,
+            apiFixtureIdsOrder: Array.isArray(apiOrder) ? apiOrder : null,
+            fixtures: sortFixturesForDisplay(poll.fixtures || [], apiOrder),
+            matches: matchesFromFixtures.length
+              ? matchesFromFixtures
+              : sortFixturesForDisplay(poll.matches || [], apiOrder).map((m, i) => ({
+                  homeTeam: m.homeTeam || 'Team A',
+                  awayTeam: m.awayTeam || 'Team B',
+                  matchNum: m.matchNum ?? i + 1,
+                  apiFixtureId: m.apiFixtureId,
+                  featuredSide: 'A',
+                  votes: m.votes,
+                  votePercentage: m.votePercentage,
+                })),
+          };
+          });
 
           setPolls(formattedPolls);
           setFilteredPolls(formattedPolls);
@@ -870,30 +945,94 @@ const PollsPage = () => {
                         pollDetails.matches.map((match, index) => {
                           const matchNum = match.matchNum ?? index + 1;
                           const isWinner = pollDetails.status === 'closed' && pollDetails.poll_winner_fixture_id != null && matchNum === pollDetails.poll_winner_fixture_id;
+                          const side = match.featuredSide === 'B' ? 'B' : 'A';
+                          const featuredSx = {
+                            fontSize: 18,
+                            fontWeight: 800,
+                            color: colors.brandBlack,
+                            lineHeight: 1.2,
+                          };
+                          const otherSx = {
+                            fontSize: 14,
+                            fontWeight: 500,
+                            color: colors.textSecondary,
+                            lineHeight: 1.25,
+                          };
                           return (
                           <Card key={index} elevation={0} sx={{
                             p: 2,
                             borderRadius: '12px',
-                            border: `1px solid ${colors.divider}`,
-                            backgroundColor: colors.brandWhite
+                            border: `1px solid ${isWinner ? colors.brandRed : colors.divider}`,
+                            backgroundColor: isWinner ? `${colors.brandRed}08` : colors.brandWhite
                           }}>
                             {isWinner && (
-                              <Box sx={{ display: 'flex', gap: 0.5, mb: 0.5, flexWrap: 'wrap' }}>
-                                <Chip label="Featured Fixture" size="small" sx={{ backgroundColor: `${colors.brandRed}15`, color: colors.brandRed, fontWeight: 600, fontSize: 9, height: 18 }} />
-                                <Chip label="Featured Team" size="small" sx={{ backgroundColor: `${colors.brandRed}22`, color: colors.brandRed, fontWeight: 700, fontSize: 9, height: 18 }} />
+                            <Box sx={{ display: 'flex', gap: 0.5, mb: 1, flexWrap: 'wrap', alignItems: 'center' }}>
+                              <Chip label="Winner fixture (most votes)" size="small" sx={{ backgroundColor: `${colors.brandRed}15`, color: colors.brandRed, fontWeight: 700, fontSize: 9, height: 18 }} />
+                              {pollDetails.poll_winner_team_name ? (
+                                <Chip label={`Poll winner: ${pollDetails.poll_winner_team_name}`} size="small" sx={{ backgroundColor: '#ECFDF5', color: '#065F46', fontWeight: 700, fontSize: 9, height: 18 }} />
+                              ) : null}
+                            </Box>
+                            )}
+                            {(() => {
+                              const hasStats =
+                                match.votePercentage != null || match.votes != null;
+                              const v = match.votes != null ? Number(match.votes) : null;
+                              const pct =
+                                match.votePercentage != null ? Number(match.votePercentage) : null;
+                              const votePart =
+                                v != null
+                                  ? `${v.toLocaleString()} vote${v === 1 ? '' : 's'}`
+                                  : null;
+                              const pctPart = pct != null ? `${pct}%` : null;
+                              const stats = [votePart, pctPart].filter(Boolean).join(' · ');
+                              return (
+                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
+                              <Box sx={{ flex: 1, minWidth: 0 }}>
+                                <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'baseline', gap: 0.5, rowGap: 0.25 }}>
+                                  <Typography
+                                    component="span"
+                                    sx={side === 'A' ? featuredSx : otherSx}
+                                  >
+                                    {match.homeTeam}
+                                  </Typography>
+                                  <Typography component="span" variant="body2" sx={{ color: colors.textSecondary, fontSize: 13, fontWeight: 500, px: 0.25 }}>
+                                    vs
+                                  </Typography>
+                                  <Typography
+                                    component="span"
+                                    sx={side === 'B' ? featuredSx : otherSx}
+                                  >
+                                    {match.awayTeam}
+                                  </Typography>
+                                </Box>
+                                {isWinner && (
+                                  <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: colors.textSecondary }}>
+                                    Match {matchNum} — winner fixture
+                                  </Typography>
+                                )}
                               </Box>
-                            )}
-                            <Typography variant="subtitle1" sx={{ fontWeight: 700, color: colors.brandBlack, lineHeight: 1.2, mb: 0.5 }}>
-                              {match.homeTeam}
-                            </Typography>
-                            <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13 }}>
-                              vs {match.awayTeam}
-                            </Typography>
-                            {pollDetails.status === 'closed' && (
-                              <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: colors.textSecondary }}>
-                                {isWinner ? 'Winner (most votes)' : '—'}
-                              </Typography>
-                            )}
+                              <Box sx={{ flexShrink: 0, textAlign: 'right', alignSelf: 'center' }}>
+                                {hasStats ? (
+                                  <Typography
+                                    variant="body2"
+                                    sx={{
+                                      fontWeight: 600,
+                                      fontSize: 14,
+                                      color: colors.brandBlack,
+                                      whiteSpace: 'nowrap',
+                                    }}
+                                  >
+                                    {stats}
+                                  </Typography>
+                                ) : pollDetails.status === 'closed' ? (
+                                  <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13 }}>
+                                    —
+                                  </Typography>
+                                ) : null}
+                              </Box>
+                            </Box>
+                              );
+                            })()}
                           </Card>
                           );
                         })
@@ -985,20 +1124,64 @@ const PollsPage = () => {
                 </Box>
               </Box>
 
-              {/* Winner Preview (Admin Only) */}
+              {/* Poll result summary (closed polls) */}
+              {pollDetails.status === 'closed' && pollDetails.poll_winner_fixture_id != null && (
               <Box sx={{ mx: 3, my: 2.5, p: 2.5, backgroundColor: '#ECFDF5', borderRadius: '12px', border: '1px solid #D1FAE5' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                  <Star sx={{ fontSize: 22, color: '#16A34A' }} />
+                <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
+                  <Star sx={{ fontSize: 22, color: '#16A34A', mt: 0.25 }} />
                   <Box>
-                    <Typography variant="body2" sx={{ color: '#16A34A', fontSize: 13, fontWeight: 600, mb: 0.25 }}>
-                      Winner Preview (Admin Only)
+                    <Typography variant="body2" sx={{ color: '#16A34A', fontSize: 13, fontWeight: 600, mb: 0.5 }}>
+                      Poll result
                     </Typography>
-                    <Typography variant="h6" sx={{ fontWeight: 600, fontSize: 16, color: colors.brandBlack }}>
-                      PSG
+                    <Typography variant="body2" sx={{ color: colors.brandBlack, fontSize: 14, mb: 0.5 }}>
+                      <strong>Winner fixture:</strong> Match {pollDetails.poll_winner_fixture_id}
+                      {(() => {
+                        const wid = pollDetails.poll_winner_fixture_id;
+                        const wf = pollDetails.matches?.find((m) => String(m.matchNum ?? '') === String(wid ?? ''));
+                        return wf ? ` — ${wf.homeTeam} vs ${wf.awayTeam}` : '';
+                      })()}
                     </Typography>
+                    {pollDetails.poll_winner_team_name ? (
+                      <Typography variant="h6" sx={{ fontWeight: 700, fontSize: 16, color: colors.brandBlack }}>
+                        Poll winner (featured team): {pollDetails.poll_winner_team_name}
+                      </Typography>
+                    ) : (
+                      <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13 }}>
+                        Poll winner team not set for this poll (admin must choose featured team per fixture when creating the poll).
+                      </Typography>
+                    )}
+                    {(() => {
+                      const winnerFixtureId = pollDetails.poll_winner_fixture_id;
+                      const wf = pollDetails.matches?.find(
+                        (m) => String(m.matchNum ?? '') === String(winnerFixtureId ?? '')
+                      );
+                      // Users vote per fixture; winning “team” is the featured side on that fixture — count = votes on that match only (not poll total).
+                      let winnerVotes = wf?.votes != null ? Number(wf.votes) : null;
+                      if (winnerVotes == null && pollDetails.poll_winner_vote_percentage != null) {
+                        const total = Number(pollDetails.voteCount ?? 0);
+                        if (total > 0) {
+                          winnerVotes = Math.round(
+                            (Number(pollDetails.poll_winner_vote_percentage) / 100) * total
+                          );
+                        }
+                      }
+                      if (winnerVotes == null) winnerVotes = 0;
+                      return (
+                    <Typography variant="body2" sx={{ display: 'block', mt: 0.5, color: colors.brandBlack, fontSize: 14 }}>
+                      <strong>Votes for the winning team’s match:</strong>{' '}
+                      {winnerVotes.toLocaleString()}
+                    </Typography>
+                      );
+                    })()}
+                    {pollDetails.poll_winner_vote_percentage != null && (
+                      <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: colors.textSecondary }}>
+                        Share of votes on the winning fixture: {pollDetails.poll_winner_vote_percentage}%
+                      </Typography>
+                    )}
                   </Box>
                 </Box>
               </Box>
+              )}
 
               {/* Close Button */}
               <Box sx={{ px: 3, pb: 3 }}>

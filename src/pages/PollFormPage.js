@@ -42,7 +42,7 @@ import {
 import { colors, constants } from '../config/theme';
 import { DateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
-import { format, differenceInHours, differenceInDays } from 'date-fns';
+import { format } from 'date-fns';
 import { formatSeasonLabel } from '../utils/seasonFormat';
 import { getPolls, getPoll, createPoll, updatePoll, getUpcomingFixtures, createPollFromApi } from '../services/pollsService';
 import { getLeagues } from '../services/leaguesService';
@@ -412,6 +412,20 @@ const PollFormPage = () => {
       const startTime = formData.startTime instanceof Date ? formData.startTime : new Date(formData.startTime);
       const closeTime = formData.closeTime instanceof Date ? formData.closeTime : new Date(formData.closeTime);
 
+    const startMs = startTime.getTime();
+    const closeMs = closeTime.getTime();
+    if (Number.isNaN(startMs) || Number.isNaN(closeMs)) {
+      alert('Please set valid start and close dates.');
+      return;
+    }
+    // Close must be strictly after start; any positive gap is allowed (e.g. 1 minute).
+    if (closeMs <= startMs) {
+      alert(
+        'Close time must be after start time. On the same calendar day, pick a later clock time than start (for example 5:10 PM is after 5:02 PM; 5:10 AM is earlier than 5:02 PM).'
+      );
+      return;
+    }
+
     if (isEditMode) {
       if (!validateFixtures()) {
         alert('Please select both teams for all 5 matches before saving.');
@@ -504,16 +518,13 @@ const PollFormPage = () => {
     );
     const leaguePolls = activePolls.filter((p) => p.leagueId === formData.leagueId);
     const activePollsCount = activePolls.length;
-    const durationHours = differenceInHours(formData.closeTime, formData.startTime);
-    const durationDays = differenceInDays(formData.closeTime, formData.startTime);
+    const st = formData.startTime instanceof Date ? formData.startTime : new Date(formData.startTime);
+    const ct = formData.closeTime instanceof Date ? formData.closeTime : new Date(formData.closeTime);
 
     return {
       onePollPerLeague: !selectedLeague || leaguePolls.length === 0,
       maxFiveActive: activePollsCount < 5,
-      closeAfterStart: formData.closeTime > formData.startTime,
-      durationValid: durationHours >= 24 && durationHours <= 30 * 24,
-      durationHours,
-      durationDays,
+      closeAfterStart: ct.getTime() > st.getTime(),
     };
   };
 
@@ -1415,7 +1426,7 @@ const PollFormPage = () => {
                 )}
               </ListItemIcon>
               <ListItemText
-                primary="Close time must be after start time"
+                primary="Close time must be after start time (even 1 minute later is OK)"
                 primaryTypographyProps={{
                   fontSize: 14,
                   color: colors.brandBlack,
