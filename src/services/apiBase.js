@@ -4,11 +4,13 @@
  * Last Updated: 2026-03-09
  */
 
-// Use ngrok public URL for backend (set REACT_APP_API_URL in .env). No local port.
+// Live backend. For local dev set REACT_APP_API_URL=http://localhost:3001 in .env
+// Use relative path '/api' in production to leverage Vercel rewrites (fixes CORS)
+// For local dev, use REACT_APP_API_URL from .env or fallback to the live site
 const API_BASE_URL = (
   process.env.REACT_APP_API_URL ||
-  (process.env.NODE_ENV === 'production' ? '/api' : '')
-).replace(/\/$/, '') || 'https://your-tunnel.ngrok-free.app/api';
+  (process.env.NODE_ENV === 'production' ? '/api' : 'https://api.cebeepredict.com/api')
+).replace(/\/$/, '');
 
 // Log API URL in development for easier debugging
 if (process.env.NODE_ENV === 'development') {
@@ -84,7 +86,6 @@ export const apiRequest = async (endpoint, options = {}) => {
 
   const defaultHeaders = {
     'Content-Type': 'application/json',
-    'ngrok-skip-browser-warning': 'true', // required for ngrok free tier so API calls don't hit interstitial
   };
 
   // Add authorization header if token exists
