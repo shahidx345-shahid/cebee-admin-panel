@@ -742,28 +742,33 @@ const PredictionsOverviewPage = () => {
               >
                 <TableHead>
                   <TableRow sx={{ bgcolor: `${colors.backgroundLight}CC` }}>
-                    <TableCell align="left" sx={{ fontWeight: 700, width: '34%' }}>
+                    <TableCell align="left" sx={{ fontWeight: 700, width: '30%' }}>
                       User
                     </TableCell>
-                    <TableCell align="left" sx={{ fontWeight: 700, width: '11%' }}>
-                      <Tooltip title="Matches participated / Total predictions (rows)" placement="top">
-                        <span>M / P</span>
+                    <TableCell align="left" sx={{ fontWeight: 700, width: '10%' }}>
+                      <Tooltip title="Top: matches participated · bottom: total prediction rows" placement="top">
+                        <span>Matches</span>
                       </Tooltip>
                     </TableCell>
-                    <TableCell align="left" sx={{ fontWeight: 700, width: '10%' }}>
+                    <TableCell align="left" sx={{ fontWeight: 700, width: '9%' }}>
                       <Tooltip title="Correct prediction slots (won)" placement="top">
                         <span>Won</span>
                       </Tooltip>
                     </TableCell>
-                    <TableCell align="left" sx={{ fontWeight: 700, width: '15%' }}>
+                    <TableCell align="left" sx={{ fontWeight: 700, width: '12%' }}>
                       {multiCmd ? 'Status —' : 'Status'}
                     </TableCell>
-                    <TableCell align="left" sx={{ fontWeight: 700, width: '16%' }}>
-                      <Tooltip title="Accuracy % and total SP won" placement="top">
-                        <span>Acc / SP</span>
+                    <TableCell align="left" sx={{ fontWeight: 700, width: '11%' }}>
+                      <Tooltip title="Prediction accuracy across evaluated slots" placement="top">
+                        <span>Acc (%)</span>
                       </Tooltip>
                     </TableCell>
-                    <TableCell align="left" sx={{ fontWeight: 700, width: '14%' }}>
+                    <TableCell align="left" sx={{ fontWeight: 700, width: '11%' }}>
+                      <Tooltip title="Total SP won" placement="top">
+                        <span>SP</span>
+                      </Tooltip>
+                    </TableCell>
+                    <TableCell align="left" sx={{ fontWeight: 700, width: '9%' }}>
                       <Tooltip title="Perfect (user × match)" placement="top">
                         <span>Perfect</span>
                       </Tooltip>
@@ -773,7 +778,7 @@ const PredictionsOverviewPage = () => {
                 <TableBody>
                   {(overview?.users || []).length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} align="center" sx={{ py: 4, color: colors.textSecondary }}>
+                      <TableCell colSpan={7} align="center" sx={{ py: 4, color: colors.textSecondary }}>
                         No users in this filter
                       </TableCell>
                     </TableRow>
@@ -826,12 +831,12 @@ const PredictionsOverviewPage = () => {
                           )}
                         </TableCell>
                         <TableCell align="left" sx={{ verticalAlign: 'top', borderBottom: `1px solid ${colors.divider}` }}>
-                          <Typography variant="body2" sx={{ fontWeight: 600, lineHeight: 1.3 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
                             {u.predictionAccuracy != null ? `${u.predictionAccuracy}%` : '—'}
                           </Typography>
-                          <Typography variant="caption" sx={{ color: colors.textSecondary, display: 'block' }}>
-                            {u.totalSPWon} SP
-                          </Typography>
+                        </TableCell>
+                        <TableCell align="left" sx={{ verticalAlign: 'top', borderBottom: `1px solid ${colors.divider}` }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600 }}>{u.totalSPWon}</Typography>
                         </TableCell>
                         <TableCell align="left" sx={{ verticalAlign: 'top', borderBottom: `1px solid ${colors.divider}` }}>
                           <Typography variant="body2" sx={{ fontWeight: 600 }}>{u.perfectCount}</Typography>

@@ -11,6 +11,8 @@ import {
   CircularProgress,
   Alert,
   Divider,
+  Collapse,
+  IconButton,
 } from '@mui/material';
 import {
   ArrowBack,
@@ -22,11 +24,75 @@ import {
   Star,
   Shield,
   Diamond,
-  EmojiEvents,
+  ExpandMore,
 } from '@mui/icons-material';
 import { colors, constants } from '../config/theme';
 import { format } from 'date-fns';
 import { getPredictionById } from '../services/predictionsService';
+
+/** Group API scorer rows into display lines like "Joao Felix 73', 79'" */
+function scorerLinesFromEntries(entries) {
+  if (!Array.isArray(entries) || entries.length === 0) return [];
+  const byName = new Map();
+  for (const e of entries) {
+    const n = e.name || 'Unknown';
+    if (!byName.has(n)) byName.set(n, []);
+    const m = e.minute;
+    const ex = e.extra;
+    let frag = m != null && m !== '' ? String(m) : '?';
+    if (ex != null && Number(ex) > 0) frag += `+${ex}`;
+    byName.get(n).push(frag);
+  }
+  return Array.from(byName.entries()).map(([name, parts]) => `${name} ${parts.map((p) => `${p}'`).join(', ')}`);
+}
+
+const statMini = (label, value, sub) => (
+  <Box sx={{ minWidth: 0 }}>
+    <Typography variant="caption" sx={{ color: colors.textSecondary, fontWeight: 600, display: 'block', mb: 0.25 }}>
+      {label}
+    </Typography>
+    <Box
+      sx={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        px: 1,
+        py: 0.5,
+        borderRadius: '8px',
+        backgroundColor: '#FFE5E5',
+        color: colors.brandRed,
+        fontWeight: 700,
+        fontSize: 13,
+        maxWidth: '100%',
+      }}
+      component="span"
+    >
+      <Typography component="span" variant="body2" sx={{ fontWeight: 700, color: colors.brandRed, wordBreak: 'break-word' }}>
+        {value}
+      </Typography>
+    </Box>
+    {sub != null && (
+      <Typography variant="caption" sx={{ color: colors.textSecondary, display: 'block', mt: 0.25 }}>
+        {sub}
+      </Typography>
+    )}
+  </Box>
+);
+
+const statTopUserMatch = (ms) => {
+  const sp = ms?.topUserHighestSP ?? 0;
+  const sub = 'Highest total SP earned by one user on this match';
+  if (sp <= 0) return statMini('Top user', '—', sub);
+  const handle =
+    ms?.topUserUsername && String(ms.topUserUsername).trim() && ms.topUserUsername !== '—'
+      ? String(ms.topUserUsername).trim()
+      : null;
+  const name =
+    ms?.topUserFullName && String(ms.topUserFullName).trim() && ms.topUserFullName !== '—'
+      ? String(ms.topUserFullName).trim()
+      : null;
+  const who = handle || name || 'User';
+  return statMini('Top user', `${who} — ${sp} SP`, sub);
+};
 
 const PredictionDetailsPage = () => {
   const navigate = useNavigate();
@@ -36,8 +102,10 @@ const PredictionDetailsPage = () => {
   const [groupData, setGroupData] = useState(null);
   const [predictions, setPredictions] = useState([]);
   const [breakdownLines, setBreakdownLines] = useState([]);
+  const [matchStats, setMatchStats] = useState(null);
   const [liveTick, setLiveTick] = useState(0);
   const [countdownTick, setCountdownTick] = useState(0);
+  const [matchSummaryExpanded, setMatchSummaryExpanded] = useState(false);
 
   useEffect(() => {
     if (!groupData) return;
@@ -81,6 +149,7 @@ const PredictionDetailsPage = () => {
           const user = apiData.user || {};
           const matchSummary = apiData.matchSummary || {};
           setBreakdownLines(Array.isArray(apiData.predictionBreakdown) ? apiData.predictionBreakdown : []);
+          setMatchStats(apiData.matchSummary || null);
           
           // Get actual result from fixture
           let actualResult = null;
@@ -150,12 +219,18 @@ const PredictionDetailsPage = () => {
             hot: fixture.isFeatured || fixture.isCeBeFeatured || fixture.isCommunityFeatured || false,
             league: fixture.league || (fixture.cmdId?.name) || '',
             matchday: fixture.matchday || '',
+            round: fixture.round != null && String(fixture.round).trim() ? fixture.round : '',
+            cmdName: fixture.cmdId?.name || '',
             kickoffTime,
             venue: fixture.venue || '',
             homeTeamLogo: fixture.homeTeamLogo || fixture.home_team_logo || null,
             awayTeamLogo: fixture.awayTeamLogo || fixture.away_team_logo || null,
             homeTeamId: fixture.homeTeamId?._id ?? fixture.homeTeamId ?? null,
             awayTeamId: fixture.awayTeamId?._id ?? fixture.awayTeamId ?? null,
+            homeScore: fixture.homeScore != null ? fixture.homeScore : null,
+            awayScore: fixture.awayScore != null ? fixture.awayScore : null,
+            homeGoalScorers: Array.isArray(fixture.homeGoalScorers) ? fixture.homeGoalScorers : null,
+            awayGoalScorers: Array.isArray(fixture.awayGoalScorers) ? fixture.awayGoalScorers : null,
           });
           
           // Set as single prediction array for display
@@ -166,12 +241,14 @@ const PredictionDetailsPage = () => {
           setGroupData(null);
           setPredictions([]);
           setBreakdownLines([]);
+          setMatchStats(null);
         }
       } catch (error) {
         console.error('Error loading prediction details:', error);
         setGroupData(null);
         setPredictions([]);
         setBreakdownLines([]);
+        setMatchStats(null);
       } finally {
         setLoading(false);
       }
@@ -181,6 +258,48 @@ const PredictionDetailsPage = () => {
       loadPredictionDetails();
     }
   }, [id]);
+
+  useEffect(() => {
+    if (!id || !groupData) return;
+    const ms = String(groupData.matchStatus || '').toLowerCase();
+    if (ms !== 'live' && ms !== 'halftime') return;
+    const tick = setInterval(async () => {
+      try {
+        const decodedId = decodeURIComponent(id);
+        const result = await getPredictionById(decodedId);
+        if (!result.success || !result.data) return;
+        const fixture = result.data.fixture || {};
+        setGroupData((prev) => {
+          if (!prev) return prev;
+          let ar = prev.actualResult;
+          if (fixture.homeScore != null && fixture.awayScore != null) {
+            ar = `${fixture.homeScore}-${fixture.awayScore}`;
+          }
+          return {
+            ...prev,
+            matchStatus: fixture.matchStatus || fixture.status || prev.matchStatus,
+            homeScore: fixture.homeScore != null ? fixture.homeScore : prev.homeScore,
+            awayScore: fixture.awayScore != null ? fixture.awayScore : prev.awayScore,
+            actualResult: ar,
+            timeline: Array.isArray(fixture.timeline) ? fixture.timeline : prev.timeline,
+            homeGoalScorers: Array.isArray(fixture.homeGoalScorers)
+              ? fixture.homeGoalScorers
+              : fixture.homeGoalScorers === null
+                ? null
+                : prev.homeGoalScorers,
+            awayGoalScorers: Array.isArray(fixture.awayGoalScorers)
+              ? fixture.awayGoalScorers
+              : fixture.awayGoalScorers === null
+                ? null
+                : prev.awayGoalScorers,
+          };
+        });
+      } catch (_) {
+        /* ignore */
+      }
+    }, 15000);
+    return () => clearInterval(tick);
+  }, [id, groupData?.matchStatus]);
 
   const getTypeChip = (type) => {
     const typeMap = {
@@ -247,8 +366,12 @@ const PredictionDetailsPage = () => {
     );
   }
 
-  // Calculate total SP won across all predictions
-  const totalSP = predictions.reduce((sum, pred) => sum + (pred.spAwarded || 0), 0);
+  const totalSP = matchStats?.totalSPWon ?? predictions.reduce((sum, pred) => sum + (pred.spAwarded || 0), 0);
+  const ms = matchStats || {};
+  const avgPredPerUser =
+    ms.uniqueUsers > 0 && ms.totalPredictions != null
+      ? Math.round((ms.totalPredictions / ms.uniqueUsers) * 100) / 100
+      : 0;
 
   const DetailRow = ({ label, value, valueHighlight }) => (
     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2 }}>
@@ -270,18 +393,6 @@ const PredictionDetailsPage = () => {
     if (s === 'published' || s === 'predictionopen' || s === 'predictionlock') return 'Not Started';
     return 'Not Started';
   })();
-  const statusChipColor = (() => {
-    switch (matchStatusDisplay) {
-      case 'Live': return { bgcolor: `${colors.brandRed}18`, color: colors.brandRed, border: `1px solid ${colors.brandRed}40` };
-      case 'HT': return { bgcolor: `${colors.brandRed}12`, color: colors.brandDarkRed, border: `1px solid ${colors.brandRed}30` };
-      case 'Full Time': return { bgcolor: `${colors.success}18`, color: colors.success, border: `1px solid ${colors.success}40` };
-      case 'Result Pending': return { bgcolor: '#FFF3E0', color: '#E65100', border: '1px solid #FFE0B2' };
-      case 'Results Processing': return { bgcolor: '#E3F2FD', color: '#1565C0', border: '1px solid #BBDEFB' };
-      case 'Pending': return { bgcolor: '#F3E5F5', color: '#7B1FA2', border: '1px solid #E1BEE7' };
-      case 'Scheduled': return { bgcolor: '#F0F4F8', color: '#475569', border: '1px solid #E2E8F0' };
-      default: return { bgcolor: '#F8FAFC', color: '#64748B', border: '1px solid #E2E8F0' };
-    }
-  })();
   const isLiveOrHT = matchStatusDisplay === 'Live' || matchStatusDisplay === 'HT';
   const liveElapsedMins = isLiveOrHT && groupData.kickoffTime
     ? Math.max(0, Math.floor((Date.now() - new Date(groupData.kickoffTime).getTime()) / 60000))
@@ -299,60 +410,145 @@ const PredictionDetailsPage = () => {
     if (m > 0) return `Starts in ${m}m`;
     return 'Starts soon';
   })();
-  const kickoffFormatted = groupData.kickoffTime && !isNaN(new Date(groupData.kickoffTime).getTime())
-    ? format(new Date(groupData.kickoffTime), 'EEE, d MMM yyyy • HH:mm')
-    : null;
   const venueDisplay = groupData.venue && String(groupData.venue).trim() ? groupData.venue : 'Stadium TBD';
   const roundLabel = (groupData.round && String(groupData.round).trim()) || (groupData.matchday ? `Matchday ${groupData.matchday}` : null) || (groupData.cmdName && String(groupData.cmdName).trim()) || null;
-  const leagueDisplay = (groupData.league || 'League').replace(/\s*\(API\s+\d+\)\s*$/i, '').trim() || groupData.league || 'League';
+  const leagueDisplay = (() => {
+    const raw = groupData.league || 'League';
+    const s = String(raw).replace(/\s*\(API\s+\d+\)\s*/gi, '').trim();
+    return s || raw;
+  })();
 
-  const LOGO_SIZE = 64;
-  const TeamBlock = ({ teamId, name, logoUrl, side }) => {
-    const logoEl = (
+  const kickoffFormatted =
+    groupData.kickoffTime && !Number.isNaN(new Date(groupData.kickoffTime).getTime())
+      ? format(new Date(groupData.kickoffTime), 'EEE, d MMM yyyy • HH:mm')
+      : null;
+  const MATCH_LOGO = 52;
+  const homeScoreNum =
+    groupData.homeScore != null && groupData.homeScore !== ''
+      ? groupData.homeScore
+      : groupData.actualResult && /^\d+-\d+$/.test(String(groupData.actualResult).replace(/\s/g, ''))
+        ? String(groupData.actualResult).replace(/\s/g, '').split('-')[0]
+        : null;
+  const awayScoreNum =
+    groupData.awayScore != null && groupData.awayScore !== ''
+      ? groupData.awayScore
+      : groupData.actualResult && /^\d+-\d+$/.test(String(groupData.actualResult).replace(/\s/g, ''))
+        ? String(groupData.actualResult).replace(/\s/g, '').split('-')[1]
+        : null;
+
+  const formatTimelineLine = (ev) => {
+    const min = ev.minute != null && String(ev.minute) !== '' ? `${ev.minute}'` : '';
+    const title = ev.event || ev.type || 'Event';
+    const det = ev.detail ? ` — ${ev.detail}` : '';
+    return `${min} ${title}${det}`.trim();
+  };
+
+  const timelineGoals = (groupData.timeline || []).filter((ev) => {
+    const t = String(ev.type || '').toLowerCase();
+    const e = String(ev.event || '').toLowerCase();
+    return t === 'goal' || e.includes('goal');
+  });
+  const timelineCards = (groupData.timeline || []).filter((ev) => {
+    const t = String(ev.type || '').toLowerCase();
+    const e = String(ev.event || '').toLowerCase();
+    return t.includes('card') || e.includes('card') || e.includes('red card') || e.includes('yellow card');
+  });
+  const hasPartitionedScorers =
+    Array.isArray(groupData.homeGoalScorers) && Array.isArray(groupData.awayGoalScorers);
+  const anyApiScorerRow =
+    hasPartitionedScorers &&
+    (groupData.homeGoalScorers.length > 0 || groupData.awayGoalScorers.length > 0);
+  const awayLeading =
+    homeScoreNum != null &&
+    awayScoreNum != null &&
+    Number(awayScoreNum) > Number(homeScoreNum);
+  let homeScorerLines = hasPartitionedScorers ? scorerLinesFromEntries(groupData.homeGoalScorers) : [];
+  let awayScorerLines = hasPartitionedScorers ? scorerLinesFromEntries(groupData.awayGoalScorers) : [];
+  if (!anyApiScorerRow && timelineGoals.length > 0) {
+    const tls = timelineGoals.map((ev) => formatTimelineLine(ev));
+    if (awayLeading) {
+      awayScorerLines = tls;
+      homeScorerLines = [];
+    } else {
+      homeScorerLines = tls;
+      awayScorerLines = [];
+    }
+  }
+  const showScoreDetailSection =
+    anyApiScorerRow ||
+    (!anyApiScorerRow && timelineGoals.length > 0) ||
+    timelineCards.length > 0 ||
+    isLiveOrHT ||
+    matchStatusDisplay === 'Full Time';
+  const liveScoreHeading = isLiveOrHT
+    ? 'LIVE SCORE · Updates every 15s'
+    : matchStatusDisplay === 'Full Time'
+      ? 'MATCH SCORE · Final'
+      : 'SCORE DETAIL';
+
+  /** align: start = flush left (home), end = flush right (away), center */
+  const MatchTeamStack = ({ teamId, name, logoUrl, side, align = 'center' }) => {
+    const colAlign = align === 'start' ? 'flex-start' : align === 'end' ? 'flex-end' : 'center';
+    const textAlign = align === 'start' ? 'left' : align === 'end' ? 'right' : 'center';
+    const inner = (
       <Box
         sx={{
-          width: LOGO_SIZE,
-          height: LOGO_SIZE,
-          borderRadius: '50%',
-          bgcolor: '#fff',
-          border: '1px solid #eee',
-          boxSizing: 'border-box',
-          margin: '0 auto 10px',
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          overflow: 'hidden',
-          flexShrink: 0,
+          flexDirection: 'column',
+          alignItems: colAlign,
+          textAlign,
+          minWidth: 0,
+          maxWidth: { xs: 140, sm: 180 },
+          cursor: teamId ? 'pointer' : 'default',
+          borderRadius: 2,
+          py: 0.5,
+          px: 0.5,
+          '&:hover': teamId ? { bgcolor: 'rgba(0,0,0,0.04)' } : {},
         }}
       >
-        {logoUrl ? (
-          <Box component="img" src={logoUrl} alt="" sx={{ width: LOGO_SIZE - 16, height: LOGO_SIZE - 16, objectFit: 'contain', display: 'block' }} />
-        ) : (
-          <SportsSoccer sx={{ fontSize: 28, color: colors.brandBlack }} />
-        )}
-      </Box>
-    );
-    const nameEl = <Typography variant="subtitle1" sx={{ fontWeight: 600, color: colors.brandBlack }}>{name || 'TBD'}</Typography>;
-    const sideEl = <Typography variant="caption" sx={{ color: 'text.secondary' }}>{side}</Typography>;
-    const block = (
-      <Box sx={{ textAlign: 'center', padding: '16px 8px' }}>
-        {logoEl}
-        {nameEl}
-        {sideEl}
+        <Box
+          sx={{
+            width: MATCH_LOGO,
+            height: MATCH_LOGO,
+            borderRadius: '50%',
+            bgcolor: '#fff',
+            border: '1px solid #E8E8E8',
+            boxSizing: 'border-box',
+            marginBottom: '8px',
+            flexShrink: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            overflow: 'hidden',
+          }}
+        >
+          {logoUrl ? (
+            <Box component="img" src={logoUrl} alt="" sx={{ width: MATCH_LOGO - 14, height: MATCH_LOGO - 14, objectFit: 'contain', display: 'block' }} />
+          ) : (
+            <SportsSoccer sx={{ fontSize: 26, color: colors.brandBlack }} />
+          )}
+        </Box>
+        <Typography
+          variant="body2"
+          sx={{ fontWeight: 700, color: colors.brandBlack, lineHeight: 1.25, width: '100%' }}
+          noWrap
+          title={name || 'TBD'}
+        >
+          {name || 'TBD'}
+        </Typography>
+        <Typography variant="caption" sx={{ color: colors.textSecondary, fontWeight: 600, fontSize: 10, letterSpacing: '0.04em' }}>
+          {side}
+        </Typography>
       </Box>
     );
     if (teamId) {
       return (
         <Link to={`${constants.routes.apiSync}/team/${teamId}`} style={{ textDecoration: 'none', color: 'inherit' }} title="View squad (API Data & Sync)">
-          <Box sx={{ textAlign: 'center', padding: '16px 8px', borderRadius: 2, cursor: 'pointer', '&:hover': { bgcolor: 'rgba(0,0,0,0.04)' }, '&:hover img': { opacity: 0.9 } }}>
-            {logoEl}
-            {nameEl}
-            {sideEl}
-          </Box>
+          {inner}
         </Link>
       );
     }
-    return block;
+    return inner;
   };
 
   return (
@@ -365,88 +561,415 @@ const PredictionDetailsPage = () => {
         {location.state?.fromFixtureId ? 'Back to match users' : 'Back to predictions'}
       </Button>
 
-      {/* 1. Match Card - same layout as Fixture Details (league/round, team blocks, kickoff/venue panel) */}
-      <Card sx={{ mb: 3, borderRadius: '16px', border: `1px solid ${colors.divider}`, boxShadow: '0 4px 20px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
-        <CardContent sx={{ p: 3.5 }}>
-          {/* MLS row: league + round on left, status on right */}
-          <Box sx={{ pl: 2, borderLeft: `4px solid ${colors.brandRed}`, mb: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
-            <Box>
-              <Typography variant="overline" sx={{ color: colors.textSecondary, fontWeight: 700, letterSpacing: '0.06em', fontSize: 12 }}>
-                {leagueDisplay}{roundLabel ? ` · ${roundLabel}` : ''}
+      {/* 1. Match card — reference-style: league (accent) + round, status right; logo–score row; venue; events */}
+      <Card sx={{ mb: 3, borderRadius: '16px', border: `1px solid ${colors.divider}`, boxShadow: '0 4px 20px rgba(0,0,0,0.06)', overflow: 'hidden', bgcolor: '#fff' }}>
+        <CardContent sx={{ p: { xs: 2.5, sm: 3.5 } }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2, mb: 2 }}>
+            <Box sx={{ pl: 2, borderLeft: `4px solid ${colors.brandRed}`, minWidth: 0 }}>
+              <Typography sx={{ fontWeight: 800, fontSize: '0.8125rem', letterSpacing: '0.08em', color: colors.brandBlack }}>
+                {leagueDisplay.toUpperCase()}
+              </Typography>
+              {roundLabel ? (
+                <Typography variant="caption" sx={{ color: colors.textSecondary, display: 'block', mt: 0.35 }}>
+                  {roundLabel}
+                </Typography>
+              ) : null}
+              {kickoffFormatted ? (
+                <Typography variant="body2" sx={{ color: colors.textSecondary, mt: 1, display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                  <AccessTime sx={{ fontSize: 18, color: colors.brandRed }} />
+                  {kickoffFormatted}
+                </Typography>
+              ) : null}
+            </Box>
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0.75, flexShrink: 0 }}>
+              {matchStatusDisplay === 'Full Time' ? (
+                <Chip
+                  label="Full Time"
+                  size="small"
+                  sx={{ fontWeight: 700, bgcolor: `${colors.success}18`, color: colors.success, border: `1px solid ${colors.success}40` }}
+                />
+              ) : (
+                <Typography variant="body2" sx={{ color: colors.textSecondary, fontWeight: 600 }}>
+                  {matchStatusDisplay}
+                </Typography>
+              )}
+              <Typography variant="caption" sx={{ color: colors.textSecondary }}>
+                {groupData.totalPredictions || predictions.length} predictions
               </Typography>
             </Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Chip label={matchStatusDisplay} size="small" sx={{ fontWeight: 600, ...statusChipColor }} />
-              <Typography variant="body2" sx={{ color: colors.textSecondary }}>
-                • {groupData.totalPredictions || predictions.length} Predictions
-              </Typography>
-            </Box>
-          </Box>
-          <Box sx={{ mb: 2 }}>
-            {countdownToKickoffStr && (
-              <Typography variant="body2" sx={{ color: colors.brandRed, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
-                <AccessTime sx={{ fontSize: 18 }} />
-                {countdownToKickoffStr}
-              </Typography>
-            )}
-            {kickoffFormatted && (
-              <Typography variant="body2" sx={{ color: colors.textSecondary, display: 'flex', alignItems: 'center', gap: 1, mt: countdownToKickoffStr ? 0.5 : 0 }}>
-                <AccessTime sx={{ fontSize: 18, color: colors.brandRed }} />
-                {kickoffFormatted}
-              </Typography>
-            )}
           </Box>
 
+          {countdownToKickoffStr && (
+            <Typography variant="caption" sx={{ color: colors.brandRed, fontWeight: 600, display: 'block', mb: 1 }}>
+              {countdownToKickoffStr}
+            </Typography>
+          )}
           {liveElapsedMins != null && (
-            <Typography variant="h6" sx={{ textAlign: 'center', color: colors.brandRed, fontWeight: 700, mb: 1 }}>
-              {liveElapsedMins}'
+            <Typography variant="body2" sx={{ textAlign: 'center', color: colors.brandRed, fontWeight: 700, mb: 1 }}>
+              {liveElapsedMins}&apos;
             </Typography>
           )}
 
-          <Grid container alignItems="center" justifyContent="center" spacing={2} sx={{ mb: 2 }}>
-            <Grid item xs={5} sm={4} sx={{ textAlign: 'center' }}>
-              <TeamBlock teamId={groupData.homeTeamId} name={groupData.homeTeam} logoUrl={groupData.homeTeamLogo} side="Home" />
-            </Grid>
-            <Grid item xs={2} sm={4} sx={{ textAlign: 'center' }}>
-              <Typography variant="h4" sx={{ fontWeight: 700, color: colors.brandBlack }}>
-                {groupData.actualResult ? groupData.actualResult.replace('-', ' – ') : 'vs'}
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: { xs: 0.5, sm: 1 },
+              py: { xs: 1.5, sm: 2 },
+              width: '100%',
+              flexWrap: 'nowrap',
+            }}
+          >
+            <Box
+              sx={{
+                flex: '1 1 0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-start',
+                minWidth: 0,
+              }}
+            >
+              <MatchTeamStack
+                align="start"
+                teamId={groupData.homeTeamId}
+                name={groupData.homeTeam}
+                logoUrl={groupData.homeTeamLogo}
+                side="Home"
+              />
+            </Box>
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+                gap: { xs: 0.5, sm: 0.75 },
+                px: { xs: 0.25, sm: 0.5 },
+              }}
+            >
+              <Typography
+                sx={{
+                  fontSize: { xs: '1.75rem', sm: '2.5rem' },
+                  fontWeight: 800,
+                  color: colors.brandBlack,
+                  lineHeight: 1,
+                }}
+              >
+                {homeScoreNum != null ? homeScoreNum : '—'}
               </Typography>
-              <Typography variant="body2" sx={{ color: colors.textSecondary, mt: 0.5, fontWeight: 500 }}>
-                {venueDisplay}
+              <Typography sx={{ fontSize: { xs: '1.25rem', sm: '1.5rem' }, fontWeight: 600, color: colors.textSecondary }}>
+                –
               </Typography>
-            </Grid>
-            <Grid item xs={5} sm={4} sx={{ textAlign: 'center' }}>
-              <TeamBlock teamId={groupData.awayTeamId} name={groupData.awayTeam} logoUrl={groupData.awayTeamLogo} side="Away" />
-            </Grid>
-          </Grid>
+              <Typography
+                sx={{
+                  fontSize: { xs: '1.75rem', sm: '2.5rem' },
+                  fontWeight: 800,
+                  color: colors.brandBlack,
+                  lineHeight: 1,
+                }}
+              >
+                {awayScoreNum != null ? awayScoreNum : '—'}
+              </Typography>
+            </Box>
+            <Box
+              sx={{
+                flex: '1 1 0',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'flex-end',
+                minWidth: 0,
+              }}
+            >
+              <MatchTeamStack
+                align="end"
+                teamId={groupData.awayTeamId}
+                name={groupData.awayTeam}
+                logoUrl={groupData.awayTeamLogo}
+                side="Away"
+              />
+            </Box>
+          </Box>
 
-          <Divider sx={{ my: 2 }} />
+          <Typography
+            variant="body2"
+            sx={{ color: colors.textSecondary, textAlign: 'center', fontWeight: 500, mb: showScoreDetailSection ? 2 : 0 }}
+          >
+            {venueDisplay}
+          </Typography>
+
+          {showScoreDetailSection && (
+            <Box sx={{ pt: 2, borderTop: `1px solid ${colors.divider}` }}>
+              <Typography
+                variant="caption"
+                sx={{
+                  color: colors.textSecondary,
+                  fontWeight: 700,
+                  letterSpacing: '0.06em',
+                  display: 'block',
+                  mb: 2,
+                }}
+              >
+                {liveScoreHeading}
+              </Typography>
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: { xs: '1fr', sm: 'minmax(0, 1fr) auto minmax(0, 1fr)' },
+                  columnGap: { xs: 2, sm: 3 },
+                  rowGap: { xs: 2, sm: 0 },
+                  alignItems: 'center',
+                  width: '100%',
+                }}
+              >
+                <Box
+                  sx={{
+                    gridColumn: { xs: '1', sm: '1' },
+                    gridRow: { xs: '1', sm: '1' },
+                    minWidth: 0,
+                    alignSelf: { xs: 'start', sm: 'center' },
+                  }}
+                >
+                  <Typography variant="body2" sx={{ fontWeight: 800, color: colors.brandBlack, textAlign: 'left' }}>
+                    {groupData.homeTeam}
+                  </Typography>
+                  <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 0.5, alignItems: 'flex-start' }}>
+                    {homeScorerLines.length === 0 ? (
+                      <Typography variant="body2" sx={{ color: colors.textSecondary }}>
+                        —
+                      </Typography>
+                    ) : (
+                      homeScorerLines.map((line, i) => (
+                        <Typography
+                          key={`hsl-${i}`}
+                          variant="body2"
+                          sx={{ color: colors.brandBlack, fontSize: 14, textAlign: 'left', lineHeight: 1.45 }}
+                        >
+                          {line}
+                        </Typography>
+                      ))
+                    )}
+                  </Box>
+                </Box>
+                <Box
+                  sx={{
+                    gridColumn: { xs: '1', sm: '2' },
+                    gridRow: { xs: '2', sm: '1' },
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    alignSelf: 'center',
+                  }}
+                >
+                  <SportsSoccer
+                    sx={{
+                      fontSize: 28,
+                      color: '#9E9E9E',
+                      opacity: homeScorerLines.length + awayScorerLines.length > 0 ? 1 : 0.45,
+                    }}
+                  />
+                </Box>
+                <Box
+                  sx={{
+                    gridColumn: { xs: '1', sm: '3' },
+                    gridRow: { xs: '3', sm: '1' },
+                    minWidth: 0,
+                    alignSelf: { xs: 'start', sm: 'center' },
+                  }}
+                >
+                  <Typography variant="body2" sx={{ fontWeight: 800, color: colors.brandBlack, textAlign: 'right', width: '100%' }}>
+                    {groupData.awayTeam}
+                  </Typography>
+                  <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 0.5, alignItems: 'flex-end', width: '100%' }}>
+                    {awayScorerLines.length === 0 ? (
+                      <Typography variant="body2" sx={{ color: colors.textSecondary, textAlign: 'right' }}>
+                        —
+                      </Typography>
+                    ) : (
+                      awayScorerLines.map((line, i) => (
+                        <Typography
+                          key={`asl-${i}`}
+                          variant="body2"
+                          sx={{ color: colors.brandBlack, fontSize: 14, textAlign: 'right', lineHeight: 1.45 }}
+                        >
+                          {line}
+                        </Typography>
+                      ))
+                    )}
+                  </Box>
+                </Box>
+              </Box>
+              {timelineCards.length > 0 && (
+                <Box sx={{ mt: 2, pt: 2, borderTop: `1px dashed ${colors.divider}` }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                    <Box component="span" sx={{ width: 11, height: 15, bgcolor: '#C62828', borderRadius: '2px' }} aria-hidden />
+                    <Typography variant="caption" sx={{ fontWeight: 700, color: colors.textSecondary }}>
+                      Cards
+                    </Typography>
+                  </Box>
+                  {timelineCards.map((ev, i) => (
+                    <Typography key={`card-${i}`} variant="body2" sx={{ color: colors.brandBlack, fontSize: 13 }}>
+                      {formatTimelineLine(ev)}
+                    </Typography>
+                  ))}
+                </Box>
+              )}
+            </Box>
+          )}
         </CardContent>
       </Card>
 
-      {groupData.timeline && groupData.timeline.length > 0 ? (
-        <Card sx={{ mb: 3, borderRadius: '16px', border: `1px solid ${colors.divider}`, boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
-          <CardContent sx={{ p: 3 }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 1.5, color: colors.brandBlack }}>
-              Score events
+      {/* Match-wide analytics — collapsible; same stat pills when expanded */}
+      <Card
+        sx={{
+          mb: 3,
+          borderRadius: '16px',
+          border: `1.5px solid ${colors.divider}26`,
+          boxShadow: `0 4px 12px ${colors.shadow}14`,
+          overflow: 'hidden',
+        }}
+      >
+        <Box
+          onClick={() => setMatchSummaryExpanded((o) => !o)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setMatchSummaryExpanded((o) => !o);
+            }
+          }}
+          role="button"
+          tabIndex={0}
+          aria-expanded={matchSummaryExpanded}
+          aria-controls="prediction-match-summary-panel"
+          sx={{
+            px: 2.5,
+            py: 2,
+            borderBottom: matchSummaryExpanded ? `1px solid ${colors.divider}` : 'none',
+            background: `linear-gradient(135deg, ${colors.brandRed}08 0%, transparent 100%)`,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            gap: 1,
+            '&:hover': { backgroundColor: `${colors.brandRed}0A` },
+          }}
+        >
+          <Box sx={{ minWidth: 0 }}>
+            <Typography variant="h6" sx={{ fontWeight: 800, color: colors.brandBlack }}>
+              Match summary
             </Typography>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
-              {groupData.timeline.map((ev, i) => (
-                <Typography key={i} variant="body2" sx={{ color: colors.brandBlack }}>
-                  <strong>{ev.minute != null && String(ev.minute) !== '' ? `${ev.minute}'` : '—'}</strong>
-                  {' '}
-                  {ev.event || ev.type || 'Event'}
-                  {ev.detail ? ` — ${ev.detail}` : ''}
-                </Typography>
-              ))}
-            </Box>
+            <Typography variant="body2" sx={{ color: colors.textSecondary, mt: 0.5 }}>
+              All predictors on this fixture — same metric style as predictions overview
+            </Typography>
+            {(leagueDisplay || roundLabel) && (
+              <Typography variant="body2" sx={{ color: colors.textSecondary, mt: 0.5, fontWeight: 600 }}>
+                {leagueDisplay}
+                {roundLabel ? ` · ${roundLabel}` : ''}
+              </Typography>
+            )}
+            <Typography variant="caption" sx={{ color: colors.textSecondary, display: 'block', mt: 0.75 }}>
+              {matchSummaryExpanded ? 'Click to collapse' : 'Click to expand match-wide stats'}
+            </Typography>
+          </Box>
+          <IconButton
+            size="small"
+            aria-label={matchSummaryExpanded ? 'Collapse match summary' : 'Expand match summary'}
+            onClick={(e) => {
+              e.stopPropagation();
+              setMatchSummaryExpanded((o) => !o);
+            }}
+            sx={{
+              color: colors.brandBlack,
+              transform: matchSummaryExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition: 'transform 0.2s ease',
+            }}
+          >
+            <ExpandMore />
+          </IconButton>
+        </Box>
+        <Collapse in={matchSummaryExpanded} id="prediction-match-summary-panel">
+          <CardContent sx={{ pt: 2.5, pb: 2, px: { xs: 2, sm: 3 } }}>
+            <Grid container spacing={2} sx={{ justifyContent: { sm: 'center' } }}>
+              <Grid item xs={6} sm={4} md={3} lg={2}>
+                {statMini('Unique users', ms.uniqueUsers ?? '—', 'predictors on this match')}
+              </Grid>
+              <Grid item xs={6} sm={4} md={3} lg={2}>
+                {statMini(
+                  'Participation rate',
+                  ms.participationRate != null ? `${ms.participationRate}%` : '—',
+                  ms.totalAppUsers != null ? `of ${ms.totalAppUsers} app users` : null,
+                )}
+              </Grid>
+              <Grid item xs={6} sm={4} md={3} lg={2}>
+                {statMini('Total predictions', ms.totalPredictions ?? '—', 'prediction rows on fixture')}
+              </Grid>
+              <Grid item xs={6} sm={4} md={3} lg={2}>
+                {statMini(
+                  'Fixture',
+                  `${(groupData.homeTeam || 'Home').slice(0, 18)}${String(groupData.homeTeam || '').length > 18 ? '…' : ''} vs ${(groupData.awayTeam || 'Away').slice(0, 18)}${String(groupData.awayTeam || '').length > 18 ? '…' : ''}`,
+                  leagueDisplay + (roundLabel ? ` · ${roundLabel}` : ''),
+                )}
+              </Grid>
+              <Grid item xs={6} sm={4} md={3} lg={2}>
+                {statMini(
+                  'Doc. correct %',
+                  ms.docAccuracyPct != null ? `${ms.docAccuracyPct}%` : '—',
+                  'correct / all rows',
+                )}
+              </Grid>
+              <Grid item xs={6} sm={4} md={3} lg={2}>
+                {statMini('Avg pred. / user', avgPredPerUser || 0, 'rows per predictor')}
+              </Grid>
+              <Grid item xs={6} sm={4} md={3} lg={2}>
+                {statMini('Total SP won', ms.totalSPWon ?? totalSP, 'all users combined')}
+              </Grid>
+              <Grid item xs={6} sm={4} md={3} lg={2}>
+                {statMini('Correct rows', ms.correctPredictions ?? '—', 'status correct')}
+              </Grid>
+              <Grid item xs={6} sm={4} md={3} lg={2}>
+                {statMini('Incorrect rows', ms.incorrectPredictions ?? '—', 'status incorrect')}
+              </Grid>
+              <Grid item xs={6} sm={4} md={3} lg={2}>
+                {statMini('Partial rows', ms.partialPredictions ?? '—', 'status partial')}
+              </Grid>
+              <Grid item xs={6} sm={4} md={3} lg={2}>
+                {statMini('Avg SP / user', ms.avgSpPerPredictor ?? '—', 'mean over predictors')}
+              </Grid>
+              <Grid item xs={6} sm={4} md={3} lg={2}>
+                {statTopUserMatch(ms)}
+              </Grid>
+            </Grid>
           </CardContent>
-        </Card>
-      ) : (
-        <Typography variant="body2" sx={{ mb: 3, color: colors.textSecondary, fontStyle: 'italic' }}>
-          No score events stored for this match yet. They are loaded from the data feed when available (not hardcoded).
-        </Typography>
-      )}
+        </Collapse>
+        <CardContent sx={{ pt: 2.5, pb: 3, px: { xs: 2, sm: 3 } }}>
+          <Divider sx={{ mb: 2.5 }} />
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, color: colors.brandRed, mb: 1.5 }}>
+            This prediction (viewed user)
+          </Typography>
+          <Grid container spacing={2} sx={{ justifyContent: { sm: 'center' } }}>
+            <Grid item xs={6} sm={4} md={3}>
+              {statMini('Slots submitted', groupData.userTotalPredictions ?? '—', 'this user × match')}
+            </Grid>
+            <Grid item xs={6} sm={4} md={3}>
+              {statMini(
+                'Accuracy %',
+                groupData.userAccuracy != null && groupData.userAccuracy !== '' ? `${groupData.userAccuracy}%` : '—',
+                'evaluated slots',
+              )}
+            </Grid>
+            <Grid item xs={6} sm={4} md={3}>
+              {statMini('SP won', predictions[0]?.spAwarded ?? 0, 'this user on match')}
+            </Grid>
+            <Grid item xs={6} sm={4} md={3}>
+              {statMini(
+                'Match status',
+                groupData.userMatchStatusLabel || '—',
+                'user × match rollup',
+              )}
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
 
       {/* 2. User / Predictor – clean card with border, shadow, hierarchy */}
       <Card sx={{ mb: 3, borderRadius: '16px', border: `1px solid ${colors.divider}`, boxShadow: '0 4px 20px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
@@ -623,41 +1146,6 @@ const PredictionDetailsPage = () => {
           </CardContent>
         </Card>
       ))}
-
-      {/* 4. Overall Match Total for SP - card with border/shadow and green accent */}
-      <Card sx={{ mb: 3, borderRadius: '16px', border: `1px solid ${colors.divider}`, borderLeft: `4px solid ${colors.success}`, boxShadow: '0 2px 12px rgba(0,0,0,0.06)', bgcolor: `${colors.success}08` }}>
-        <CardContent sx={{ p: 3 }}>
-          <Grid container spacing={3} alignItems="center">
-            <Grid item xs={12} md={8}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                <EmojiEvents sx={{ fontSize: 32, color: colors.success }} />
-                <Box>
-                  <Typography variant="body2" sx={{ color: colors.textSecondary, mb: 0.5 }}>
-                    Total SP Won for This Match
-                  </Typography>
-                  <Typography variant="h4" sx={{ fontWeight: 700, color: colors.success }}>
-                    {totalSP} SP
-                  </Typography>
-                </Box>
-              </Box>
-            </Grid>
-            <Grid item xs={12} md={4} sx={{ textAlign: { xs: 'left', md: 'right' } }}>
-              <Typography variant="body2" sx={{ color: colors.textSecondary, mb: 0.5 }}>
-                From {predictions.length} Predictions
-              </Typography>
-              <Chip
-                icon={<Star sx={{ fontSize: 16 }} />}
-                label={`${predictions.filter(p => p.correctness === 'won').length} Correct`}
-                sx={{
-                  bgcolor: colors.success,
-                  color: colors.brandWhite,
-                  fontWeight: 700,
-                }}
-              />
-            </Grid>
-          </Grid>
-        </CardContent>
-      </Card>
 
       {/* Immutable Record Notice */}
       <Alert

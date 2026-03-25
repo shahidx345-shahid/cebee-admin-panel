@@ -10,14 +10,337 @@ import {
   Chip,
   CircularProgress,
   Alert,
+  Collapse,
+  IconButton,
 } from '@mui/material';
-import { ArrowBack, Star, SportsSoccer, Whatshot, EmojiEvents, KeyboardArrowRight } from '@mui/icons-material';
+import {
+  ArrowBack,
+  Star,
+  SportsSoccer,
+  Whatshot,
+  EmojiEvents,
+  KeyboardArrowRight,
+  ExpandMore,
+} from '@mui/icons-material';
+import { format } from 'date-fns';
 import { colors, constants } from '../config/theme';
 import { getCmdBreakdown } from '../services/predictionsAdminAnalyticsService';
 
+const LIST_LOGO = 44;
+/** Centered match row — larger than list avatars so teams + score read first */
+const CENTER_LOGO = 72;
+
+/** Strip trailing or embedded " (API 307)" from stored league strings */
+function stripApiLeagueSuffix(name) {
+  if (name == null || typeof name !== 'string') return name;
+  const s = name.replace(/\s*\(API\s+\d+\)\s*/gi, '').trim();
+  return s || name;
+}
+
+function matchMetaRoundLabel(m) {
+  if (m.round != null && String(m.round).trim()) return String(m.round).trim();
+  if (m.matchday != null && String(m.matchday).trim() !== '') return `Matchday ${m.matchday}`;
+  return '';
+}
+
+function breakdownStatusLabel(matchStatus, status) {
+  const s = String(matchStatus || status || '').toLowerCase();
+  if (s === 'completed') return 'FT';
+  if (s === 'live') return 'Live';
+  if (s === 'halftime') return 'HT';
+  return 'NS';
+}
+
+function statusChipSx(label) {
+  if (label === 'FT') return { backgroundColor: '#E8F5E9', color: '#2E7D32' };
+  if (label === 'Live' || label === 'HT') return { backgroundColor: `${colors.brandRed}14`, color: colors.brandRed };
+  return { backgroundColor: '#F5F5F5', color: colors.textSecondary };
+}
+
+/** Same grid cell pattern as Prediction Details → Match summary */
+const statMini = (label, value, sub) => (
+  <Box sx={{ minWidth: 0 }}>
+    <Typography
+      variant="body2"
+      sx={{ color: colors.textSecondary, fontWeight: 700, fontSize: 12, display: 'block', mb: 0.25, lineHeight: 1.3 }}
+    >
+      {label}
+    </Typography>
+    <Box
+      sx={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        px: 1,
+        py: 0.5,
+        borderRadius: '8px',
+        backgroundColor: '#FFE5E5',
+        color: colors.brandRed,
+        fontWeight: 700,
+        fontSize: 14,
+        maxWidth: '100%',
+      }}
+      component="span"
+    >
+      <Typography component="span" variant="body2" sx={{ fontWeight: 800, fontSize: 14, color: colors.brandRed, wordBreak: 'break-word' }}>
+        {value}
+      </Typography>
+    </Box>
+    {sub != null && sub !== '' && (
+      <Typography variant="body2" sx={{ color: colors.textSecondary, fontWeight: 500, fontSize: 12, display: 'block', mt: 0.25, lineHeight: 1.3 }}>
+        {sub}
+      </Typography>
+    )}
+  </Box>
+);
+
+const statTopUserMatch = (ms) => {
+  const sp = ms?.topUserHighestSP ?? 0;
+  const sub = 'Most SP earned by one user on this match';
+  if (sp <= 0) return statMini('Top user', '—', sub);
+  const handle =
+    ms?.topUserUsername && String(ms.topUserUsername).trim() && ms.topUserUsername !== '—'
+      ? String(ms.topUserUsername).trim()
+      : null;
+  const name =
+    ms?.topUserFullName && String(ms.topUserFullName).trim() && ms.topUserFullName !== '—'
+      ? String(ms.topUserFullName).trim()
+      : null;
+  const who = handle || name || 'User';
+  return statMini('Top user', `${who} — ${sp} SP`, sub);
+};
+
+const TeamLogo = ({ url, size = LIST_LOGO, prominent = false }) => {
+  const inner = Math.max(16, size - (prominent ? 14 : 16));
+  return (
+    <Box
+      sx={{
+        width: size,
+        height: size,
+        borderRadius: '50%',
+        bgcolor: '#fff',
+        border: prominent ? '2px solid #E8E8E8' : '1px solid #EEEEEE',
+        boxSizing: 'border-box',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'hidden',
+        flexShrink: 0,
+        boxShadow: prominent ? '0 6px 20px rgba(0,0,0,0.1)' : '0 1px 4px rgba(0,0,0,0.06)',
+        mx: 'auto',
+      }}
+    >
+      {url ? (
+        <Box component="img" src={url} alt="" sx={{ width: inner, height: inner, objectFit: 'contain', display: 'block' }} />
+      ) : (
+        <SportsSoccer sx={{ fontSize: Math.round(size * 0.42), color: '#BDBDBD' }} />
+      )}
+    </Box>
+  );
+};
+
+const MatchRowCard = ({ m, onOpen, isLast }) => {
+  const [expanded, setExpanded] = useState(false);
+  const kickoffDate = m.kickoffTime ? new Date(m.kickoffTime) : null;
+  const kickoffStr =
+    kickoffDate && !Number.isNaN(kickoffDate.getTime()) ? format(kickoffDate, 'EEE d MMM • HH:mm') : '—';
+  const statusLbl = breakdownStatusLabel(m.matchStatus, m.status);
+  const mid = m.homeScore != null && m.awayScore != null ? `${m.homeScore} – ${m.awayScore}` : 'vs';
+  const leagueLine = m.league ? stripApiLeagueSuffix(m.league) : '';
+  const roundLine = matchMetaRoundLabel(m);
+
+  const openDetail = () => onOpen(m.fixtureId);
+
+  const topUserMs = {
+    topUserHighestSP: m.topUserHighestSP,
+    topUserUsername: m.topUserUsername,
+    topUserFullName: m.topUserFullName,
+  };
+
+  const toggleExpand = () => setExpanded((v) => !v);
+
+  return (
+    <Box
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        px: 2.5,
+        py: 2,
+        borderBottom: isLast ? 'none' : `1px solid ${colors.divider}`,
+        transition: 'background-color 0.2s ease',
+        bgcolor: '#fff',
+      }}
+    >
+      <Box
+        onClick={toggleExpand}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            toggleExpand();
+          }
+        }}
+        role="button"
+        tabIndex={0}
+        aria-expanded={expanded}
+        aria-label={expanded ? 'Collapse match card' : 'Expand match card'}
+        sx={{
+          cursor: 'pointer',
+          borderRadius: 1,
+          outline: 'none',
+          '&:hover': { backgroundColor: '#FAFAFA' },
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          gap: 1,
+          pb: 1,
+        }}
+      >
+        <Typography
+          variant="body2"
+          sx={{
+            color: colors.brandBlack,
+            fontSize: { xs: 14, sm: 15 },
+            fontWeight: 700,
+            letterSpacing: '0.01em',
+            lineHeight: 1.35,
+            pr: 1,
+            flex: 1,
+            minWidth: 0,
+          }}
+        >
+          {kickoffStr}
+          {leagueLine ? ` · ${leagueLine}` : ''}
+          {roundLine ? ` · ${roundLine}` : ''}
+        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0 }}>
+          <Chip
+            label={statusLbl}
+            size="small"
+            sx={{ fontWeight: 800, fontSize: 13, height: 30, px: 0.75, ...statusChipSx(statusLbl) }}
+          />
+          <ExpandMore
+            sx={{
+              color: colors.textSecondary,
+              fontSize: 28,
+              transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition: 'transform 0.2s ease',
+            }}
+          />
+          <IconButton
+            size="small"
+            aria-label="Open match users"
+            onClick={(e) => {
+              e.stopPropagation();
+              openDetail();
+            }}
+            sx={{ color: colors.textSecondary }}
+          >
+            <KeyboardArrowRight sx={{ fontSize: 26 }} />
+          </IconButton>
+        </Box>
+      </Box>
+      <Grid container alignItems="center" justifyContent="center" spacing={{ xs: 2, sm: 3 }} sx={{ py: 1.5 }}>
+        <Grid item xs={5} sm={4} sx={{ textAlign: 'center' }}>
+          <Box sx={{ py: 0.5 }}>
+            <TeamLogo url={m.homeTeamLogo} size={CENTER_LOGO} prominent />
+            <Typography
+              sx={{
+                fontWeight: 800,
+                color: colors.brandBlack,
+                mt: 1.25,
+                px: { xs: 0.5, sm: 1 },
+                fontSize: { xs: '0.95rem', sm: '1.05rem' },
+                lineHeight: 1.25,
+                letterSpacing: '-0.02em',
+              }}
+            >
+              {m.homeTeam || 'TBD'}
+            </Typography>
+            <Typography variant="caption" sx={{ color: colors.textSecondary, display: 'block', mt: 0.35, fontSize: 11, fontWeight: 600 }}>
+              Home
+            </Typography>
+          </Box>
+        </Grid>
+        <Grid item xs={2} sm={4} sx={{ textAlign: 'center' }}>
+          <Typography
+            variant="h4"
+            sx={{
+              fontWeight: 800,
+              color: colors.brandBlack,
+              letterSpacing: '-0.03em',
+              fontSize: { xs: '1.5rem', sm: '1.85rem' },
+              lineHeight: 1.1,
+            }}
+          >
+            {mid}
+          </Typography>
+        </Grid>
+        <Grid item xs={5} sm={4} sx={{ textAlign: 'center' }}>
+          <Box sx={{ py: 0.5 }}>
+            <TeamLogo url={m.awayTeamLogo} size={CENTER_LOGO} prominent />
+            <Typography
+              sx={{
+                fontWeight: 800,
+                color: colors.brandBlack,
+                mt: 1.25,
+                px: { xs: 0.5, sm: 1 },
+                fontSize: { xs: '0.95rem', sm: '1.05rem' },
+                lineHeight: 1.25,
+                letterSpacing: '-0.02em',
+              }}
+            >
+              {m.awayTeam || 'TBD'}
+            </Typography>
+            <Typography variant="caption" sx={{ color: colors.textSecondary, display: 'block', mt: 0.35, fontSize: 11, fontWeight: 600 }}>
+              Away
+            </Typography>
+          </Box>
+        </Grid>
+      </Grid>
+      <Collapse in={expanded} timeout="auto" unmountOnExit>
+        <Box
+          sx={{
+            pt: 0.5,
+            pb: 1.5,
+            display: 'grid',
+            gap: 2,
+            width: '100%',
+            gridTemplateColumns: {
+              xs: 'repeat(2, minmax(0, 1fr))',
+              sm: 'repeat(3, minmax(0, 1fr))',
+              md: 'repeat(3, minmax(0, 1fr))',
+              lg: 'repeat(6, minmax(0, 1fr))',
+            },
+            alignItems: 'start',
+          }}
+        >
+          {statMini('Unique users', m.totalUsers ?? '—', 'Users who predicted this match')}
+          {statMini(
+            'Participation rate',
+            m.participationRate != null ? `${m.participationRate}%` : '—',
+            m.totalAppUsers != null ? `Of ${m.totalAppUsers} app users` : null,
+          )}
+          {statMini('Total predictions', m.totalPredictions ?? '—', 'Prediction rows on this fixture')}
+          {statMini(
+            'Row correct %',
+            m.docAccuracyPct != null ? `${m.docAccuracyPct}%` : '—',
+            'Correct rows / all rows',
+          )}
+          {statMini('Avg pred. / user', m.avgPredPerUser != null ? m.avgPredPerUser : '—', 'Rows per predicting user')}
+          {statMini('Total SP won', m.totalSPWon ?? '—', 'All predictors combined')}
+          {statMini('Correct rows', m.correctPredictionDocs ?? '—', 'Marked correct')}
+          {statMini('Incorrect rows', m.incorrectPredictionDocs ?? '—', 'Marked incorrect')}
+          {statMini('Partial rows', m.partialPredictionDocs ?? '—', 'Marked partial')}
+          {statMini('Avg SP / user', m.avgSpPerPredictor != null ? m.avgSpPerPredictor : '—', 'Mean SP per predicting user')}
+          {statTopUserMatch(topUserMs)}
+        </Box>
+      </Collapse>
+    </Box>
+  );
+};
+
 const Stat = ({ label, v }) => (
   <Box sx={{ minWidth: 0 }}>
-    <Typography variant="caption" sx={{ color: colors.textSecondary, fontWeight: 600, display: 'block', mb: 0.25 }}>
+    <Typography variant="body2" sx={{ color: colors.textSecondary, fontWeight: 700, fontSize: 12, display: 'block', mb: 0.25 }}>
       {label}
     </Typography>
     <Box
@@ -29,87 +352,13 @@ const Stat = ({ label, v }) => (
         borderRadius: '8px',
         backgroundColor: '#FFE5E5',
         color: colors.brandRed,
-        fontWeight: 700,
-        fontSize: 13,
+        fontWeight: 800,
+        fontSize: 14,
       }}
     >
       {v}
     </Box>
   </Box>
-);
-
-const MatchRowCard = ({ m, onOpen }) => (
-  <Card
-    sx={{
-      width: '100%',
-      borderRadius: '16px',
-      border: `1px solid ${colors.divider}`,
-      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-      cursor: 'pointer',
-      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-      overflow: 'hidden',
-      display: 'flex',
-      flexDirection: { xs: 'column', sm: 'row' },
-      alignItems: { sm: 'stretch' },
-      '&:hover': {
-        boxShadow: `0 8px 20px ${colors.brandRed}2F`,
-        borderColor: colors.brandRed,
-        transform: { xs: 'none', sm: 'translateY(-1px)' },
-      },
-    }}
-    onClick={() => onOpen(m.fixtureId)}
-  >
-    <Box
-      sx={{
-        width: { xs: '100%', sm: 5 },
-        minHeight: { xs: 4, sm: '100%' },
-        flexShrink: 0,
-        background: `linear-gradient(180deg, ${colors.brandRed}, ${colors.brandDarkRed})`,
-      }}
-    />
-    <CardContent
-      sx={{
-        flex: 1,
-        py: 2,
-        px: { xs: 2, sm: 2.5, md: 3 },
-        '&:last-child': { pb: 2 },
-        display: 'flex',
-        flexDirection: { xs: 'column', lg: 'row' },
-        alignItems: { lg: 'center' },
-        gap: { xs: 2, lg: 2.5 },
-        minWidth: 0,
-      }}
-    >
-      <Box sx={{ flex: { lg: '0 0 260px' }, minWidth: 0 }}>
-        <Typography variant="subtitle1" sx={{ fontWeight: 800, color: colors.brandBlack, lineHeight: 1.35 }}>
-          {m.matchName}
-        </Typography>
-        <Typography variant="caption" sx={{ color: colors.textSecondary, mt: 0.5, display: 'block' }}>
-          Tap to open match users
-        </Typography>
-      </Box>
-      <Grid container spacing={1.25} sx={{ flex: 1, minWidth: 0 }}>
-        <Grid item xs={6} sm={4} md={3} lg={2}><Stat label="Users" v={m.totalUsers} /></Grid>
-        <Grid item xs={6} sm={4} md={3} lg={2}><Stat label="Predictions" v={m.totalPredictions} /></Grid>
-        <Grid item xs={6} sm={4} md={3} lg={2}><Stat label="Partic. %" v={`${m.participationRate}%`} /></Grid>
-        <Grid item xs={6} sm={4} md={3} lg={2}><Stat label="Accuracy %" v={`${m.predictionAccuracy}%`} /></Grid>
-        <Grid item xs={6} sm={4} md={3} lg={2}><Stat label="SP won" v={m.totalSPWon} /></Grid>
-        <Grid item xs={6} sm={4} md={3} lg={2}><Stat label="Perfect" v={m.totalPerfectCount} /></Grid>
-        <Grid item xs={6} sm={4} md={3} lg={2}><Stat label="Pred. won" v={m.totalPredictionsWon} /></Grid>
-        <Grid item xs={6} sm={4} md={3} lg={2}><Stat label="Pred. lost" v={m.totalPredictionsLost} /></Grid>
-        <Grid item xs={6} sm={4} md={3} lg={2}><Stat label="Completion %" v={`${m.completionRate}%`} /></Grid>
-      </Grid>
-      <KeyboardArrowRight
-        sx={{
-          color: colors.textSecondary,
-          fontSize: 28,
-          flexShrink: 0,
-          display: { xs: 'none', lg: 'block' },
-          alignSelf: 'center',
-        }}
-      />
-    </CardContent>
-  </Card>
 );
 
 const PredictionsCmdBreakdownPage = () => {
@@ -251,16 +500,37 @@ function Section({ title, titlePrefix = '', icon, matches, navigate }) {
   return (
     <Box sx={{ mb: 4, width: '100%' }}>
       <Typography
-        variant="subtitle2"
-        sx={{ fontWeight: 700, color: colors.brandRed, mb: 2, textTransform: 'none', display: 'flex', alignItems: 'center', gap: 1 }}
+        variant="subtitle1"
+        sx={{
+          fontWeight: 800,
+          fontSize: { xs: '1rem', sm: '1.05rem' },
+          color: colors.brandRed,
+          mb: 2,
+          textTransform: 'none',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1,
+        }}
       >
         <Box component="span" aria-hidden>{titlePrefix}</Box>
         {icon}
         {title}
       </Typography>
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, width: '100%' }}>
-        {matches.map((m) => (
-          <MatchRowCard key={m.fixtureId} m={m} onOpen={(fid) => navigate(`/predictions/match/${encodeURIComponent(fid)}/users`)} />
+      <Box
+        sx={{
+          borderRadius: '16px',
+          overflow: 'hidden',
+          boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+          border: `1px solid ${colors.divider}`,
+        }}
+      >
+        {matches.map((m, idx) => (
+          <MatchRowCard
+            key={m.fixtureId}
+            m={m}
+            isLast={idx === matches.length - 1}
+            onOpen={(fid) => navigate(`/predictions/match/${encodeURIComponent(fid)}/users`)}
+          />
         ))}
       </Box>
     </Box>
