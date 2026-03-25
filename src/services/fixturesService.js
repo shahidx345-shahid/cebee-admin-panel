@@ -250,7 +250,7 @@ export const getUpcomingFixturesByLeague = async (leagueId, season, options = {}
 
 /**
  * Create CeBee Featured fixture from one Football API fixture (teams, kickoff, venue from API).
- * @param {object} params - { apiFixtureId, leagueId, publishDateTime, venue? }
+ * @param {object} params - { apiFixtureId, leagueId, publishDateTime, kickoffTime?, venue?, featuredTeamSide }
  * @returns {Promise<{success: boolean, data?: object, error?: string, message?: string}>}
  */
 export const createFixtureFromApi = async (params) => {
@@ -273,6 +273,11 @@ export const createFixtureFromApi = async (params) => {
     }
     if (params.featuredTeamSide === 'A' || params.featuredTeamSide === 'B') {
       body.featuredTeamSide = params.featuredTeamSide;
+    }
+    if (params.kickoffTime) {
+      body.kickoffTime = params.kickoffTime instanceof Date
+        ? params.kickoffTime.toISOString()
+        : params.kickoffTime;
     }
     const response = await apiPost('/fixtures/from-api', body);
     if (response.success) {

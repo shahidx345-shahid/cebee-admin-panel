@@ -12,6 +12,8 @@ import TeamsPage from './pages/TeamsPage';
 import TeamHistoryPage from './pages/TeamHistoryPage';
 import PlayersPage from './pages/PlayersPage';
 import PredictionsPage from './pages/PredictionsPage';
+import PredictionsCmdBreakdownPage from './pages/PredictionsCmdBreakdownPage';
+import PredictionsMatchUsersPage from './pages/PredictionsMatchUsersPage';
 import LeaderboardPage from './pages/LeaderboardPage';
 import RewardsPage from './pages/RewardsPage';
 import NotificationsPage from './pages/NotificationsPage';
@@ -100,6 +102,8 @@ function App() {
                 <Route path="/teams/history/:teamId" element={<TeamHistoryPage />} />
                 <Route path="/teams/:teamId/players" element={<PlayersPage />} />
                 <Route path={constants.routes.predictions} element={<PredictionsPage />} />
+                <Route path="/predictions/cmd/:cmdId/breakdown" element={<PredictionsCmdBreakdownPage />} />
+                <Route path="/predictions/match/:fixtureId/users" element={<PredictionsMatchUsersPage />} />
                 <Route path="/predictions/details/:id" element={<PredictionDetailsPage />} />
                 <Route path={constants.routes.leaderboard} element={<LeaderboardPage />} />
                 <Route path="/leaderboard/details/:id" element={<LeaderboardDetailsPage />} />

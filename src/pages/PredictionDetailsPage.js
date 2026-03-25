@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams, Link } from 'react-router-dom';
+import { useNavigate, useParams, Link, useLocation } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -26,14 +26,16 @@ import {
 } from '@mui/icons-material';
 import { colors, constants } from '../config/theme';
 import { format } from 'date-fns';
-import { getPredictionGroup, formatPredictions, getPredictionById } from '../services/predictionsService';
+import { getPredictionById } from '../services/predictionsService';
 
 const PredictionDetailsPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { id } = useParams();
   const [loading, setLoading] = useState(true);
   const [groupData, setGroupData] = useState(null);
   const [predictions, setPredictions] = useState([]);
+  const [breakdownLines, setBreakdownLines] = useState([]);
   const [liveTick, setLiveTick] = useState(0);
   const [countdownTick, setCountdownTick] = useState(0);
 
@@ -78,6 +80,7 @@ const PredictionDetailsPage = () => {
           const fixture = apiData.fixture || {};
           const user = apiData.user || {};
           const matchSummary = apiData.matchSummary || {};
+          setBreakdownLines(Array.isArray(apiData.predictionBreakdown) ? apiData.predictionBreakdown : []);
           
           // Get actual result from fixture
           let actualResult = null;
@@ -125,17 +128,22 @@ const PredictionDetailsPage = () => {
             username: user.username || user.fullName || 'Unknown User',
             userEmail: user.email || '',
             userCountry: user.country || '',
-            userTotalPredictions: matchSummary.totalPredictions || 0,
-            userAccuracy: matchSummary.correctPredictions && matchSummary.totalPredictions
-              ? ((matchSummary.correctPredictions / matchSummary.totalPredictions) * 100).toFixed(1)
-              : 0,
+            userTotalPredictions: (matchSummary.userSubmittedSlots ?? matchSummary.totalPredictions) || 0,
+            userAccuracy:
+              matchSummary.userMatchAccuracy != null
+                ? String(matchSummary.userMatchAccuracy)
+                : matchSummary.correctPredictions && matchSummary.totalPredictions
+                  ? ((matchSummary.correctPredictions / matchSummary.totalPredictions) * 100).toFixed(1)
+                  : 0,
+            userMatchStatusLabel: matchSummary.userMatchStatus || null,
             matchId: fixture.matchId || fixture._id || '',
             matchName: fixture.matchName || `${fixture.homeTeam || 'TBD'} vs ${fixture.awayTeam || 'TBD'}`,
             homeTeam: fixture.homeTeam || 'TBD',
             awayTeam: fixture.awayTeam || 'TBD',
             fixtureId: fixture._id || '',
-            matchStatus: fixture.status || 'ongoing',
+            matchStatus: fixture.matchStatus || fixture.status || 'ongoing',
             actualResult: actualResult,
+            timeline: Array.isArray(fixture.timeline) ? fixture.timeline : [],
             totalPredictions: matchSummary.totalPredictions || 0,
             totalSPWon: matchSummary.totalSPWon || 0,
             isCommunityFeatured: fixture.isCommunityFeatured || false,
@@ -157,11 +165,13 @@ const PredictionDetailsPage = () => {
           console.error('Failed to load prediction details from API:', result.error);
           setGroupData(null);
           setPredictions([]);
+          setBreakdownLines([]);
         }
       } catch (error) {
         console.error('Error loading prediction details:', error);
         setGroupData(null);
         setPredictions([]);
+        setBreakdownLines([]);
       } finally {
         setLoading(false);
       }
@@ -198,6 +208,15 @@ const PredictionDetailsPage = () => {
     );
   };
 
+  const goBack = () => {
+    const fid = location.state?.fromFixtureId;
+    if (fid) {
+      navigate(`/predictions/match/${encodeURIComponent(fid)}/users`);
+      return;
+    }
+    navigate(constants.routes.predictions);
+  };
+
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
@@ -211,7 +230,7 @@ const PredictionDetailsPage = () => {
       <Box>
         <Button
           startIcon={<ArrowBack />}
-          onClick={() => navigate(constants.routes.predictions)}
+          onClick={goBack}
           sx={{
             mb: 3,
             color: colors.brandRed,
@@ -219,7 +238,7 @@ const PredictionDetailsPage = () => {
             fontWeight: 600,
           }}
         >
-          Back to Predictions
+          Back
         </Button>
         <Typography variant="h6" sx={{ color: colors.textSecondary }}>
           Prediction not found
@@ -340,10 +359,10 @@ const PredictionDetailsPage = () => {
     <Box sx={{ width: '100%', maxWidth: 900, pb: 4 }}>
       <Button
         startIcon={<ArrowBack />}
-        onClick={() => navigate(constants.routes.predictions)}
+        onClick={goBack}
         sx={{ mb: 2, color: colors.brandRed, textTransform: 'none', fontWeight: 600, '&:hover': { bgcolor: `${colors.brandRed}0A` } }}
       >
-        Back to Predictions
+        {location.state?.fromFixtureId ? 'Back to match users' : 'Back to predictions'}
       </Button>
 
       {/* 1. Match Card - same layout as Fixture Details (league/round, team blocks, kickoff/venue panel) */}
@@ -405,6 +424,30 @@ const PredictionDetailsPage = () => {
         </CardContent>
       </Card>
 
+      {groupData.timeline && groupData.timeline.length > 0 ? (
+        <Card sx={{ mb: 3, borderRadius: '16px', border: `1px solid ${colors.divider}`, boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
+          <CardContent sx={{ p: 3 }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 1.5, color: colors.brandBlack }}>
+              Score events
+            </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+              {groupData.timeline.map((ev, i) => (
+                <Typography key={i} variant="body2" sx={{ color: colors.brandBlack }}>
+                  <strong>{ev.minute != null && String(ev.minute) !== '' ? `${ev.minute}'` : '—'}</strong>
+                  {' '}
+                  {ev.event || ev.type || 'Event'}
+                  {ev.detail ? ` — ${ev.detail}` : ''}
+                </Typography>
+              ))}
+            </Box>
+          </CardContent>
+        </Card>
+      ) : (
+        <Typography variant="body2" sx={{ mb: 3, color: colors.textSecondary, fontStyle: 'italic' }}>
+          No score events stored for this match yet. They are loaded from the data feed when available (not hardcoded).
+        </Typography>
+      )}
+
       {/* 2. User / Predictor – clean card with border, shadow, hierarchy */}
       <Card sx={{ mb: 3, borderRadius: '16px', border: `1px solid ${colors.divider}`, boxShadow: '0 4px 20px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
         <CardContent sx={{ p: 3.5 }}>
@@ -437,23 +480,81 @@ const PredictionDetailsPage = () => {
                 )}
                 <Chip label={`${groupData.userTotalPredictions} Total Predictions`} size="small" sx={{ borderRadius: '10px', bgcolor: `${colors.brandRed}12`, color: colors.brandRed, fontWeight: 600, border: `1px solid ${colors.brandRed}30` }} />
                 <Chip label={`${groupData.userAccuracy}% Accuracy`} size="small" sx={{ borderRadius: '10px', bgcolor: `${colors.success}12`, color: colors.success, fontWeight: 600, border: `1px solid ${colors.success}30` }} />
+                {groupData.userMatchStatusLabel && (
+                  <Chip label={`Status: ${groupData.userMatchStatusLabel}`} size="small" sx={{ borderRadius: '10px', fontWeight: 700 }} />
+                )}
               </Box>
             </Box>
           </Box>
         </CardContent>
       </Card>
 
-      {/* 3. Prediction Breakdown – section header + rounded detail cards */}
+      {/* 3. Prediction breakdown — per CS / GR / FPS / FGM when API provides lines */}
       <Box sx={{ pl: 2, borderLeft: `4px solid ${colors.brandRed}`, mb: 2.5 }}>
         <Typography variant="h5" sx={{ fontWeight: 700, color: colors.brandBlack }}>
-          Prediction Breakdown
+          Prediction breakdown
         </Typography>
         <Typography variant="body2" sx={{ color: colors.textSecondary, mt: 0.25 }}>
-          {predictions.length} prediction{predictions.length !== 1 ? 's' : ''} for this match
+          {breakdownLines.length > 0
+            ? `${breakdownLines.length} line(s) — CS, GR, FPS, FGM`
+            : `${predictions.length} record(s) for this match`}
         </Typography>
       </Box>
 
-      {predictions.map((pred, index) => (
+      {breakdownLines.length > 0
+        ? breakdownLines.map((line, index) => {
+            const pred0 = predictions[0];
+            const fmt = (x) => {
+              try {
+                return x ? format(new Date(x), 'MMM dd, yyyy HH:mm') : '—';
+              } catch {
+                return '—';
+              }
+            };
+            return (
+              <Card key={`${line.type}-${index}`} sx={{ mb: 2.5, borderRadius: '16px', border: `1px solid ${colors.divider}`, boxShadow: '0 4px 16px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
+                <CardContent sx={{ p: 0 }}>
+                  <Box sx={{ px: 3, py: 2, borderBottom: `1px solid ${colors.divider}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1.5 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <Typography variant="h6" sx={{ fontWeight: 800, color: colors.brandBlack }}>
+                        {line.label}
+                      </Typography>
+                      <Chip label={line.type} size="small" sx={{ fontWeight: 800 }} />
+                    </Box>
+                    {pred0?.id && (
+                      <Chip
+                        label={`Prediction ID: ${pred0.id}`}
+                        size="small"
+                        sx={{ borderRadius: '8px', bgcolor: `${colors.brandRed}12`, color: colors.brandRed, fontWeight: 600 }}
+                      />
+                    )}
+                  </Box>
+                  <Box sx={{ p: 3 }}>
+                    <Box sx={{ p: 2.5, borderRadius: '12px', bgcolor: '#F8FAFC', border: '1px solid #E2E8F0', display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
+                      <DetailRow label="User prediction" value={line.userPrediction} valueHighlight />
+                      <DetailRow label="Actual result" value={line.actualResult} />
+                      <DetailRow label="Awarded" value={line.awarded} />
+                      <DetailRow label="Correctness" value={line.correctness} />
+                      <DetailRow label="Prediction created" value={fmt(line.createdAt)} />
+                      <DetailRow label="Last updated" value={fmt(line.updatedAt)} />
+                    </Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2, p: 2, borderRadius: '12px', bgcolor: `${colors.brandRed}0C`, border: `1px solid ${colors.brandRed}25` }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <Star sx={{ fontSize: 22, color: colors.brandRed }} />
+                        <Typography variant="body1" sx={{ color: colors.brandRed, fontWeight: 700 }}>
+                          SP (document total for this match)
+                        </Typography>
+                      </Box>
+                      <Typography variant="h6" sx={{ fontWeight: 800, color: colors.brandRed }}>
+                        SP: +{pred0?.spAwarded ?? 0}
+                      </Typography>
+                    </Box>
+                  </Box>
+                </CardContent>
+              </Card>
+            );
+          })
+        : predictions.map((pred, index) => (
         <Card key={pred.id} sx={{ mb: 2.5, borderRadius: '16px', border: `1px solid ${colors.divider}`, boxShadow: '0 4px 16px rgba(0,0,0,0.08)', overflow: 'hidden' }}>
           <CardContent sx={{ p: 0 }}>
             {/* Card header */}

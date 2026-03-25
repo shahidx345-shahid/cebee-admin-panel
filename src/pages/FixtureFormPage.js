@@ -905,6 +905,9 @@ const FixtureFormPage = () => {
           apiFixtureId: selectedApiFixture.apiFixtureId,
           leagueId: formData.leagueId,
           publishDateTime: formData.publishDateTime,
+          kickoffTime: formData.kickoffTime instanceof Date
+            ? formData.kickoffTime.toISOString()
+            : formData.kickoffTime,
           featuredTeamSide: cebeeFeaturedSide,
         };
         if (!selectedApiFixture.venue && formData.venue && String(formData.venue).trim()) {
