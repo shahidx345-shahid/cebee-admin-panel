@@ -40,7 +40,7 @@ import { colors, constants } from '../config/theme';
 import SearchBar from '../components/common/SearchBar';
 import DataTable from '../components/common/DataTable';
 import ReferralDetailsView from '../components/referrals/ReferralDetailsView';
-import { getReferrals, getReferralStatistics } from '../services/referralService';
+import { getReferrals, getReferralStatistics, getReferralDisplayConfig } from '../services/referralService';
 
 import { format } from 'date-fns';
 
@@ -63,6 +63,8 @@ const ReferralsPage = () => {
   const [selectedRowForAction, setSelectedRowForAction] = useState(null);
   const [timePeriod, setTimePeriod] = useState('monthly'); // 'allTime' or 'monthly' - Default changed to monthly
   const [timePeriodMenuAnchor, setTimePeriodMenuAnchor] = useState(null);
+  /** System CP per successful referral — from backend, read-only in UI */
+  const [cpPerReferralSystem, setCpPerReferralSystem] = useState(null);
 
   const handleActionMenuOpen = (event, row) => {
     setActionMenuAnchor(event.currentTarget);
@@ -83,6 +85,19 @@ const ReferralsPage = () => {
     loadReferrals();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, rowsPerPage, searchQuery, statusFilter, countryFilter, selectedSort, timePeriod]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const res = await getReferralDisplayConfig();
+      if (!cancelled && res.success && res.data && res.data.cpPerReferral != null) {
+        setCpPerReferralSystem(Number(res.data.cpPerReferral));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     filterAndSortReferrals();
@@ -522,7 +537,14 @@ const ReferralsPage = () => {
 
   if (selectedReferral) {
     const stats = getReferrerStats(selectedReferral.referrerId);
-    return <ReferralDetailsView referral={selectedReferral} onBack={() => setSelectedReferral(null)} referrerStats={stats} />;
+    return (
+      <ReferralDetailsView
+        referral={selectedReferral}
+        onBack={() => setSelectedReferral(null)}
+        referrerStats={stats}
+        cpPerReferralSystem={cpPerReferralSystem}
+      />
+    );
   }
 
   return (
@@ -552,10 +574,12 @@ const ReferralsPage = () => {
         </Box>
         <Box sx={{ flex: 1 }}>
           <Typography sx={{ fontWeight: 600, fontSize: 14, color: '#1976D2', mb: 0.5 }}>
-            View Only Mode (Phase 1)
+            Monitoring only (Phase 1)
           </Typography>
-          <Typography sx={{ fontSize: 13, color: '#1976D2', lineHeight: 1.5 }}>
-            CP values are system-defined. Engagement and Campaign CP sources are coming in Phase 2.
+          <Typography sx={{ fontSize: 13, color: '#1565C0', lineHeight: 1.55 }}>
+            Referral CP is calculated and granted by the backend when a signup completes. You use this page to review activity
+            and audit issued CP—not to change reward rules. Other CP sources (campaigns, engagement) are planned for later
+            phases.
           </Typography>
         </Box>
       </Box>
@@ -592,11 +616,43 @@ const ReferralsPage = () => {
           sx={{
             color: colors.textSecondary,
             fontSize: 13,
-            ml: 8,
+            ml: { xs: 0, sm: 8 },
           }}
         >
           Monitor referral activity and audit CP issued from referrals
         </Typography>
+        {cpPerReferralSystem != null && (
+          <Box
+            sx={{
+              ml: { xs: 0, sm: 8 },
+              mt: 2,
+              maxWidth: 560,
+              p: 2,
+              borderRadius: '12px',
+              bgcolor: '#F8FAFC',
+            }}
+          >
+            <Typography
+              variant="subtitle2"
+              sx={{ fontWeight: 800, fontSize: 12, letterSpacing: 0.4, color: colors.textSecondary, textTransform: 'uppercase', mb: 1 }}
+            >
+              CP per referral — how it works
+            </Typography>
+            <Typography sx={{ fontSize: 18, fontWeight: 800, color: colors.brandRed, mb: 1.5 }}>
+              {cpPerReferralSystem} CP
+              <Box component="span" sx={{ fontWeight: 600, fontSize: 14, color: colors.brandBlack, ml: 1 }}>
+                for each successful referral
+              </Box>
+            </Typography>
+            <Typography sx={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.7, m: 0 }}>
+              <Box component="span" sx={{ fontWeight: 700, color: colors.brandBlack }}>
+                Backend / system:
+              </Box>{' '}
+              Stores this amount in server config, awards it automatically when a referred user finishes signup, and records each
+              referral. Changing the number requires a code deploy—not this admin panel.
+            </Typography>
+          </Box>
+        )}
       </Box>
 
       {/* Time Period Filter */}

@@ -35,6 +35,12 @@ export const normalizeRewardListItem = (r, index = 0) => {
     consentOptIn: r.consentOptIn ?? r.consent_opt_in ?? r.consent ?? r.videoConsent ?? false,
     adminNotes: r.adminNotes ?? r.admin_notes ?? '',
     declineReason: r.declineReason ?? r.decline_reason ?? null,
+    rankLabel: r.rankLabel ?? null,
+    claimStatusLabel: r.claimStatusLabel ?? null,
+    fulfillmentStatusLabel: r.fulfillmentStatusLabel ?? null,
+    eligibilityStatus: r.eligibilityStatus ?? 'eligible',
+    eligibilityStatusLabel: r.eligibilityStatusLabel ?? (r.eligibilityStatus === 'disqualified' ? 'Disqualified' : 'Eligible'),
+    kycDisplayStatus: r.kycDisplayStatus ?? null,
   };
 };
 
@@ -66,6 +72,9 @@ export const getRewards = async (params = {}) => {
         backendParams[key] = v;
       }
     });
+    if (backendParams.month && !backendParams.rewardMonth) {
+      backendParams.rewardMonth = backendParams.month;
+    }
     if (backendParams.page !== undefined) {
       backendParams.page = backendParams.page + 1;
     }
@@ -194,15 +203,20 @@ export const updateRewardStatus = async (rewardId, status, declineReason = null,
  * @returns {Promise<{success: boolean, data?: object, error?: string, message?: string}>}
  */
 export const markRewardAsFulfilled = async (rewardId, options = {}) => {
+  const userType = options.userRewardType || options.adminFulfillmentMethod || 'Gift Card';
   const extra = {
     kycVerified: true,
     adminConfirmedKyc: true,
     adminConfirmedVideoConsent: true,
+    adminFulfillmentMethod: String(userType).trim(),
+    ...(options.fulfillmentReference != null &&
+      String(options.fulfillmentReference).trim() !== '' && {
+        fulfillmentReference: String(options.fulfillmentReference).trim(),
+      }),
     ...(options.giftCardCode != null && options.giftCardCode !== '' && {
       giftCardCode: String(options.giftCardCode).trim(),
       gift_card_code: String(options.giftCardCode).trim(),
     }),
-    // Send consent so backend can accept fulfillment when it requires "video consent status"
     ...(options.videoConsentStatus != null && options.videoConsentStatus !== '' && {
       videoConsentStatus: String(options.videoConsentStatus),
       video_consent_status: String(options.videoConsentStatus),
@@ -213,6 +227,21 @@ export const markRewardAsFulfilled = async (rewardId, options = {}) => {
     }),
   };
   return await updateRewardStatus(rewardId, 'fulfilled', null, extra);
+};
+
+/**
+ * Read-only monthly reward structure for admin UI (tier amounts, copy).
+ */
+export const getRewardDisplayConfig = async () => {
+  try {
+    const response = await apiGet('/rewards/admin/display-config');
+    if (response.success) {
+      return { success: true, data: response.data };
+    }
+    return { success: false, error: response.error, data: null };
+  } catch (error) {
+    return { success: false, error: error.message || 'Failed to load reward display config', data: null };
+  }
 };
 
 /**

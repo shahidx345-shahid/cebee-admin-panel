@@ -68,7 +68,7 @@ const DetailRow = ({ label, value, isLink, color }) => (
     </Box>
 );
 
-const ReferralDetailsView = ({ referral, onBack, referrerStats }) => {
+const ReferralDetailsView = ({ referral, onBack, referrerStats, cpPerReferralSystem }) => {
     if (!referral) return null;
 
     const date = referral.referralDate instanceof Date ? referral.referralDate : new Date(referral.referralDate);
@@ -181,6 +181,27 @@ const ReferralDetailsView = ({ referral, onBack, referrerStats }) => {
                     </Grid>
                 </Grid>
             </Card>
+
+            {cpPerReferralSystem != null && (
+                <Box
+                    sx={{
+                        mb: 3,
+                        p: 1.75,
+                        borderRadius: '10px',
+                        bgcolor: '#F8FAFC',
+                    }}
+                >
+                    <Typography sx={{ fontSize: 11, fontWeight: 800, letterSpacing: 0.3, color: colors.textSecondary, textTransform: 'uppercase', mb: 0.5 }}>
+                        System rule (not editable here)
+                    </Typography>
+                    <Typography sx={{ fontSize: 15, fontWeight: 800, color: colors.brandRed }}>
+                        {cpPerReferralSystem} CP per successful referral
+                    </Typography>
+                    <Typography sx={{ fontSize: 12, color: colors.textSecondary, mt: 0.5, lineHeight: 1.5 }}>
+                        Set on the server. CP shown above is what was recorded for this signup.
+                    </Typography>
+                </Box>
+            )}
 
             {/* Info Cards Row */}
             <Grid container spacing={3} sx={{ mb: 4 }}>

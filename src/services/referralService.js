@@ -6,6 +6,30 @@
 import { apiGet, apiPost, apiPut, apiPatch } from './apiBase';
 
 /**
+ * Read-only CP per successful referral (system value from backend).
+ */
+export const getReferralDisplayConfig = async () => {
+  try {
+    const response = await apiGet('/referrals/admin/display-config');
+    if (response.success && response.data) {
+      return { success: true, data: response.data };
+    }
+    return {
+      success: false,
+      error: response.error,
+      data: { cpPerReferral: null, readOnly: true },
+    };
+  } catch (error) {
+    console.error('Error fetching referral display config:', error);
+    return {
+      success: false,
+      error: error.message || 'Failed to fetch referral display config',
+      data: { cpPerReferral: null, readOnly: true },
+    };
+  }
+};
+
+/**
  * Get all referrals with filtering, search, sorting, and pagination
  * @param {object} params - Query parameters (page, limit, search, status, country, sort, month)
  * @returns {Promise<{success: boolean, data?: object, error?: string}>}

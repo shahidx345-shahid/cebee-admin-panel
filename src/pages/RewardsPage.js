@@ -14,6 +14,7 @@ import {
   IconButton,
   Menu,
   Avatar,
+  Tooltip,
 } from '@mui/material';
 import {
   Add,
@@ -46,7 +47,7 @@ import {
 import { colors, constants } from '../config/theme';
 import DataTable from '../components/common/DataTable';
 import { format } from 'date-fns';
-import { getRewards, getRewardStatistics } from '../services/rewardsService';
+import { getRewards, getRewardStatistics, getRewardDisplayConfig } from '../services/rewardsService';
 
 // Static rewards data
 
@@ -82,6 +83,7 @@ const RewardsPage = () => {
     processingCount: 0,
     totalPaid: 0,
   });
+  const [rewardDisplayConfig, setRewardDisplayConfig] = useState(null);
 
   // Reset page when filters change
   useEffect(() => {
@@ -93,6 +95,13 @@ const RewardsPage = () => {
     loadStatistics();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, rowsPerPage, searchQuery, selectedMonth, statusFilter, rankFilter, consentFilter, selectedSort]);
+
+  useEffect(() => {
+    (async () => {
+      const res = await getRewardDisplayConfig();
+      if (res.success && res.data) setRewardDisplayConfig(res.data);
+    })();
+  }, []);
 
   const loadStatistics = async () => {
     try {
@@ -146,7 +155,7 @@ const RewardsPage = () => {
       }
 
       if (selectedMonth && selectedMonth !== 'all') {
-        params.month = selectedMonth;
+        params.rewardMonth = selectedMonth;
       }
 
       if (statusFilter !== 'all') {
@@ -155,8 +164,7 @@ const RewardsPage = () => {
 
       if (rankFilter && rankFilter !== 'all') {
         if (rankFilter === '1st-3rd') {
-          params.minRank = 1;
-          params.maxRank = 3;
+          params.rankFilter = '1st-3rd';
         } else if (rankFilter === '1st') {
           params.rank = 1;
         } else if (rankFilter === '2nd') {
@@ -258,58 +266,6 @@ const RewardsPage = () => {
   // Filtering and sorting is now handled by the backend API
   // filteredRewards is set directly from the API response
 
-  const getStatusChip = (status) => {
-    const statusMap = {
-      pending: 'PENDING',
-      processing: 'PROCESSING',
-      fulfilled: 'FULFILLED',
-      paid: 'FULFILLED', // Backward compatibility
-      cancelled: 'CANCELLED',
-      declined: 'DECLINED',
-      unclaimed: 'UNCLAIMED',
-    };
-
-    const label = statusMap[status] || 'PENDING';
-    const isProcessing = status === 'processing';
-    const isPending = status === 'pending';
-    const isFulfilled = status === 'fulfilled' || status === 'paid';
-    const isCancelled = status === 'cancelled' || status === 'declined';
-    const isUnclaimed = status === 'unclaimed';
-
-    let color = '#FF9800'; // Pending
-    let bg = '#FFF7ED';
-    let border = '#FF9800';
-
-    if (isProcessing) { color = '#42A5F5'; bg = '#EBF8FF'; border = '#42A5F5'; }
-    if (isFulfilled) { color = '#66BB6A'; bg = '#F0FDF4'; border = '#66BB6A'; }
-    if (isCancelled) { color = '#EF4444'; bg = '#FEF2F2'; border = '#EF4444'; }
-    if (isUnclaimed) { color = '#9CA3AF'; bg = '#F3F4F6'; border = '#9CA3AF'; }
-
-    return (
-      <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-        <Chip
-          label={label}
-          size="small"
-          sx={{
-            backgroundColor: bg,
-            color: color,
-            border: `1px solid ${border}`,
-            fontWeight: 700,
-            fontSize: 11,
-            height: 24,
-            borderRadius: '6px',
-            mb: 0.5
-          }}
-        />
-        {isUnclaimed && (
-          <Typography variant="caption" sx={{ color: '#EF4444', fontSize: 10, lineHeight: 1 }}>
-            Claim window expired
-          </Typography>
-        )}
-      </Box>
-    );
-  };
-
   const handleActionsOpen = (event, reward) => {
     setActionsAnchor(event.currentTarget);
     setSelectedReward(reward);
@@ -366,7 +322,7 @@ const RewardsPage = () => {
     },
     {
       id: 'username',
-      label: 'Winner',
+      label: 'User',
       render: (value, row) => (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Box>
@@ -397,6 +353,24 @@ const RewardsPage = () => {
           </Box>
         </Box>
       ),
+    },
+    {
+      id: 'rewardMonth',
+      label: 'Month',
+      render: (_, row) => {
+        const m = (row.rewardMonth || row.month || row.monthYear || '').toString().slice(0, 7);
+        if (!m || m.length < 7) return <Typography variant="body2">—</Typography>;
+        try {
+          const label = /^\d{4}-\d{2}$/.test(m) ? format(new Date(`${m}-01`), 'MMM yyyy') : m;
+          return (
+            <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack }}>
+              {label}
+            </Typography>
+          );
+        } catch {
+          return <Typography variant="body2">{m}</Typography>;
+        }
+      },
     },
     {
       id: 'spTotal',
@@ -467,12 +441,17 @@ const RewardsPage = () => {
       id: 'kycStatus',
       label: 'KYC Status',
       render: (value, row) => {
-        const kycStatus = row.kycStatus || (row.kycVerified ? 'verified' : 'under_review');
-        const isVerified = kycStatus === 'verified';
+        const kycStatus = (row.kycDisplayStatus || row.kycStatus || (row.kycVerified ? 'verified' : 'under_review'))
+          .toString()
+          .toLowerCase()
+          .replace(/\s/g, '_');
+        const isVerified = kycStatus === 'verified' || row.kycVerified === true;
+        const label =
+          isVerified ? 'Verified' : kycStatus === 'not_submitted' ? 'Not submitted' : 'Under review';
         return (
           <Chip
             icon={isVerified ? <CheckCircle sx={{ fontSize: 16, color: '#66BB6A !important' }} /> : <VerifiedUser sx={{ fontSize: 16, color: '#FF9800 !important' }} />}
-            label={isVerified ? 'Verified' : 'Under Review'}
+            label={label}
             size="small"
             sx={{
               backgroundColor: isVerified ? '#E8F5E9' : '#FFF4E6',
@@ -491,9 +470,80 @@ const RewardsPage = () => {
       },
     },
     {
-      id: 'status',
-      label: 'Status',
-      render: (_, row) => getStatusChip(row.status || row.rewardStatus),
+      id: 'claimStatusLabel',
+      label: 'Claim',
+      render: (_, row) => {
+        const label = row.claimStatusLabel || '—';
+        const expired = label === 'Expired';
+        const submitted = label === 'Submitted';
+        const claimTip = expired
+          ? 'Claim window ended — reward is locked; cannot be fulfilled or modified.'
+          : submitted
+            ? 'User submitted a claim (or reward is in processing / post-claim flow).'
+            : 'User has not claimed yet; still within or before the claim deadline.';
+        return (
+          <Tooltip title={claimTip} arrow placement="top">
+            <Chip
+              label={label}
+              size="small"
+              sx={{
+                fontWeight: 700,
+                fontSize: 11,
+                height: 24,
+                bgcolor: expired ? '#FEF2F2' : submitted ? '#E8F5E9' : '#F3F4F6',
+                color: expired ? '#B91C1C' : submitted ? '#166534' : '#4B5563',
+                border: `1px solid ${expired ? '#FECACA' : submitted ? '#BBF7D0' : '#E5E7EB'}`,
+              }}
+            />
+          </Tooltip>
+        );
+      },
+    },
+    {
+      id: 'eligibilityStatusLabel',
+      label: 'Eligibility',
+      render: (_, row) => {
+        const ok = (row.eligibilityStatusLabel || '').toLowerCase() === 'eligible';
+        const eligTip =
+          'System-controlled eligibility (e.g. fraud / policy). Independent of KYC and claim expiry. Expired claims still show Eligible unless the user was disqualified.';
+        return (
+          <Tooltip title={eligTip} arrow placement="top">
+            <Chip
+              label={row.eligibilityStatusLabel || (row.eligibilityStatus === 'disqualified' ? 'Disqualified' : 'Eligible')}
+              size="small"
+              sx={{
+                fontWeight: 700,
+                fontSize: 11,
+                height: 24,
+                bgcolor: ok ? '#ECFDF5' : '#FEF2F2',
+                color: ok ? '#047857' : '#B91C1C',
+              }}
+            />
+          </Tooltip>
+        );
+      },
+    },
+    {
+      id: 'fulfillmentStatusLabel',
+      label: 'Fulfillment',
+      render: (_, row) => {
+        const label = row.fulfillmentStatusLabel || 'Pending';
+        const fulfilled = label === 'Fulfilled';
+        const cancelled = label === 'Cancelled';
+        return (
+          <Chip
+            label={label}
+            size="small"
+            sx={{
+              fontWeight: 700,
+              fontSize: 11,
+              height: 24,
+              bgcolor: fulfilled ? '#E8F5E9' : cancelled ? '#FEF2F2' : '#FFFBEB',
+              color: fulfilled ? '#166534' : cancelled ? '#B91C1C' : '#B45309',
+            }}
+          />
+        );
+      },
     },
     {
       id: 'actions',
@@ -576,6 +626,38 @@ const RewardsPage = () => {
                 </Typography>
               </Box>
             </Box>
+          </Card>
+
+          {/* Read-only monthly reward structure (system) */}
+          <Card
+            sx={{
+              mb: 3,
+              p: 3,
+              borderRadius: '16px',
+              border: `1px solid ${colors.divider}40`,
+              bgcolor: colors.brandWhite,
+            }}
+          >
+            <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 1.5, color: colors.brandBlack }}>
+              {rewardDisplayConfig?.title || 'Reward Structure (Monthly)'}
+            </Typography>
+            {rewardDisplayConfig?.tiers?.length ? (
+              <Box component="ul" sx={{ m: 0, pl: 2.5, mb: 1.5 }}>
+                {rewardDisplayConfig.tiers.map((t) => (
+                  <Typography key={t.rank} component="li" variant="body2" sx={{ color: colors.brandBlack, mb: 0.5 }}>
+                    {t.displayLine || `${t.label} — $${t.usd} (${t.rewardType || 'Gift Card'})`}
+                  </Typography>
+                ))}
+              </Box>
+            ) : (
+              <Typography variant="body2" sx={{ color: colors.textSecondary, mb: 1 }}>
+                1st Place — $150 (Gift Card) · 2nd Place — $100 (Gift Card) · 3rd Place — $50 (Gift Card)
+              </Typography>
+            )}
+            <Typography variant="caption" sx={{ color: colors.textSecondary, display: 'block' }}>
+              {rewardDisplayConfig?.subtext ||
+                'Rewards are assigned based on final monthly SP leaderboard rankings.'}
+            </Typography>
           </Card>
 
           {/* Stats Cards */}

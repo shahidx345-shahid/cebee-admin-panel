@@ -57,6 +57,7 @@ const RewardDetailsPage = () => {
     const [declineReason, setDeclineReason] = useState('');
     const [confirmPaidDialogOpen, setConfirmPaidDialogOpen] = useState(false);
     const [fulfillGiftCardCode, setFulfillGiftCardCode] = useState('');
+    const [fulfillReferenceNote, setFulfillReferenceNote] = useState('');
 
     useEffect(() => {
         loadReward();
@@ -142,11 +143,23 @@ const RewardDetailsPage = () => {
                     ? 'verified'
                     : (typeof kycOnReward.status === 'string' ? kycOnReward.status.toLowerCase() : 'not_submitted');
 
+                const ad = data.adminDetail || null;
+
                 const rewardData = {
                     // Core fields (from database)
                     id: data._id || data.id || id,
                     userId: user._id || user.id || data.userId || data.user_id || null,
                     rank: data.rank ?? data.rank_achieved ?? 0,
+                    rankLabel: data.rankLabel || null,
+                    generatedFrom: data.generatedFrom || ad?.rewardOverview?.generatedFrom || null,
+                    rankLocked: data.rankLocked !== undefined ? data.rankLocked : ad?.rewardOverview?.rankLocked,
+                    claimStatusLabel: data.claimStatusLabel || ad?.claimSummary?.claimStatus || null,
+                    claimWindowDays: data.claimWindowDays ?? ad?.claimSummary?.claimWindowDays ?? 7,
+                    eligibilityStatusLabel: data.eligibilityStatusLabel || ad?.eligibility?.eligibilityStatusLabel || null,
+                    eligibilityStatus: data.eligibilityStatus || ad?.eligibility?.eligibilityStatus || 'eligible',
+                    canFulfill: ad?.fulfillment?.canFulfill,
+                    adminDetail: ad,
+                    fulfillmentLog: ad?.fulfillmentLog || null,
                     // User data from populated userId/user
                     username: user.username || data.username || 'N/A',
                     userEmail: user.email || data.userEmail || data.email || 'N/A',
@@ -179,6 +192,7 @@ const RewardDetailsPage = () => {
                     consentOptIn: data.consentOptIn ?? data.consent_opt_in ?? false,
                     consentTimestamp: parseDate(data.consentTimestamp ?? data.consent_timestamp),
                     consentSource: data.consentSource ?? data.consent_source ?? null,
+                    consentType: data.consentType ?? data.consent_type ?? null,
                     
                     // Gift Card fields (from API)
                     giftCardPlatform: data.giftCardPlatform ?? data.gift_card_platform ?? null,
@@ -198,12 +212,14 @@ const RewardDetailsPage = () => {
                     processedAt: parseDate(data.processedAt ?? data.processed_at),
                     
                     // Fulfillment fields (from database)
-                    fulfillmentStatus: data.fulfillmentStatus ?? data.fulfillment_status ?? (
+                    fulfillmentStatus: data.fulfillmentStatusLabel ?? data.fulfillmentStatus ?? data.fulfillment_status ?? ad?.fulfillment?.fulfillmentStatus ?? (
                         (data.status === 'fulfilled' || data.status === 'paid') ? 'Fulfilled' :
                         (data.status === 'cancelled' || data.status === 'declined') ? 'Cancelled' : 'Pending'
                     ),
                     fulfilledAt: parseDate(data.fulfilledAt ?? data.fulfilled_at ?? data.processedAt ?? data.processed_at),
-                    fulfilledBy: data.fulfilledBy ?? data.fulfilled_by ?? data.processedBy ?? data.processed_by ?? kycOnReward.verifiedBy ?? null,
+                    fulfilledBy: data.fulfilledByLabel ?? data.fulfilledBy ?? data.fulfilled_by ?? data.processedBy ?? data.processed_by ?? kycOnReward.verifiedBy ?? null,
+                    fulfillmentReference: data.fulfillmentReference ?? data.fulfillment_reference ?? null,
+                    adminFulfillmentMethodStored: data.adminFulfillmentMethod ?? null,
                     
                     // User profile data (from populated userId/user)
                     userCountry: user.country || data.userCountry || null,
@@ -212,12 +228,18 @@ const RewardDetailsPage = () => {
                     lastLoginDate: parseDate(user.lastLogin ?? user.last_login),
                     
                     // Events / Activity timeline (from API, support snake_case)
-                    events: (data.events ?? data.activity_log ?? data.audit_log ?? []).map((e, i) => ({
-                        id: e.id ?? e._id ?? i,
-                        action: e.action ?? e.event ?? e.type ?? 'Unknown',
-                        timestamp: parseDate(e.timestamp ?? e.created_at ?? e.date) || new Date(),
-                        triggeredBy: e.triggeredBy ?? e.triggered_by ?? e.actor ?? e.user ?? 'System'
-                    })),
+                    events: (() => {
+                        const raw = ad?.activityTimeline?.length
+                            ? ad.activityTimeline
+                            : (data.events ?? data.activity_log ?? data.audit_log ?? []);
+                        return raw.map((e, i) => ({
+                            id: e.id ?? e._id ?? i,
+                            action: e.action ?? e.event ?? e.type ?? 'Unknown',
+                            timestamp: parseDate(e.timestamp ?? e.created_at ?? e.date) || new Date(),
+                            triggeredBy: e.triggeredBy ?? e.triggered_by ?? e.actor ?? e.user ?? 'System',
+                            triggerSource: e.triggerSource ?? e.trigger_source ?? null,
+                        }));
+                    })(),
                     
                     // Admin fields (from API)
                     adminNotes: data.adminNotes ?? data.admin_notes ?? '',
@@ -229,6 +251,17 @@ const RewardDetailsPage = () => {
 
                 // If KYC not verified from reward/populated user, fetch user details (source of truth for KYC)
                 const userIdStr = typeof rewardData.userId === 'string' ? rewardData.userId : (rewardData.userId?._id || rewardData.userId?.id || null);
+                if (ad?.userSnapshot) {
+                    const us = ad.userSnapshot;
+                    rewardData.userId = us.userId || rewardData.userId;
+                    rewardData.username = us.username || rewardData.username;
+                    rewardData.userEmail = us.email || rewardData.userEmail;
+                    rewardData.userCountry = us.country ?? rewardData.userCountry;
+                    rewardData.accountStatus = us.accountStatus || rewardData.accountStatus;
+                    rewardData.registrationDate = parseDate(us.registrationDate) || rewardData.registrationDate;
+                    rewardData.lastLoginDate = parseDate(us.lastLogin) || rewardData.lastLoginDate;
+                }
+
                 if (rewardData.kycStatus !== 'verified' && userIdStr) {
                     try {
                         const userRes = await getUserDetails(userIdStr);
@@ -308,15 +341,20 @@ const RewardDetailsPage = () => {
             return;
         }
         try {
+            const userRewardType = reward?.rewardType || reward?.payoutMethod || 'Gift Card';
             const response = await markRewardAsFulfilled(id, {
                 ...(isGiftCard && { giftCardCode: String(fulfillGiftCardCode).trim() }),
                 videoConsentStatus: reward?.videoConsentStatus ?? (reward?.consentOptIn ? 'granted' : 'not_granted'),
                 consentOptIn: reward?.consentOptIn ?? false,
+                userRewardType,
+                adminFulfillmentMethod: userRewardType,
+                ...(fulfillReferenceNote.trim() && { fulfillmentReference: fulfillReferenceNote.trim() }),
             });
             if (response.success) {
                 await loadReward();
                 setConfirmPaidDialogOpen(false);
                 setFulfillGiftCardCode('');
+                setFulfillReferenceNote('');
             } else {
                 setConfirmPaidDialogOpen(false);
                 alert(`Failed to mark reward as fulfilled: ${response.error}`);
@@ -393,6 +431,15 @@ const RewardDetailsPage = () => {
         };
         return colors[badge] || '#6B7280';
     };
+
+    const kycOk = reward && (reward.kycVerified || reward.kycStatus === 'verified');
+    const fulfillBlocked =
+        !reward ||
+        reward.isLocked ||
+        ['fulfilled', 'paid', 'cancelled', 'rejected', 'expired'].includes(reward.status || '') ||
+        reward.claimStatusLabel === 'Expired' ||
+        reward.canFulfill === false ||
+        !kycOk;
 
     if (loading) {
         return <Box sx={{ p: 4, display: 'flex', justifyContent: 'center' }}><CircularProgress /></Box>;
@@ -566,7 +613,7 @@ const RewardDetailsPage = () => {
                                     <Typography variant="caption" sx={{ color: colors.textSecondary, textTransform: 'uppercase', fontWeight: 600 }}>Rank Achieved</Typography>
                                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
                                         <Chip 
-                                            label={`#${reward.rank}`}
+                                            label={reward.rankLabel || (reward.rank === 1 ? '1st' : reward.rank === 2 ? '2nd' : reward.rank === 3 ? '3rd' : `#${reward.rank}`)}
                                             sx={{
                                                 bgcolor: reward.rank === 1 ? '#FFD700' : reward.rank === 2 ? '#C0C0C0' : reward.rank === 3 ? '#CD7F32' : colors.primary + '20',
                                                 color: reward.rank <= 3 ? '#000' : colors.primary,
@@ -584,6 +631,23 @@ const RewardDetailsPage = () => {
                                 <Grid item xs={12} sm={6} md={4}>
                                     <Typography variant="caption" sx={{ color: colors.textSecondary, textTransform: 'uppercase', fontWeight: 600 }}>Reward Amount (USD)</Typography>
                                     <Typography variant="h5" sx={{ fontWeight: 700, color: colors.success, mt: 0.5 }}>${reward.usdAmount || 0}</Typography>
+                                </Grid>
+                                <Grid item xs={12} sm={6} md={4}>
+                                    <Typography variant="caption" sx={{ color: colors.textSecondary, textTransform: 'uppercase', fontWeight: 600 }}>Generated From</Typography>
+                                    <Typography variant="body1" sx={{ fontWeight: 600, mt: 0.5 }}>
+                                        {reward.generatedFrom || 'Monthly SP Leaderboard'}
+                                    </Typography>
+                                </Grid>
+                                <Grid item xs={12} sm={6} md={4}>
+                                    <Typography variant="caption" sx={{ color: colors.textSecondary, textTransform: 'uppercase', fontWeight: 600 }}>Rank Locked</Typography>
+                                    <Typography variant="body1" sx={{ fontWeight: 600, mt: 0.5 }}>
+                                        {reward.rankLocked === false ? 'No' : 'Yes'}
+                                        {reward.rankLocked !== false && (
+                                            <Typography component="span" variant="caption" sx={{ display: 'block', color: colors.textSecondary }}>
+                                                (after reward generation)
+                                            </Typography>
+                                        )}
+                                    </Typography>
                                 </Grid>
                                 <Grid item xs={12}>
                                     <Divider sx={{ my: 1 }} />
@@ -625,7 +689,7 @@ const RewardDetailsPage = () => {
                                 size="small"
                                 variant="outlined"
                                 startIcon={<Visibility />}
-                                onClick={() => navigate(`${constants.routes.users}/${reward.userId}`)}
+                                onClick={() => navigate(`${constants.routes.users}/${typeof reward.userId === 'object' && reward.userId !== null ? (reward.userId._id || reward.userId.id) : reward.userId}`)}
                                 sx={{ 
                                     borderRadius: '8px', 
                                     textTransform: 'none',
@@ -663,7 +727,11 @@ const RewardDetailsPage = () => {
                                 </Grid>
                                 <Grid item xs={12} sm={6} md={3}>
                                     <Typography variant="caption" sx={{ color: colors.textSecondary, textTransform: 'uppercase', fontWeight: 600 }}>User ID</Typography>
-                                    <Typography variant="body1" sx={{ fontWeight: 600, mt: 0.5 }}>{reward.userId}</Typography>
+                                    <Typography variant="body1" sx={{ fontWeight: 600, mt: 0.5, wordBreak: 'break-all' }}>
+                                        {typeof reward.userId === 'object' && reward.userId !== null
+                                            ? (reward.userId._id || reward.userId.id || '')
+                                            : (reward.userId || '—')}
+                                    </Typography>
                                 </Grid>
                                 <Grid item xs={12} sm={6} md={3}>
                                     <Typography variant="caption" sx={{ color: colors.textSecondary, textTransform: 'uppercase', fontWeight: 600 }}>Country</Typography>
@@ -717,9 +785,15 @@ const RewardDetailsPage = () => {
                                     <Typography variant="caption" sx={{ color: colors.textSecondary, textTransform: 'uppercase', fontWeight: 600 }}>Claim Status</Typography>
                                     <Box sx={{ mt: 0.5 }}>
                                         <Chip
-                                            label={reward.claimSubmittedAt ? 'Claimed' : (reward.claimDeadline && new Date() > reward.claimDeadline ? 'Expired' : 'Not Claimed')}
+                                            label={reward.claimStatusLabel || (reward.claimSubmittedAt ? 'Submitted' : (reward.claimDeadline && new Date() > reward.claimDeadline ? 'Expired' : 'Pending'))}
                                             size="small"
-                                            color={reward.claimSubmittedAt ? 'success' : (reward.claimDeadline && new Date() > reward.claimDeadline ? 'error' : 'warning')}
+                                            color={
+                                                (reward.claimStatusLabel === 'Expired' || (reward.claimDeadline && new Date() > reward.claimDeadline && !reward.claimSubmittedAt))
+                                                    ? 'error'
+                                                    : reward.claimSubmittedAt || reward.claimStatusLabel === 'Submitted'
+                                                        ? 'success'
+                                                        : 'warning'
+                                            }
                                             sx={{ fontWeight: 700 }}
                                         />
                                     </Box>
@@ -738,13 +812,15 @@ const RewardDetailsPage = () => {
                                 </Grid>
                                 <Grid item xs={12} sm={6} md={3}>
                                     <Typography variant="caption" sx={{ color: colors.textSecondary, textTransform: 'uppercase', fontWeight: 600 }}>Claim Window</Typography>
-                                    <Typography variant="body1" sx={{ fontWeight: 600, mt: 0.5 }}>7 Days</Typography>
+                                    <Typography variant="body1" sx={{ fontWeight: 600, mt: 0.5 }}>
+                                        {reward.claimWindowDays != null ? `${reward.claimWindowDays} days` : '7 days'}
+                                    </Typography>
                                 </Grid>
                                 <Grid item xs={12}>
                                     <Typography variant="caption" sx={{ color: colors.textSecondary, textTransform: 'uppercase', fontWeight: 600 }}>Claim Source</Typography>
                                     <Typography variant="body1" sx={{ fontWeight: 500, mt: 0.5 }}>Reward Claim Flow</Typography>
                                 </Grid>
-                                {reward.claimDeadline && new Date() > reward.claimDeadline && !reward.claimSubmittedAt && (
+                                {(reward.claimStatusLabel === 'Expired' || (reward.claimDeadline && new Date() > reward.claimDeadline && !reward.claimSubmittedAt && reward.status === 'unclaimed')) && (
                                     <Grid item xs={12}>
                                         <Box sx={{ 
                                             p: 2, 
@@ -757,7 +833,7 @@ const RewardDetailsPage = () => {
                                         }}>
                                             <Info sx={{ color: colors.error, fontSize: 20 }} />
                                             <Typography variant="body2" sx={{ color: '#991B1B', fontWeight: 500 }}>
-                                                Claim deadline expired. This reward is automatically locked.
+                                                Expired rewards are permanently locked, cannot be fulfilled, and cannot be modified.
                                             </Typography>
                                         </Box>
                                     </Grid>
@@ -784,7 +860,7 @@ const RewardDetailsPage = () => {
                                 size="small"
                                 variant="outlined"
                                 startIcon={<Visibility />}
-                                onClick={() => navigate(`${constants.routes.users}/${reward.userId}`)}
+                                onClick={() => navigate(`${constants.routes.users}/${typeof reward.userId === 'object' && reward.userId !== null ? (reward.userId._id || reward.userId.id) : reward.userId}`)}
                                 sx={{ borderRadius: '8px', textTransform: 'none', fontWeight: 600 }}
                             >
                                 View KYC Profile
@@ -876,6 +952,31 @@ const RewardDetailsPage = () => {
                         </CardContent>
                     </Card>
 
+                    {/* Eligibility (system-controlled) */}
+                    <Card sx={{ mb: 3, borderRadius: '16px', border: `1px solid ${colors.divider}` }}>
+                        <Box sx={{ bgcolor: '#F9FAFB', p: 2, borderBottom: `1px solid ${colors.divider}` }}>
+                            <Typography variant="h6" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Shield />
+                                Eligibility Status
+                            </Typography>
+                        </Box>
+                        <CardContent sx={{ p: 3 }}>
+                            <Chip
+                                label={reward.eligibilityStatusLabel || (reward.eligibilityStatus === 'disqualified' ? 'Disqualified' : 'Eligible')}
+                                size="small"
+                                sx={{
+                                    fontWeight: 700,
+                                    mb: 1.5,
+                                    bgcolor: reward.eligibilityStatus === 'disqualified' ? '#FEF2F2' : '#ECFDF5',
+                                    color: reward.eligibilityStatus === 'disqualified' ? '#B91C1C' : '#047857',
+                                }}
+                            />
+                            <Typography variant="body2" sx={{ color: colors.textSecondary }}>
+                                {reward.adminDetail?.eligibility?.subtext || 'Determines whether user qualifies for reward fulfillment.'}
+                            </Typography>
+                        </CardContent>
+                    </Card>
+
                     {/* 5. Reward Type & Fulfillment */}
                     <Card sx={{ mb: 3, borderRadius: '16px' }}>
                         <Box sx={{ 
@@ -958,7 +1059,7 @@ const RewardDetailsPage = () => {
                                         <Typography variant="caption" sx={{ color: colors.textSecondary, textTransform: 'uppercase', fontWeight: 600 }}>Fulfillment Method</Typography>
                                         <Box sx={{ mt: 0.5 }}>
                                             <Chip
-                                                label={reward.fulfillmentMethod || (reward.rewardType === 'Alternative Reward' ? 'Manual Alternative Reward Fulfillment' : 'Manual Gift Card Fulfillment')}
+                                                label={reward.adminFulfillmentMethodStored || reward.fulfillmentMethod || (reward.rewardType === 'Alternative Reward' ? 'Manual Alternative Reward Fulfillment' : 'Gift Card')}
                                                 sx={{
                                                     bgcolor: '#FEF3C7',
                                                     color: '#78350F',
@@ -1155,7 +1256,7 @@ const RewardDetailsPage = () => {
                                 <Grid item xs={12} sm={6} md={3}>
                                     <Typography variant="caption" sx={{ color: colors.textSecondary, textTransform: 'uppercase', fontWeight: 600 }}>Consent Type</Typography>
                                     <Typography variant="body1" sx={{ fontWeight: 600, mt: 0.5, whiteSpace: 'nowrap' }}>
-                                        Video/Testimonial
+                                        {reward.consentType || reward.adminDetail?.consentTracking?.consentType || 'Video / testimonial'}
                                     </Typography>
                                 </Grid>
                                 <Grid item xs={12} sm={6} md={3}>
@@ -1181,7 +1282,7 @@ const RewardDetailsPage = () => {
                             }}>
                                 <Info sx={{ color: '#0369A1', fontSize: 18 }} />
                                 <Typography variant="caption" sx={{ color: '#0C4A6E', fontWeight: 500 }}>
-                                    Informational only • Does not affect reward approval or fulfillment
+                                    {reward.adminDetail?.consentTracking?.note || 'Does not affect reward approval or fulfillment.'}
                                 </Typography>
                             </Box>
                         </CardContent>
@@ -1246,12 +1347,21 @@ const RewardDetailsPage = () => {
                                 </Box>
                             )}
 
+                            {(reward.fulfillmentLog?.referenceNote || reward.fulfillmentReference) && (
+                                <Box sx={{ mb: 2 }}>
+                                    <Typography variant="caption" sx={{ color: colors.textSecondary, textTransform: 'uppercase', fontWeight: 600 }}>Fulfillment Note / Reference</Typography>
+                                    <Typography variant="body2" sx={{ fontWeight: 500, mt: 0.5 }}>
+                                        {reward.fulfillmentLog?.referenceNote || reward.fulfillmentReference}
+                                    </Typography>
+                                </Box>
+                            )}
+
                             <Divider sx={{ my: 2 }} />
 
                             {/* Actions */}
-                            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 2 }}>Allowed Actions (Phase 1)</Typography>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 2 }}>Allowed Actions</Typography>
                             
-                            {reward.kycStatus !== 'verified' && (
+                            {!kycOk && (
                                 <Box sx={{ 
                                     mb: 2,
                                     p: 1.5, 
@@ -1264,18 +1374,34 @@ const RewardDetailsPage = () => {
                                 }}>
                                     <Warning sx={{ color: '#92400E', fontSize: 18 }} />
                                     <Typography variant="caption" sx={{ color: '#92400E', fontWeight: 600 }}>
-                                        Actions enabled only if KYC = Verified
+                                        Fulfillment requires KYC = Verified and Eligibility = Eligible
                                     </Typography>
                                 </Box>
                             )}
 
-                            {reward.status !== 'fulfilled' && reward.status !== 'paid' && reward.status !== 'cancelled' ? (
+                            {reward.claimStatusLabel === 'Expired' && (
+                                <Box sx={{ mb: 2, p: 1.5, borderRadius: '8px', bgcolor: '#FEF2F2', border: '1px solid #FECACA' }}>
+                                    <Typography variant="caption" sx={{ color: '#991B1B', fontWeight: 600 }}>
+                                        Expired — cannot fulfill or modify
+                                    </Typography>
+                                </Box>
+                            )}
+
+                            {reward.eligibilityStatus === 'disqualified' && (
+                                <Box sx={{ mb: 2, p: 1.5, borderRadius: '8px', bgcolor: '#FEF2F2', border: '1px solid #FECACA' }}>
+                                    <Typography variant="caption" sx={{ color: '#991B1B', fontWeight: 600 }}>
+                                        User disqualified — cannot fulfill
+                                    </Typography>
+                                </Box>
+                            )}
+
+                            {reward.status !== 'fulfilled' && reward.status !== 'paid' && reward.status !== 'cancelled' && reward.status !== 'rejected' && reward.status !== 'expired' ? (
                                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                                     <Button
                                         variant="contained"
                                         color="success"
                                         fullWidth
-                                        disabled={reward.kycStatus !== 'verified'}
+                                        disabled={fulfillBlocked}
                                         onClick={() => setConfirmPaidDialogOpen(true)}
                                         startIcon={<CheckCircle />}
                                         sx={{ 
@@ -1291,6 +1417,7 @@ const RewardDetailsPage = () => {
                                         variant="outlined"
                                         color="error"
                                         fullWidth
+                                        disabled={reward.isLocked || reward.claimStatusLabel === 'Expired' || ['expired'].includes(reward.status)}
                                         onClick={() => setDeclineDialogOpen(true)}
                                         startIcon={<Cancel />}
                                         sx={{ 
@@ -1437,6 +1564,9 @@ const RewardDetailsPage = () => {
                                             </Typography>
                                             <Typography variant="caption" sx={{ color: colors.textSecondary, display: 'block', mt: 0.5 }}>
                                                 Triggered by: <strong>{event.triggeredBy}</strong>
+                                                {event.triggerSource ? (
+                                                    <> · Source: <strong>{event.triggerSource}</strong></>
+                                                ) : null}
                                             </Typography>
                                         </Box>
                                     </Box>
@@ -1466,7 +1596,7 @@ const RewardDetailsPage = () => {
                 </DialogActions>
             </Dialog>
 
-            <Dialog open={confirmPaidDialogOpen} onClose={() => { setConfirmPaidDialogOpen(false); setFulfillGiftCardCode(''); }}>
+            <Dialog open={confirmPaidDialogOpen} onClose={() => { setConfirmPaidDialogOpen(false); setFulfillGiftCardCode(''); setFulfillReferenceNote(''); }}>
                 <DialogContent>
                     <Typography variant="h6" sx={{ mb: 2 }}>Confirm Fulfillment</Typography>
                     <Typography sx={{ mb: 2 }}>Are you sure you want to mark this reward as FULFILLED? This action cannot be undone.</Typography>
@@ -1482,9 +1612,17 @@ const RewardDetailsPage = () => {
                             helperText="Required for gift card rewards. Enter the code you will send to the user."
                         />
                     )}
+                    <TextField
+                        fullWidth
+                        label="Optional note / reference (audit)"
+                        placeholder="e.g. internal ticket ID"
+                        value={fulfillReferenceNote}
+                        onChange={(e) => setFulfillReferenceNote(e.target.value)}
+                        sx={{ mt: 2 }}
+                    />
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => { setConfirmPaidDialogOpen(false); setFulfillGiftCardCode(''); }}>Cancel</Button>
+                    <Button onClick={() => { setConfirmPaidDialogOpen(false); setFulfillGiftCardCode(''); setFulfillReferenceNote(''); }}>Cancel</Button>
                     <Button variant="contained" color="success" onClick={handleMarkFulfilled}>Confirm Fulfilled</Button>
                 </DialogActions>
             </Dialog>
