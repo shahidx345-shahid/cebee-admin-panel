@@ -5,6 +5,9 @@
 
 import { apiGet, apiPost, apiPut, apiPatch } from './apiBase';
 
+const POLL_FIXTURES_MIN = 2;
+const POLL_FIXTURES_MAX = 8;
+
 /**
  * Get all polls with filtering, search, pagination, and sorting
  * @param {object} params - Query parameters (status, leagueId, search, page, limit, sort_by, sort_order)
@@ -90,6 +93,15 @@ export const createPoll = async (pollData) => {
       return {
         success: false,
         error: 'At least one fixture is required',
+      };
+    }
+    if (
+      pollData.fixtures.length < POLL_FIXTURES_MIN ||
+      pollData.fixtures.length > POLL_FIXTURES_MAX
+    ) {
+      return {
+        success: false,
+        error: `Between ${POLL_FIXTURES_MIN} and ${POLL_FIXTURES_MAX} fixtures are required`,
       };
     }
 
@@ -260,27 +272,30 @@ export const getUpcomingFixtures = async (leagueId, season, options = {}) => {
 };
 
 /**
- * Create poll from 5 Football API fixture IDs (new flow: league → select 5 fixtures → create).
+ * Create poll from 2–8 Football API fixture IDs (league → select fixtures → create).
  * @param {object} params - { leagueId, season, apiFixtureIds: number[], featuredTeamSides?: string[], startTime, closeTime, status? }
  * @returns {Promise<{success: boolean, data?: object, error?: string, message?: string}>}
  */
 export const createPollFromApi = async (params) => {
   try {
     const { leagueId, season, apiFixtureIds, featuredTeamSides, startTime, closeTime, status } = params;
-    if (!leagueId || season == null || !Array.isArray(apiFixtureIds) || apiFixtureIds.length !== 5) {
+    const cleanedIds = Array.isArray(apiFixtureIds)
+      ? apiFixtureIds.map((id) => parseInt(String(id).trim(), 10)).filter((n) => !Number.isNaN(n))
+      : [];
+    if (!leagueId || season == null || cleanedIds.length < POLL_FIXTURES_MIN || cleanedIds.length > POLL_FIXTURES_MAX) {
       return {
         success: false,
-        error: 'leagueId, season, and exactly 5 apiFixtureIds are required',
+        error: `leagueId, season, and between ${POLL_FIXTURES_MIN} and ${POLL_FIXTURES_MAX} apiFixtureIds are required`,
       };
     }
     const body = {
       leagueId,
       season: typeof season === 'number' ? season : parseInt(String(season), 10),
-      apiFixtureIds: apiFixtureIds.map((id) => parseInt(id, 10)).filter((n) => !Number.isNaN(n)),
+      apiFixtureIds: cleanedIds,
       startTime: startTime instanceof Date ? startTime.toISOString() : startTime,
       closeTime: closeTime instanceof Date ? closeTime.toISOString() : closeTime,
     };
-    if (Array.isArray(featuredTeamSides) && featuredTeamSides.length === 5) {
+    if (Array.isArray(featuredTeamSides) && featuredTeamSides.length === cleanedIds.length) {
       body.featuredTeamSides = featuredTeamSides.map((s) => (s === 'B' ? 'B' : 'A'));
     }
     if (status) body.status = status;

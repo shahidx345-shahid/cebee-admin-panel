@@ -44,9 +44,54 @@ import { DateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { format } from 'date-fns';
 import { formatSeasonLabel } from '../utils/seasonFormat';
-import { getPolls, getPoll, createPoll, updatePoll, getUpcomingFixtures, createPollFromApi } from '../services/pollsService';
+import { getPolls, getPoll, updatePoll, getUpcomingFixtures, createPollFromApi } from '../services/pollsService';
 import { getLeagues } from '../services/leaguesService';
 import { getTeams } from '../services/teamsService';
+
+const POLL_FIXTURES_MIN = 2;
+const POLL_FIXTURES_MAX = 8;
+const POLL_FIXTURE_SLOT_INDICES = Array.from({ length: POLL_FIXTURES_MAX }, (_, i) => i);
+
+function emptyApiFixtureSlots() {
+  return Array.from({ length: POLL_FIXTURES_MAX }, () => null);
+}
+
+function emptyFeaturedSides() {
+  return Array.from({ length: POLL_FIXTURES_MAX }, () => '');
+}
+
+function emptyManualFixtures() {
+  return Array.from({ length: POLL_FIXTURES_MAX }, (_, i) => ({
+    matchNum: i + 1,
+    teamA: '',
+    teamB: '',
+  }));
+}
+
+/** Contiguous filled API slots from the start (no gaps). */
+function getContiguousApiFillCount(selectedApiFixtureIds) {
+  let n = 0;
+  for (let i = 0; i < selectedApiFixtureIds.length; i++) {
+    const v = selectedApiFixtureIds[i];
+    if (v != null && !Number.isNaN(Number(v))) n++;
+    else break;
+  }
+  return n;
+}
+
+/** Contiguous complete manual rows from the start. */
+function getContiguousManualCompleteCount(fixtures) {
+  let n = 0;
+  for (let i = 0; i < fixtures.length; i++) {
+    const f = fixtures[i];
+    const a = !!f.teamA;
+    const b = !!f.teamB;
+    if (a && b) n++;
+    else if (!a && !b) break;
+    else return -1;
+  }
+  return n;
+}
 
 const PollFormPage = () => {
   const navigate = useNavigate();
@@ -70,15 +115,9 @@ const PollFormPage = () => {
   const [teamsError, setTeamsError] = useState('');
   const [loadingFixtures, setLoadingFixtures] = useState(false);
   const [fixturesError, setFixturesError] = useState('');
-  const [selectedApiFixtureIds, setSelectedApiFixtureIds] = useState([null, null, null, null, null]); // exactly 5 slots for new create flow
-  const [featuredTeamSidePerSlot, setFeaturedTeamSidePerSlot] = useState(['', '', '', '', '']); // '' = not chosen, 'A' = home, 'B' = away per slot
-  const [selectedFixtures, setSelectedFixtures] = useState([
-    { matchNum: 1, teamA: '', teamB: '' },
-    { matchNum: 2, teamA: '', teamB: '' },
-    { matchNum: 3, teamA: '', teamB: '' },
-    { matchNum: 4, teamA: '', teamB: '' },
-    { matchNum: 5, teamA: '', teamB: '' },
-  ]);
+  const [selectedApiFixtureIds, setSelectedApiFixtureIds] = useState(emptyApiFixtureSlots);
+  const [featuredTeamSidePerSlot, setFeaturedTeamSidePerSlot] = useState(emptyFeaturedSides);
+  const [selectedFixtures, setSelectedFixtures] = useState(emptyManualFixtures);
 
   const [formData, setFormData] = useState({
     leagueId: '',
@@ -172,11 +211,10 @@ const PollFormPage = () => {
                 teamA: f.team_a_id || f.teamAId || '',
                 teamB: f.team_b_id || f.teamBId || '',
               }));
-              // Ensure we have exactly 5 fixtures
-              while (fixtures.length < 5) {
+              while (fixtures.length < POLL_FIXTURES_MAX) {
                 fixtures.push({ matchNum: fixtures.length + 1, teamA: '', teamB: '' });
               }
-              setSelectedFixtures(fixtures.slice(0, 5));
+              setSelectedFixtures(fixtures.slice(0, POLL_FIXTURES_MAX));
             }
           }
         }
@@ -382,25 +420,20 @@ const PollFormPage = () => {
   };
 
   const validateFixtures = () => {
-    // Check all matches have both teams
-    const allMatchesComplete = selectedFixtures.every(f => f.teamA && f.teamB);
-    
-    // Check no team plays itself in the same match
-    const noSelfMatchups = selectedFixtures.every(f => f.teamA !== f.teamB);
-    
-    // Check no team is used more than once across all fixtures
+    const n = getContiguousManualCompleteCount(selectedFixtures);
+    if (n < 0) return false;
+    if (n < POLL_FIXTURES_MIN || n > POLL_FIXTURES_MAX) return false;
+
+    const used = selectedFixtures.slice(0, n);
+    const noSelfMatchups = used.every((f) => f.teamA !== f.teamB);
     const allSelectedTeams = [];
-    selectedFixtures.forEach(f => {
-      if (f.teamA) allSelectedTeams.push(f.teamA);
-      if (f.teamB) allSelectedTeams.push(f.teamB);
+    used.forEach((f) => {
+      allSelectedTeams.push(f.teamA, f.teamB);
     });
     const uniqueTeams = new Set(allSelectedTeams);
     const noDuplicateTeams = allSelectedTeams.length === uniqueTeams.size;
-    
-    // Check exactly 5 matches
-    const exactlyFive = selectedFixtures.length === 5;
-    
-    return allMatchesComplete && noSelfMatchups && noDuplicateTeams && exactlyFive;
+
+    return noSelfMatchups && noDuplicateTeams;
   };
 
   const handleSave = async () => {
@@ -427,8 +460,17 @@ const PollFormPage = () => {
     }
 
     if (isEditMode) {
+      const nManual = getContiguousManualCompleteCount(selectedFixtures);
+      if (nManual < 0) {
+        alert('Each match must have both home and away teams selected, or leave the row empty to end the list.');
+        return;
+      }
+      if (nManual < POLL_FIXTURES_MIN || nManual > POLL_FIXTURES_MAX) {
+        alert(`Please configure between ${POLL_FIXTURES_MIN} and ${POLL_FIXTURES_MAX} complete matches (fill from Match 1 upward with no gaps).`);
+        return;
+      }
       if (!validateFixtures()) {
-        alert('Please select both teams for all 5 matches before saving.');
+        alert('Check matchups: no duplicate teams across matches, and home ≠ away in each match.');
         return;
       }
       try {
@@ -437,7 +479,7 @@ const PollFormPage = () => {
         leagueId: formData.leagueId,
           startTime,
           closeTime,
-          fixtures: selectedFixtures.map((f) => ({
+          fixtures: selectedFixtures.slice(0, nManual).map((f) => ({
           matchNum: f.matchNum,
           teamAId: f.teamA,
             teamAName: availableTeams.find((t) => t.id === f.teamA)?.name,
@@ -461,20 +503,21 @@ const PollFormPage = () => {
       return;
     }
 
-    // Create flow: require 5 API fixtures selected
-    const apiIds = selectedApiFixtureIds.filter((id) => id != null && !Number.isNaN(id));
-    if (apiIds.length !== 5) {
-      alert('Please select exactly 5 fixtures from the upcoming fixtures list.');
+    const apiCount = getContiguousApiFillCount(selectedApiFixtureIds);
+    if (apiCount < POLL_FIXTURES_MIN || apiCount > POLL_FIXTURES_MAX) {
+      alert(`Please select between ${POLL_FIXTURES_MIN} and ${POLL_FIXTURES_MAX} fixtures from the upcoming list (fill Fixture 1, then 2, … with no gaps).`);
       return;
     }
-    const uniqueIds = [...new Set(apiIds)];
-    if (uniqueIds.length !== 5) {
-      alert('Each fixture can only be selected once. Please choose 5 different fixtures.');
+    const apiIdsCompact = selectedApiFixtureIds.slice(0, apiCount);
+    const uniqueIds = [...new Set(apiIdsCompact)];
+    if (uniqueIds.length !== apiCount) {
+      alert('Each fixture can only be selected once.');
       return;
     }
-    const allFeaturedPicked = featuredTeamSidePerSlot.every((s) => s === 'A' || s === 'B');
+    const sidesCompact = featuredTeamSidePerSlot.slice(0, apiCount);
+    const allFeaturedPicked = sidesCompact.every((s) => s === 'A' || s === 'B');
     if (!allFeaturedPicked) {
-      alert('Please select the featured team for each of the 5 fixtures before creating the poll.');
+      alert(`Please select the featured team (home or away) for each of the ${apiCount} fixtures before creating the poll.`);
       return;
     }
 
@@ -483,8 +526,8 @@ const PollFormPage = () => {
       const result = await createPollFromApi({
         leagueId: formData.leagueId,
         season: formData.season,
-        apiFixtureIds: selectedApiFixtureIds,
-        featuredTeamSides: featuredTeamSidePerSlot.map((s) => (s === 'B' ? 'B' : 'A')),
+        apiFixtureIds: apiIdsCompact,
+        featuredTeamSides: sidesCompact.map((s) => (s === 'B' ? 'B' : 'A')),
         startTime,
         closeTime,
       });
@@ -775,7 +818,7 @@ const PollFormPage = () => {
               </Grid>
             )}
 
-            {/* Create flow: Upcoming fixtures from API + select 5 */}
+            {/* Create flow: Upcoming fixtures from API + select 2–8 */}
             {!isEditMode && formData.leagueId && formData.season && (
               <Grid item xs={12}>
                 <Box
@@ -789,7 +832,7 @@ const PollFormPage = () => {
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
                     <SportsSoccer sx={{ fontSize: 18, color: colors.info }} />
                     <Typography variant="body2" sx={{ fontWeight: 600, color: colors.brandBlack }}>
-                      Upcoming fixtures (Football API) – select exactly 5
+                      Upcoming fixtures (Football API) – select {POLL_FIXTURES_MIN} to {POLL_FIXTURES_MAX}
                     </Typography>
                   </Box>
                   {loadingFixtures ? (
@@ -814,7 +857,7 @@ const PollFormPage = () => {
                       <Typography variant="caption" sx={{ mb: 0.5, color: colors.textSecondary, fontStyle: 'italic' }}>
                         All fixtures are available for the poll. Choose one per slot; no duplicate fixtures. Scroll to see all; use &quot;Load more&quot; for more.
                       </Typography>
-                      {[0, 1, 2, 3, 4].map((slotIndex) => (
+                      {POLL_FIXTURE_SLOT_INDICES.map((slotIndex) => (
                         <Box key={slotIndex} sx={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
                         <FormControl
                           fullWidth
@@ -1042,10 +1085,10 @@ const PollFormPage = () => {
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                       <Alert severity="info" sx={{ mb: 1 }}>
                         <Typography variant="body2" sx={{ fontWeight: 600, fontSize: 13 }}>
-                          Matches per poll: Minimum 5, Maximum 5
+                          Matches per poll: Minimum {POLL_FIXTURES_MIN}, Maximum {POLL_FIXTURES_MAX}
                         </Typography>
                         <Typography variant="caption" sx={{ fontSize: 12 }}>
-                          (Only Super Admin can override this limit if required)
+                          Fill matches in order starting from Match 1, with no gaps.
                         </Typography>
                       </Alert>
 
@@ -1189,7 +1232,7 @@ const PollFormPage = () => {
                       {validateFixtures() && (
                         <Alert severity="success" sx={{ mt: 1 }}>
                           <Typography variant="body2" sx={{ fontWeight: 600, fontSize: 13 }}>
-                            ✓ All 5 matches configured correctly
+                            ✓ {getContiguousManualCompleteCount(selectedFixtures)} matches configured correctly
                           </Typography>
                         </Alert>
                       )}
