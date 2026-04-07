@@ -16,10 +16,13 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
+  InputAdornment,
   Chip,
   IconButton,
   CircularProgress,
+  Autocomplete,
 } from '@mui/material';
+import { createFilterOptions } from '@mui/material/Autocomplete';
 import {
   Settings,
   PowerSettingsNew,
@@ -38,6 +41,7 @@ import {
   Info,
   SystemUpdate,
   Build,
+  Search as SearchIcon,
 } from '@mui/icons-material';
 import { colors, constants } from '../config/theme';
 import { format } from 'date-fns';
@@ -47,6 +51,87 @@ const MAINTENANCE_DEFAULTS = {
   defaultTitle: 'Under Maintenance',
   defaultMessage: 'We are currently performing scheduled maintenance. The app will be back online shortly. Thank you for your patience.',
 };
+
+/** IANA time zone identifiers; prefers Intl.supportedValuesOf (modern browsers). */
+function getAllIanaTimeZones() {
+  try {
+    if (typeof Intl !== 'undefined' && typeof Intl.supportedValuesOf === 'function') {
+      return Intl.supportedValuesOf('timeZone').sort((a, b) => a.localeCompare(b));
+    }
+  } catch {
+    /* ignore */
+  }
+  return [
+    'UTC',
+    'Etc/UTC',
+    'Europe/London',
+    'Europe/Paris',
+    'Asia/Dubai',
+    'Asia/Karachi',
+    'Asia/Kolkata',
+    'Asia/Tokyo',
+    'America/New_York',
+    'America/Los_Angeles',
+    'Australia/Sydney',
+  ].sort((a, b) => a.localeCompare(b));
+}
+
+/**
+ * Offset label for `at` (DST-aware). Uses GMT-style strings from Intl; Zulu shown as "UTC".
+ */
+function getTimezoneOffsetLabel(timeZoneId, at = new Date()) {
+  if (!timeZoneId || typeof timeZoneId !== 'string') return 'UTC';
+  try {
+    const formatter = new Intl.DateTimeFormat('en-GB', {
+      timeZone: timeZoneId,
+      timeZoneName: 'longOffset',
+    });
+    const parts = formatter.formatToParts(at);
+    let offset = parts.find((p) => p.type === 'timeZoneName')?.value?.trim();
+    if (offset) {
+      if (offset === 'GMT+00:00' || offset === 'GMT-00:00') return 'UTC';
+      return offset;
+    }
+  } catch {
+    /* e.g. non-IANA legacy value */
+  }
+  return null;
+}
+
+/** Single-line label for the input + list (search matches offset text too). */
+function formatTimezoneWithGmtOffset(timeZoneId, at = new Date()) {
+  if (!timeZoneId || typeof timeZoneId !== 'string') return 'UTC';
+  const off = getTimezoneOffsetLabel(timeZoneId, at);
+  if (off) return `${timeZoneId} — ${off}`;
+  return timeZoneId;
+}
+
+/** Lowercase string used only for Autocomplete filtering (IANA segments, labels, GMT/UTC variants). */
+function buildTimezoneSearchHaystack(id, displayLine, offLabel) {
+  const segments = id.split('/').filter(Boolean);
+  const underscored = id.replace(/_/g, ' ');
+  const parts = [id, displayLine, underscored, ...segments];
+  if (offLabel) {
+    const o = offLabel.trim();
+    parts.push(o, o.toLowerCase(), o.toUpperCase());
+    if (o === 'UTC') {
+      parts.push('gmt+00', 'gmt+00:00', 'gmt-00', 'gmt-00:00', 'zulu', 'utc+0', 'utc-0');
+    } else {
+      parts.push(o.replace(/:/g, ''), o.replace(/^GMT/i, '').trim());
+    }
+  }
+  return parts.join(' ').toLowerCase();
+}
+
+function isValidIanaTimeZoneClient(tz) {
+  if (!tz || typeof tz !== 'string' || !tz.trim()) return false;
+  try {
+    Intl.DateTimeFormat('en-US', { timeZone: tz.trim() });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 const SettingsPage = () => {
   const [settings, setSettings] = useState({
@@ -81,6 +166,48 @@ const SettingsPage = () => {
   const [isCheckingUpdates, setIsCheckingUpdates] = useState(false);
   const [error, setError] = useState(null);
   const [saveError, setSaveError] = useState(null);
+
+  const ianaTimeZones = useMemo(() => getAllIanaTimeZones(), []);
+  const timezoneSelectOptions = useMemo(() => {
+    const current = (settings.displayTimezone || '').trim();
+    if (current && !ianaTimeZones.includes(current)) {
+      return [current, ...ianaTimeZones];
+    }
+    return ianaTimeZones;
+  }, [ianaTimeZones, settings.displayTimezone]);
+
+  const timezoneOptionLabels = useMemo(() => {
+    const at = new Date();
+    const map = new Map();
+    for (const id of timezoneSelectOptions) {
+      map.set(id, formatTimezoneWithGmtOffset(id, at));
+    }
+    return map;
+  }, [timezoneSelectOptions]);
+
+  const timezoneSearchIndex = useMemo(() => {
+    const map = new Map();
+    for (const id of timezoneSelectOptions) {
+      const displayLine = timezoneOptionLabels.get(id) || formatTimezoneWithGmtOffset(id);
+      const off = getTimezoneOffsetLabel(id) || '';
+      map.set(id, buildTimezoneSearchHaystack(id, displayLine, off));
+    }
+    return map;
+  }, [timezoneSelectOptions, timezoneOptionLabels]);
+
+  const filterTimezoneOptions = useMemo(
+    () =>
+      createFilterOptions({
+        matchFrom: 'any',
+        stringify: (id) => timezoneSearchIndex.get(id) || id.toLowerCase(),
+      }),
+    [timezoneSearchIndex]
+  );
+
+  const timezoneStoredInvalid = useMemo(() => {
+    const v = (settings.displayTimezone || '').trim();
+    return v.length > 0 && !isValidIanaTimeZoneClient(v);
+  }, [settings.displayTimezone]);
 
   // Helper function to map backend format to frontend format
   const mapBackendToFrontend = useCallback((backendSettings) => {
@@ -1089,20 +1216,77 @@ const SettingsPage = () => {
               </Typography>
             </Box>
           </Box>
-          <TextField
+          {timezoneStoredInvalid && (
+            <Alert severity="warning" sx={{ mb: 2, borderRadius: '12px' }}>
+              The saved value is not a valid IANA timezone (API will reject saves until you pick a zone
+              from the list, e.g. <strong>Asia/Karachi</strong> instead of UTC+5).
+            </Alert>
+          )}
+          <Autocomplete
             fullWidth
+            options={timezoneSelectOptions}
             value={settings.displayTimezone || 'UTC'}
-            onChange={(e) => handleChange('displayTimezone', e.target.value)}
-            placeholder="UTC"
-            helperText="Default timezone for the platform (e.g., UTC, Asia/Karachi)"
+            onChange={(_, newValue) => handleChange('displayTimezone', newValue || 'UTC')}
+            filterOptions={filterTimezoneOptions}
+            openOnFocus
+            noOptionsText="No time zones match your search — try a city, region, or offset (e.g. GMT+5, Dubai)"
+            getOptionLabel={(id) => timezoneOptionLabels.get(id) || formatTimezoneWithGmtOffset(id)}
+            isOptionEqualToValue={(a, b) => a === b}
+            groupBy={(id) => {
+              const i = id.indexOf('/');
+              return i === -1 ? 'Other' : id.slice(0, i);
+            }}
+            renderOption={(props, id) => {
+              const { key, ...liProps } = props;
+              const off = getTimezoneOffsetLabel(id);
+              return (
+                <li key={key} {...liProps}>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', py: 0.25 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 600, lineHeight: 1.3 }}>
+                      {id}
+                    </Typography>
+                    {off ? (
+                      <Typography variant="caption" sx={{ color: 'text.secondary', lineHeight: 1.2 }}>
+                        {off === 'UTC' ? 'UTC / GMT+00:00' : off}
+                      </Typography>
+                    ) : (
+                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                        Custom / legacy value — pick an IANA zone if you can
+                      </Typography>
+                    )}
+                  </Box>
+                </li>
+              );
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="Type to search — city, region, IANA id, or offset (e.g. Karachi, GMT+5)"
+                helperText="Open the list and type; results match any part of the zone name or current GMT/UTC offset."
+                InputProps={{
+                  ...params.InputProps,
+                  startAdornment: (
+                    <>
+                      <InputAdornment position="start">
+                        <SearchIcon sx={{ color: 'text.secondary', fontSize: 22 }} aria-hidden />
+                      </InputAdornment>
+                      {params.InputProps.startAdornment}
+                    </>
+                  ),
+                }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    borderRadius: '12px',
+                    backgroundColor: 'white',
+                    '& fieldset': { borderColor: '#E9D5FF' },
+                    '&:hover fieldset': { borderColor: '#C084FC' },
+                    '&.Mui-focused fieldset': { borderColor: '#9333EA' },
+                  },
+                }}
+              />
+            )}
             sx={{
-              '& .MuiOutlinedInput-root': {
-                borderRadius: '12px',
-                backgroundColor: 'white',
-                '& fieldset': { borderColor: '#E9D5FF' },
-                '&:hover fieldset': { borderColor: '#C084FC' },
-                '&.Mui-focused fieldset': { borderColor: '#9333EA' },
-              }
+              '& .MuiAutocomplete-popupIndicator': { color: '#9333EA' },
             }}
           />
         </Box>
