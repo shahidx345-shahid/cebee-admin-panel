@@ -13,9 +13,62 @@ const POLL_FIXTURES_MAX = 8;
  * @param {object} params - Query parameters (status, leagueId, search, page, limit, sort_by, sort_order)
  * @returns {Promise<{success: boolean, data?: object, error?: string}>}
  */
+/**
+ * Start a new CeBee Voting Cycle (CVC). Previous cycle is marked completed; app shows only the new cycle once it has polls.
+ */
+/** Admin: active CVC, cycle list, poll counts per cvcId */
+export const getVotingCycleOverview = async () => {
+  try {
+    const response = await apiGet('/polls/voting-cycle', {});
+    if (response.success) {
+      return { success: true, data: response.data };
+    }
+    return {
+      success: false,
+      error: response.message || response.error || 'Failed to load voting cycles',
+      data: null,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message || 'Failed to load voting cycles',
+      data: null,
+    };
+  }
+};
+
+/**
+ * @param {{ name: string, startDate: string|Date, endDate?: string|Date|null, status?: 'current'|'completed' }} payload
+ */
+export const startNewVotingCycle = async (payload) => {
+  try {
+    const body = { ...payload };
+    if (body.startDate instanceof Date) body.startDate = body.startDate.toISOString();
+    if (body.endDate == null || body.endDate === '') {
+      delete body.endDate;
+    } else if (body.endDate instanceof Date) {
+      body.endDate = body.endDate.toISOString();
+    }
+    const response = await apiPost('/polls/voting-cycle/start', body);
+    if (response.success) {
+      return { success: true, data: response.data, message: response.message };
+    }
+    return {
+      success: false,
+      error: response.error || response.message || 'Failed to create voting cycle',
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message || 'Failed to create voting cycle',
+    };
+  }
+};
+
 export const getPolls = async (params = {}) => {
   try {
-    const response = await apiGet('/polls', params);
+    // Admin panel needs every poll across all CVCs; mobile/community omits `all` and gets one cycle only.
+    const response = await apiGet('/polls', { all: 'true', ...params });
     
     if (response.success) {
       return {
@@ -62,6 +115,37 @@ export const getPoll = async (pollId) => {
     return {
       success: false,
       error: error.message || 'Failed to fetch poll',
+    };
+  }
+};
+
+/**
+ * Admin: paginated voters for a poll (latest vote per user).
+ * @param {string} pollId
+ * @param {{ page?: number, limit?: number, sortBy?: 'time'|'match' }} params — page is 1-based
+ */
+export const getPollVoters = async (pollId, params = {}) => {
+  try {
+    const page = Math.max(1, Number(params.page) || 1);
+    const limit = Math.min(50, Math.max(1, Number(params.limit) || 25));
+    const sortBy = params.sortBy === 'match' ? 'match' : 'time';
+    const response = await apiGet(`/polls/${pollId}/voters`, { page, limit, sortBy });
+    if (response.success) {
+      return {
+        success: true,
+        data: response.data,
+      };
+    }
+    return {
+      success: false,
+      error: response.error || response.message || 'Failed to load voters',
+      data: { voters: [], pagination: { page: 1, limit, total: 0, pages: 1 } },
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message || 'Failed to load voters',
+      data: { voters: [], pagination: { page: 1, limit: 25, total: 0, pages: 1 } },
     };
   }
 };

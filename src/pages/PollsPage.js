@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -11,8 +11,22 @@ import {
   MenuItem,
   IconButton,
   Dialog,
+  DialogTitle,
   DialogContent,
+  DialogActions,
   Divider,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TablePagination,
+  Avatar,
+  CircularProgress,
+  FormControl,
+  InputLabel,
+  Select,
 } from '@mui/material';
 import {
   Add,
@@ -34,11 +48,13 @@ import {
   VerifiedUser,
   HighlightOff,
   Description,
+  Autorenew,
+  Event as EventIcon,
 } from '@mui/icons-material';
 import { colors } from '../config/theme';
 import SearchBar from '../components/common/SearchBar';
 import DataTable from '../components/common/DataTable';
-import { getPolls, closePoll } from '../services/pollsService';
+import { getPolls, closePoll, getVotingCycleOverview, getPollVoters } from '../services/pollsService';
 
 import { format } from 'date-fns';
 
@@ -78,12 +94,21 @@ const PollsPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [leagueFilter, setLeagueFilter] = useState('all');
+  /** Same pattern as Fixtures CMd filter: 'current' | 'all' | specific cvcId */
+  const [selectedCvc, setSelectedCvc] = useState('current');
+  const [cvcOverview, setCvcOverview] = useState(null);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(25);
   const [anchorEl, setAnchorEl] = useState(null);
   const [selectedPoll, setSelectedPoll] = useState(null);
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const [pollDetails, setPollDetails] = useState(null);
+  const [voters, setVoters] = useState([]);
+  const [votersLoading, setVotersLoading] = useState(false);
+  const [votersPage, setVotersPage] = useState(0);
+  const [votersRowsPerPage, setVotersRowsPerPage] = useState(25);
+  const [votersSortBy, setVotersSortBy] = useState('time');
+  const [votersTotal, setVotersTotal] = useState(0);
   const [closePollDialogOpen, setClosePollDialogOpen] = useState(false);
   const [pollToClose, setPollToClose] = useState(null);
 
@@ -92,7 +117,13 @@ const PollsPage = () => {
       try {
         setLoading(true);
 
-        const result = await getPolls();
+        const [result, cycleRes] = await Promise.all([getPolls(), getVotingCycleOverview()]);
+        if (cycleRes.success && cycleRes.data) {
+          setCvcOverview(cycleRes.data);
+        } else {
+          setCvcOverview(null);
+        }
+
         if (result.success && result.data?.polls) {
           const idStr = (x) => {
             if (x == null || x === '') return '';
@@ -133,6 +164,7 @@ const PollsPage = () => {
             return {
             id: poll._id || poll.poll_id || poll.id,
             pollId: poll.poll_id || poll.pollId || `POLL_${String(poll.order || 0).padStart(3, '0')}`,
+            cvcId: poll.cvc_id || poll.cvcId || null,
             leagueId: poll.league_id || poll.leagueId,
             leagueName: leagueNameForDisplay(poll.league_name || poll.leagueName || 'Unknown League'),
             status: poll.status || poll.pollStatus || 'scheduled',
@@ -140,7 +172,11 @@ const PollsPage = () => {
             voteCount: poll.vote_count || poll.voteCount || 0,
             startTime: poll.start_time ? new Date(poll.start_time) : poll.startTime ? new Date(poll.startTime) : new Date(),
             closeTime: poll.close_time ? new Date(poll.close_time) : poll.closeTime ? new Date(poll.closeTime) : new Date(),
-            createdAt: poll.created_at ? new Date(poll.created_at) : new Date(),
+            createdAt: poll.createdAt
+              ? new Date(poll.createdAt)
+              : poll.created_at
+                ? new Date(poll.created_at)
+                : new Date(),
             poll_winner_fixture_id: poll.poll_winner_fixture_id ?? poll.pollWinnerFixtureId ?? null,
             poll_winner_team_id: idStr(poll.poll_winner_team_id),
             poll_winner_team_name: winnerTeamName,
@@ -179,6 +215,31 @@ const PollsPage = () => {
   }, []);
 
   useEffect(() => {
+    if (!detailsDialogOpen || !pollDetails?.id) return undefined;
+    let cancelled = false;
+    (async () => {
+      setVotersLoading(true);
+      const r = await getPollVoters(pollDetails.id, {
+        page: votersPage + 1,
+        limit: votersRowsPerPage,
+        sortBy: votersSortBy,
+      });
+      if (cancelled) return;
+      if (r.success && r.data) {
+        setVoters(r.data.voters || []);
+        setVotersTotal(r.data.pagination?.total ?? 0);
+      } else {
+        setVoters([]);
+        setVotersTotal(0);
+      }
+      setVotersLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [detailsDialogOpen, pollDetails?.id, votersPage, votersRowsPerPage, votersSortBy]);
+
+  useEffect(() => {
     const filterPolls = () => {
       let filtered = [...polls];
 
@@ -188,7 +249,8 @@ const PollsPage = () => {
           (poll) =>
             poll.pollId?.toLowerCase().includes(query) ||
             poll.leagueName?.toLowerCase().includes(query) ||
-            poll.question?.toLowerCase().includes(query)
+            poll.question?.toLowerCase().includes(query) ||
+            (poll.cvcId && String(poll.cvcId).toLowerCase().includes(query))
         );
       }
 
@@ -207,6 +269,15 @@ const PollsPage = () => {
         filtered = filtered.filter((poll) => poll.leagueId === leagueFilter);
       }
 
+      if (selectedCvc === 'current') {
+        const cur = cvcOverview?.activeCycle?.name || cvcOverview?.activeCycle?.cvcId;
+        if (cur) {
+          filtered = filtered.filter((poll) => String(poll.cvcId || '') === String(cur));
+        }
+      } else if (selectedCvc !== 'all') {
+        filtered = filtered.filter((poll) => String(poll.cvcId || '') === selectedCvc);
+      }
+
       filtered.sort((a, b) => {
         const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
         const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
@@ -216,16 +287,25 @@ const PollsPage = () => {
       setFilteredPolls(filtered);
     };
     filterPolls();
-  }, [polls, searchQuery, statusFilter, leagueFilter]);
+  }, [polls, searchQuery, statusFilter, leagueFilter, selectedCvc, cvcOverview]);
 
   const canCreateMorePolls = () => {
-    const activePolls = polls.filter((p) => (p.status || p.pollStatus) === 'active');
-    return activePolls.length < 5;
+    const activeCvcId = cvcOverview?.activeCycle?.name || cvcOverview?.activeCycle?.cvcId;
+    const live = ['active', 'scheduled', 'pending'];
+    const activeInCurrentCvc = polls.filter((p) => {
+      if (!live.includes(p.status || p.pollStatus)) return false;
+      if (activeCvcId && p.cvcId) return p.cvcId === activeCvcId;
+      if (activeCvcId && !p.cvcId) return false;
+      return true;
+    });
+    return activeInCurrentCvc.length < 5;
   };
 
   const handleCreatePoll = () => {
     if (!canCreateMorePolls()) {
-      alert('Maximum 5 active polls reached. Close a poll to create a new one.');
+      alert(
+        'Maximum 5 active/scheduled polls in the current voting cycle (CVC). Close one or start a new cycle from Add / Create Poll.'
+      );
       return;
     }
     navigate('/polls/add');
@@ -298,6 +378,10 @@ const PollsPage = () => {
   const handleDetailsDialogClose = () => {
     setDetailsDialogOpen(false);
     setPollDetails(null);
+    setVoters([]);
+    setVotersPage(0);
+    setVotersTotal(0);
+    setVotersSortBy('time');
   };
 
   const getStatusChip = (status) => {
@@ -345,6 +429,29 @@ const PollsPage = () => {
           }}
         />
       ),
+    },
+    {
+      id: 'cvcId',
+      label: 'CVC',
+      render: (_, row) => {
+        const id = row.cvcId || '—';
+        const activeKey = cvcOverview?.activeCycle?.name || cvcOverview?.activeCycle?.cvcId;
+        const isActive = activeKey && row.cvcId === activeKey;
+        return (
+          <Chip
+            label={id}
+            size="small"
+            sx={{
+              backgroundColor: isActive ? '#D1FAE5' : '#F3F4F6',
+              color: isActive ? '#047857' : '#4B5563',
+              fontWeight: 600,
+              fontSize: 12,
+              borderRadius: '8px',
+              height: 26,
+            }}
+          />
+        );
+      },
     },
     {
       id: 'leagueName',
@@ -439,6 +546,11 @@ const PollsPage = () => {
     page * rowsPerPage + rowsPerPage
   );
 
+  const completedCycles = useMemo(() => {
+    if (!cvcOverview?.cycles?.length) return [];
+    return cvcOverview.cycles.filter((c) => c.status === 'completed' || c.cycleStatus === 'completed');
+  }, [cvcOverview]);
+
   const activePolls = polls.filter((p) => (p.status || p.pollStatus) === 'active');
 
   return (
@@ -478,7 +590,7 @@ const PollsPage = () => {
             ml: 9,
           }}
         >
-          One poll per league • Max 5 active polls
+          Create and configure voting cycles on the Add / Create Poll page. Use filters below to view polls by cycle.
         </Typography>
       </Box>
 
@@ -691,6 +803,94 @@ const PollsPage = () => {
         })}
       </Card>
 
+      {/* CVC scope filter — mirrors Fixtures “Filter by CMd” */}
+      <Card
+        sx={{
+          mb: 3,
+          borderRadius: '16px',
+          backgroundColor: colors.brandWhite,
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+          padding: 2,
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <EventIcon sx={{ fontSize: 20, color: colors.brandRed }} />
+            <Typography variant="body1" sx={{ fontWeight: 600, color: colors.brandBlack }}>
+              Filter table by CVC:
+            </Typography>
+          </Box>
+          <Button
+            variant={selectedCvc === 'current' ? 'contained' : 'outlined'}
+            onClick={() => {
+              setSelectedCvc('current');
+              setPage(0);
+            }}
+            sx={{
+              backgroundColor: selectedCvc === 'current' ? colors.brandRed : 'transparent',
+              color: selectedCvc === 'current' ? colors.brandWhite : colors.brandBlack,
+              borderColor: colors.brandRed,
+              textTransform: 'none',
+              fontWeight: 600,
+              borderRadius: '8px',
+              '&:hover': {
+                backgroundColor: selectedCvc === 'current' ? colors.brandDarkRed : `${colors.brandRed}0A`,
+              },
+            }}
+          >
+            {cvcOverview?.activeCycle?.name || cvcOverview?.activeCycle?.cvcId
+              ? `Current (${cvcOverview.activeCycle.name || cvcOverview.activeCycle.cvcId})`
+              : 'Current CVC'}
+          </Button>
+          {completedCycles.map((c) => {
+            const cKey = c.name || c.cvcId;
+            return (
+            <Button
+              key={cKey}
+              variant={selectedCvc === cKey ? 'contained' : 'outlined'}
+              onClick={() => {
+                setSelectedCvc(cKey);
+                setPage(0);
+              }}
+              sx={{
+                backgroundColor: selectedCvc === cKey ? colors.textSecondary : 'transparent',
+                color: selectedCvc === cKey ? colors.brandWhite : colors.brandBlack,
+                borderColor: colors.textSecondary,
+                textTransform: 'none',
+                fontWeight: 600,
+                borderRadius: '8px',
+                '&:hover': {
+                  backgroundColor: selectedCvc === cKey ? colors.textSecondary : `${colors.textSecondary}0A`,
+                },
+              }}
+            >
+              {cKey}
+            </Button>
+          );
+          })}
+          <Button
+            variant={selectedCvc === 'all' ? 'contained' : 'outlined'}
+            onClick={() => {
+              setSelectedCvc('all');
+              setPage(0);
+            }}
+            sx={{
+              backgroundColor: selectedCvc === 'all' ? colors.info : 'transparent',
+              color: selectedCvc === 'all' ? colors.brandWhite : colors.brandBlack,
+              borderColor: colors.info,
+              textTransform: 'none',
+              fontWeight: 600,
+              borderRadius: '8px',
+              '&:hover': {
+                backgroundColor: selectedCvc === 'all' ? colors.info : `${colors.info}0A`,
+              },
+            }}
+          >
+            All cycles
+          </Button>
+        </Box>
+      </Card>
+
       {/* Search Bar and Create Button */}
       <Card
         sx={{
@@ -710,7 +910,7 @@ const PollsPage = () => {
           <SearchBar
             value={searchQuery}
             onChange={setSearchQuery}
-            placeholder="Search polls by ID or league..."
+            placeholder="Search polls by ID, league, or CVC (e.g. CVC01)..."
           />
         </Box>
         <Button
@@ -828,13 +1028,13 @@ const PollsPage = () => {
       <Dialog
         open={detailsDialogOpen}
         onClose={handleDetailsDialogClose}
-        maxWidth="sm"
+        maxWidth="lg"
         fullWidth
         PaperProps={{
           sx: {
             borderRadius: '16px',
             overflow: 'hidden',
-            maxWidth: '600px',
+            maxWidth: '960px',
           },
         }}
       >
@@ -906,6 +1106,18 @@ const PollsPage = () => {
                     </Box>
                     <Typography variant="body2" sx={{ fontWeight: 600, fontSize: 14, color: colors.brandBlack }}>
                       {pollDetails.pollId}
+                    </Typography>
+                  </Box>
+
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 2, borderBottom: `1px solid #E5E7EB` }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+                      <Autorenew sx={{ fontSize: 18, color: colors.brandRed }} />
+                      <Typography variant="body2" sx={{ color: '#6B7280', fontSize: 14 }}>
+                        Voting cycle (CVC)
+                      </Typography>
+                    </Box>
+                    <Typography variant="body2" sx={{ fontWeight: 600, fontSize: 14, color: colors.brandBlack }}>
+                      {pollDetails.cvcId || '—'}
                     </Typography>
                   </Box>
 
@@ -1182,6 +1394,138 @@ const PollsPage = () => {
                 </Box>
               </Box>
               )}
+
+              {/* Voters (admin) */}
+              <Box sx={{ px: 3, py: 2, borderTop: '1px solid #E5E7EB' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2, mb: 2 }}>
+                  <Typography variant="h6" sx={{ fontWeight: 600, fontSize: 16, color: colors.brandBlack }}>
+                    Voters
+                  </Typography>
+                  <FormControl size="small" sx={{ minWidth: 200 }}>
+                    <InputLabel id="voters-sort-label">Sort by</InputLabel>
+                    <Select
+                      labelId="voters-sort-label"
+                      label="Sort by"
+                      value={votersSortBy}
+                      onChange={(e) => {
+                        setVotersSortBy(e.target.value);
+                        setVotersPage(0);
+                      }}
+                      sx={{ borderRadius: '10px' }}
+                    >
+                      <MenuItem value="time">Latest vote first</MenuItem>
+                      <MenuItem value="match">Match (then time)</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Box>
+
+                {votersLoading ? (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                    <CircularProgress size={32} sx={{ color: colors.brandRed }} />
+                  </Box>
+                ) : voters.length === 0 ? (
+                  <Typography variant="body2" sx={{ color: colors.textSecondary, py: 2 }}>
+                    No votes yet.
+                  </Typography>
+                ) : (
+                  <>
+                    <TableContainer sx={{ maxHeight: 360, border: '1px solid #E5E7EB', borderRadius: '12px' }}>
+                      <Table size="small" stickyHeader>
+                        <TableHead>
+                          <TableRow>
+                            <TableCell sx={{ fontWeight: 700, backgroundColor: '#F9FAFB' }}>User</TableCell>
+                            <TableCell sx={{ fontWeight: 700, backgroundColor: '#F9FAFB' }}>Username</TableCell>
+                            <TableCell sx={{ fontWeight: 700, backgroundColor: '#F9FAFB' }}>Email</TableCell>
+                            <TableCell sx={{ fontWeight: 700, backgroundColor: '#F9FAFB' }}>Selected match</TableCell>
+                            <TableCell sx={{ fontWeight: 700, backgroundColor: '#F9FAFB' }}>Vote time</TableCell>
+                            <TableCell sx={{ fontWeight: 700, backgroundColor: '#F9FAFB' }}>User ID</TableCell>
+                            <TableCell sx={{ fontWeight: 700, backgroundColor: '#F9FAFB' }}>Country</TableCell>
+                            <TableCell sx={{ fontWeight: 700, backgroundColor: '#F9FAFB' }}>Platform</TableCell>
+                          </TableRow>
+                        </TableHead>
+                        <TableBody>
+                          {voters.map((row) => {
+                            const name = row.fullName || row.username || 'User';
+                            const initial = String(name).trim().charAt(0).toUpperCase() || '?';
+                            const avatarSrc =
+                              row.avatar && (row.avatar.startsWith('http') || row.avatar.startsWith('/'))
+                                ? row.avatar
+                                : null;
+                            return (
+                              <TableRow key={row.userId} hover>
+                                <TableCell>
+                                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.25 }}>
+                                    <Avatar
+                                      src={avatarSrc || undefined}
+                                      alt=""
+                                      sx={{ width: 32, height: 32, fontSize: 14, bgcolor: colors.brandRed }}
+                                    >
+                                      {!avatarSrc ? initial : null}
+                                    </Avatar>
+                                    <Typography variant="body2" sx={{ fontWeight: 600, fontSize: 13 }}>
+                                      {row.fullName || '—'}
+                                    </Typography>
+                                  </Box>
+                                </TableCell>
+                                <TableCell>
+                                  <Typography variant="body2" sx={{ fontSize: 13, fontFamily: 'monospace' }}>
+                                    {row.username ?? '—'}
+                                  </Typography>
+                                </TableCell>
+                                <TableCell>
+                                  <Typography variant="body2" sx={{ fontSize: 13 }}>
+                                    {row.email ?? '—'}
+                                  </Typography>
+                                </TableCell>
+                                <TableCell>
+                                  <Typography variant="body2" sx={{ fontSize: 13 }}>
+                                    {row.selectedMatch || '—'}
+                                  </Typography>
+                                </TableCell>
+                                <TableCell>
+                                  <Typography variant="body2" sx={{ fontSize: 13 }}>
+                                    {row.votedAt
+                                      ? format(new Date(row.votedAt), 'd MMM, HH:mm')
+                                      : '—'}
+                                  </Typography>
+                                </TableCell>
+                                <TableCell>
+                                  <Typography variant="caption" sx={{ color: colors.textSecondary, fontFamily: 'monospace' }}>
+                                    {row.userId}
+                                  </Typography>
+                                </TableCell>
+                                <TableCell>
+                                  <Typography variant="body2" sx={{ fontSize: 13 }}>
+                                    {row.country || '—'}
+                                  </Typography>
+                                </TableCell>
+                                <TableCell>
+                                  <Typography variant="body2" sx={{ fontSize: 13, color: colors.textSecondary }}>
+                                    {row.platform || '—'}
+                                  </Typography>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </TableContainer>
+                    <TablePagination
+                      component="div"
+                      count={votersTotal}
+                      page={votersPage}
+                      onPageChange={(_, p) => setVotersPage(p)}
+                      rowsPerPage={votersRowsPerPage}
+                      onRowsPerPageChange={(e) => {
+                        setVotersRowsPerPage(parseInt(e.target.value, 10));
+                        setVotersPage(0);
+                      }}
+                      rowsPerPageOptions={[10, 25, 50]}
+                      labelRowsPerPage="Rows"
+                    />
+                  </>
+                )}
+              </Box>
 
               {/* Close Button */}
               <Box sx={{ px: 3, pb: 3 }}>

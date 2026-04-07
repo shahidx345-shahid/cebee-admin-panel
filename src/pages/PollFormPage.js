@@ -36,15 +36,26 @@ import {
   Info,
   CheckCircle,
   RadioButtonUnchecked,
+  RadioButtonChecked,
+  Event as EventIcon,
   SportsSoccer,
   ExpandMore,
+  Autorenew,
 } from '@mui/icons-material';
 import { colors, constants } from '../config/theme';
 import { DateTimePicker, LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { format } from 'date-fns';
 import { formatSeasonLabel } from '../utils/seasonFormat';
-import { getPolls, getPoll, updatePoll, getUpcomingFixtures, createPollFromApi } from '../services/pollsService';
+import {
+  getPolls,
+  getPoll,
+  updatePoll,
+  getUpcomingFixtures,
+  createPollFromApi,
+  getVotingCycleOverview,
+  startNewVotingCycle,
+} from '../services/pollsService';
 import { getLeagues } from '../services/leaguesService';
 import { getTeams } from '../services/teamsService';
 
@@ -110,6 +121,17 @@ const PollFormPage = () => {
   const [fixturesTotalPages, setFixturesTotalPages] = useState(0);
   const [fixturesLoadingMore, setFixturesLoadingMore] = useState(false);
   const [polls, setPolls] = useState([]);
+  const [votingCycleOverview, setVotingCycleOverview] = useState(null);
+  const [showNewCycleForm, setShowNewCycleForm] = useState(false);
+  const [cycleStarting, setCycleStarting] = useState(false);
+  const [cycleRefreshKey, setCycleRefreshKey] = useState(0);
+  const [newCvcForm, setNewCvcForm] = useState({
+    name: '',
+    startDate: new Date(),
+    endDate: null,
+    status: 'current',
+  });
+  const [existingPollCvcId, setExistingPollCvcId] = useState(null);
   const [availableTeams, setAvailableTeams] = useState([]);
   const [loadingTeams, setLoadingTeams] = useState(false);
   const [teamsError, setTeamsError] = useState('');
@@ -187,8 +209,12 @@ const PollFormPage = () => {
 
         await loadLeagues();
 
-        // Fetch all polls to check rules
-        const pollsResult = await getPolls();
+        const [pollsResult, cycleRes] = await Promise.all([getPolls(), getVotingCycleOverview()]);
+        if (cycleRes.success && cycleRes.data) {
+          setVotingCycleOverview(cycleRes.data);
+        } else {
+          setVotingCycleOverview(null);
+        }
         if (pollsResult.success && pollsResult.data?.polls) {
           setPolls(pollsResult.data.polls);
         }
@@ -197,7 +223,8 @@ const PollFormPage = () => {
         if (isEditMode && id) {
           const pollResult = await getPoll(id);
           if (pollResult.success && pollResult.data) {
-            const poll = pollResult.data;
+            const poll = pollResult.data.poll || pollResult.data;
+            setExistingPollCvcId(poll.cvcId || poll.cvc_id || null);
             setFormData({
               leagueId: poll.league_id || poll.leagueId,
               startTime: poll.start_time ? new Date(poll.start_time) : new Date(),
@@ -217,6 +244,8 @@ const PollFormPage = () => {
               setSelectedFixtures(fixtures.slice(0, POLL_FIXTURES_MAX));
             }
           }
+        } else {
+          setExistingPollCvcId(null);
         }
       } catch (error) {
         console.error('Error loading data:', error);
@@ -227,6 +256,30 @@ const PollFormPage = () => {
 
     loadData();
   }, [id, isEditMode]);
+
+  useEffect(() => {
+    if (cycleRefreshKey === 0) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [pollsResult, cycleRes] = await Promise.all([getPolls(), getVotingCycleOverview()]);
+        if (cancelled) return;
+        if (cycleRes.success && cycleRes.data) {
+          setVotingCycleOverview(cycleRes.data);
+        } else {
+          setVotingCycleOverview(null);
+        }
+        if (pollsResult.success && pollsResult.data?.polls) {
+          setPolls(pollsResult.data.polls);
+        }
+      } catch (e) {
+        console.error('Error refreshing voting cycle:', e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [cycleRefreshKey]);
 
   useEffect(() => {
     const loadLeagueTeams = async (leagueId) => {
@@ -555,11 +608,21 @@ const PollFormPage = () => {
 
   const checkPollRules = () => {
     const selectedLeague = leagues.find((l) => l.id === formData.leagueId);
-    // Exclude current poll when in edit mode
-    const activePolls = polls.filter(
-      (p) => (p.status || p.pollStatus) === 'active' && (!isEditMode || p.id !== id)
-    );
-    const leaguePolls = activePolls.filter((p) => p.leagueId === formData.leagueId);
+    const live = ['active', 'scheduled', 'pending'];
+    const activeCvcKey =
+      votingCycleOverview?.activeCycle?.name || votingCycleOverview?.activeCycle?.cvcId || null;
+    const activePolls = polls.filter((p) => {
+      if (!live.includes(p.status || p.pollStatus)) return false;
+      const pid = p._id || p.id;
+      if (isEditMode && id && String(pid) === String(id)) return false;
+      if (activeCvcKey && p.cvcId) return p.cvcId === activeCvcKey;
+      if (activeCvcKey && !p.cvcId) return false;
+      return true;
+    });
+    const leaguePolls = activePolls.filter((p) => {
+      const pl = p.leagueId?._id ?? p.leagueId ?? p.league_id;
+      return String(pl) === String(formData.leagueId);
+    });
     const activePollsCount = activePolls.length;
     const st = formData.startTime instanceof Date ? formData.startTime : new Date(formData.startTime);
     const ct = formData.closeTime instanceof Date ? formData.closeTime : new Date(formData.closeTime);
@@ -572,62 +635,449 @@ const PollFormPage = () => {
   };
 
   const rules = checkPollRules();
+  const completedCycles = (votingCycleOverview?.cycles || []).filter(
+    (c) => c.status === 'completed' || c.cycleStatus === 'completed'
+  );
+  const pollCountByCvcId = votingCycleOverview?.pollCountByCvcId || {};
 
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns}>
       <Box sx={{ width: '100%', maxWidth: '100%' }}>
-        {/* Header */}
-        <Box sx={{ mb: 4 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-            <IconButton
-              onClick={() => navigate(constants.routes.polls)}
+        {/* Back — keep above CVC so it stays visible */}
+        <Box sx={{ mb: 2 }}>
+          <IconButton
+            onClick={() => navigate(constants.routes.polls)}
+            aria-label="Back to polls"
+            sx={{
+              backgroundColor: colors.brandRed,
+              color: colors.brandWhite,
+              width: 40,
+              height: 40,
+              '&:hover': {
+                backgroundColor: colors.brandDarkRed,
+              },
+            }}
+          >
+            <ArrowBack sx={{ fontSize: 20 }} />
+          </IconButton>
+        </Box>
+
+        {/* CVC at top of create/edit flow (per product: see cycle before poll details) */}
+        <Card sx={{ padding: 3, borderRadius: '16px', mb: 3, boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+            <EventIcon sx={{ fontSize: 20, color: colors.brandRed }} />
+            <Typography variant="h6" sx={{ fontWeight: 700, color: colors.brandBlack }}>
+              CeBee Voting Cycle (CVC)
+            </Typography>
+          </Box>
+          <Alert
+            icon={<Info sx={{ color: colors.info }} />}
+            sx={{
+              mb: 2,
+              backgroundColor: `${colors.info}15`,
+              border: `1px solid ${colors.info}33`,
+              borderRadius: '12px',
+              '& .MuiAlert-icon': { color: colors.info },
+            }}
+          >
+            <Typography variant="body2" sx={{ color: colors.info, fontWeight: 600, mb: 0.5 }}>
+              CVC assignment
+            </Typography>
+            <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 12 }}>
+              {isEditMode
+                ? 'Cycle is fixed for this poll. To move the app to a new voting window, use New voting cycle below, then create new polls in that cycle.'
+                : 'New polls are saved under the current CVC (same pattern as assigning fixtures to the current CMd).'}
+            </Typography>
+          </Alert>
+
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+            {!showNewCycleForm ? (
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<Autorenew sx={{ fontSize: 18 }} />}
+                onClick={() => setShowNewCycleForm(true)}
+                sx={{
+                  textTransform: 'none',
+                  fontWeight: 700,
+                  borderRadius: '12px',
+                  borderColor: colors.brandRed,
+                  color: colors.brandRed,
+                  '&:hover': { borderColor: colors.brandDarkRed, backgroundColor: `${colors.brandRed}0D` },
+                }}
+              >
+                New voting cycle
+              </Button>
+            ) : (
+              <Button
+                variant="text"
+                size="small"
+                onClick={() => !cycleStarting && setShowNewCycleForm(false)}
+                disabled={cycleStarting}
+                sx={{ textTransform: 'none', fontWeight: 600, color: colors.textSecondary }}
+              >
+                Close form
+              </Button>
+            )}
+          </Box>
+
+          {showNewCycleForm && (
+            <Card
+              variant="outlined"
               sx={{
-                backgroundColor: colors.brandRed,
-                color: colors.brandWhite,
-                width: 40,
-                height: 40,
-                '&:hover': {
-                  backgroundColor: colors.brandDarkRed,
-                },
+                mb: 2,
+                p: 2.5,
+                borderRadius: '16px',
+                borderColor: colors.divider,
+                boxShadow: 'none',
+                backgroundColor: colors.brandWhite,
               }}
             >
-              <ArrowBack sx={{ fontSize: 20 }} />
-            </IconButton>
+              <Typography variant="subtitle1" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 1.5 }}>
+                Create new voting cycle
+              </Typography>
+              <Alert
+                severity="info"
+                icon={<Info sx={{ color: colors.info }} />}
+                sx={{
+                  mb: 2,
+                  backgroundColor: `${colors.info}12`,
+                  border: `1px solid ${colors.info}33`,
+                  borderRadius: '12px',
+                  '& .MuiAlert-icon': { color: colors.info },
+                }}
+              >
+                <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13, lineHeight: 1.5 }}>
+                  The current CeBee Voting Cycle (CVC) will be marked completed. The app will only show polls you add to
+                  the new cycle. Existing polls stay in the database for admin history but disappear from the community
+                  poll page.
+                </Typography>
+              </Alert>
+              <Grid container spacing={2} sx={{ mb: 2 }}>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="CVC name"
+                    placeholder="e.g., CVC-06"
+                    value={newCvcForm.name}
+                    onChange={(e) => setNewCvcForm({ ...newCvcForm, name: e.target.value })}
+                    required
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: '12px',
+                      },
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <DateTimePicker
+                    label="Start date"
+                    value={newCvcForm.startDate}
+                    onChange={(date) => date && setNewCvcForm({ ...newCvcForm, startDate: date })}
+                    slotProps={{
+                      textField: {
+                        fullWidth: true,
+                        sx: {
+                          '& .MuiOutlinedInput-root': { borderRadius: '12px' },
+                        },
+                      },
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <Box>
+                    <DateTimePicker
+                      label="End date (optional)"
+                      value={newCvcForm.endDate}
+                      onChange={(date) => setNewCvcForm({ ...newCvcForm, endDate: date })}
+                      slotProps={{
+                        textField: {
+                          fullWidth: true,
+                          helperText: 'Leave empty if the cycle has no fixed end',
+                          sx: {
+                            '& .MuiOutlinedInput-root': { borderRadius: '12px' },
+                          },
+                        },
+                      }}
+                    />
+                    {newCvcForm.endDate ? (
+                      <Button
+                        size="small"
+                        onClick={() => setNewCvcForm({ ...newCvcForm, endDate: null })}
+                        sx={{ mt: 0.5, textTransform: 'none', fontSize: 12 }}
+                      >
+                        Clear end date
+                      </Button>
+                    ) : null}
+                  </Box>
+                </Grid>
+                <Grid item xs={12}>
+                  <FormControl fullWidth>
+                    <InputLabel>Status</InputLabel>
+                    <Select
+                      value={newCvcForm.status}
+                      onChange={(e) => setNewCvcForm({ ...newCvcForm, status: e.target.value })}
+                      label="Status"
+                      sx={{
+                        borderRadius: '12px',
+                        '& .MuiOutlinedInput-notchedOutline': { borderRadius: '12px' },
+                      }}
+                    >
+                      <MenuItem value="current">Current (active in app when it has polls)</MenuItem>
+                      <MenuItem value="completed">Completed</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+              </Grid>
+              <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5, flexWrap: 'wrap' }}>
+                <Button
+                  onClick={() => setShowNewCycleForm(false)}
+                  disabled={cycleStarting}
+                  sx={{ textTransform: 'none', fontWeight: 600, color: colors.textSecondary }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="contained"
+                  disabled={cycleStarting}
+                  onClick={async () => {
+                    if (!newCvcForm.name || !String(newCvcForm.name).trim()) {
+                      alert('Please enter a CVC name.');
+                      return;
+                    }
+                    const sd = newCvcForm.startDate instanceof Date ? newCvcForm.startDate : new Date(newCvcForm.startDate);
+                    if (Number.isNaN(sd.getTime())) {
+                      alert('Please choose a valid start date.');
+                      return;
+                    }
+                    const payload = {
+                      name: newCvcForm.name.trim(),
+                      startDate: sd.toISOString(),
+                      status: newCvcForm.status,
+                    };
+                    if (newCvcForm.endDate) {
+                      const ed =
+                        newCvcForm.endDate instanceof Date ? newCvcForm.endDate : new Date(newCvcForm.endDate);
+                      if (Number.isNaN(ed.getTime())) {
+                        alert('End date is invalid. Clear it or pick a valid date.');
+                        return;
+                      }
+                      if (ed.getTime() <= sd.getTime()) {
+                        alert('End date must be after start date.');
+                        return;
+                      }
+                      payload.endDate = ed.toISOString();
+                    }
+                    setCycleStarting(true);
+                    const r = await startNewVotingCycle(payload);
+                    setCycleStarting(false);
+                    if (r.success) {
+                      setShowNewCycleForm(false);
+                      setNewCvcForm({
+                        name: '',
+                        startDate: new Date(),
+                        endDate: null,
+                        status: 'current',
+                      });
+                      setCycleRefreshKey((k) => k + 1);
+                    } else {
+                      alert(r.error || 'Failed to create voting cycle');
+                    }
+                  }}
+                  sx={{
+                    textTransform: 'none',
+                    fontWeight: 700,
+                    borderRadius: '12px',
+                    backgroundColor: colors.brandRed,
+                    '&:hover': { backgroundColor: colors.brandDarkRed },
+                  }}
+                >
+                  {cycleStarting ? 'Creating…' : 'Create voting cycle'}
+                </Button>
+              </Box>
+            </Card>
+          )}
+
+          {!isEditMode &&
+            (votingCycleOverview?.activeCycle?.name || votingCycleOverview?.activeCycle?.cvcId) &&
+            (votingCycleOverview.activeCycle.status === 'current' ||
+              votingCycleOverview.activeCycle.cycleStatus === 'active') && (
             <Box
               sx={{
-                width: 48,
-                height: 48,
+                p: 2.5,
                 borderRadius: '12px',
-                background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
+                backgroundColor: `${colors.brandRed}08`,
+                border: `2px solid ${colors.brandRed}`,
               }}
             >
-              <BarChart sx={{ fontSize: 28, color: colors.brandWhite }} />
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Box sx={{ padding: 1, borderRadius: '8px', backgroundColor: colors.brandRed }}>
+                    <RadioButtonChecked sx={{ fontSize: 20, color: colors.brandWhite }} />
+                  </Box>
+                  <Box>
+                    <Typography variant="h6" sx={{ fontWeight: 700, color: colors.brandBlack }}>
+                      {votingCycleOverview.activeCycle.name || votingCycleOverview.activeCycle.cvcId} (current)
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: colors.textSecondary, fontSize: 11, display: 'block' }}>
+                      {votingCycleOverview.activeCycle.startDate
+                        ? `${format(new Date(votingCycleOverview.activeCycle.startDate), 'MMM d, yyyy')}${
+                            votingCycleOverview.activeCycle.endDate
+                              ? ` – ${format(new Date(votingCycleOverview.activeCycle.endDate), 'MMM d, yyyy')}`
+                              : ' · no end date'
+                          }`
+                        : 'This poll will be created in this cycle'}
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: colors.textSecondary, fontSize: 11 }}>
+                      New polls use this cycle until you create another with status Current.
+                    </Typography>
+                  </Box>
+                </Box>
+                <Chip
+                  label="CURRENT"
+                  size="small"
+                  sx={{
+                    backgroundColor: colors.success,
+                    color: colors.brandWhite,
+                    fontWeight: 700,
+                    fontSize: 10,
+                    height: 24,
+                  }}
+                />
+              </Box>
             </Box>
-            <Box>
-              <Typography
-                variant="h4"
-                sx={{
-                  fontWeight: 700,
-                  color: colors.brandBlack,
-                  fontSize: { xs: 24, md: 28 },
-                  mb: 0.5,
-                }}
-              >
-                {isEditMode ? 'Edit Poll' : 'Create New Poll'}
-              </Typography>
-              <Typography
-                variant="body2"
-                sx={{
-                  color: colors.textSecondary,
-                  fontSize: 14,
-                }}
-              >
-                One poll per league • Max 5 active • 24h-30d duration
-              </Typography>
+          )}
+
+          {!isEditMode &&
+            votingCycleOverview &&
+            !(votingCycleOverview.activeCycle?.status === 'current' || votingCycleOverview.activeCycle?.cycleStatus === 'active') && (
+              <Alert severity="warning" sx={{ mb: 2, borderRadius: '12px' }}>
+                There is no <strong>current</strong> voting cycle. Create one above with status &quot;Current&quot; before
+                adding polls.
+              </Alert>
+            )}
+
+          {isEditMode && existingPollCvcId && (
+            <Box
+              sx={{
+                p: 2,
+                borderRadius: '12px',
+                backgroundColor: colors.brandWhite,
+                border: `1px solid ${colors.divider}`,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.5,
+              }}
+            >
+              <RadioButtonUnchecked sx={{ fontSize: 18, color: colors.textSecondary, opacity: 0.7 }} />
+              <Box>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                  Poll cycle: <strong>{existingPollCvcId}</strong>
+                </Typography>
+                <Typography variant="caption" sx={{ color: colors.textSecondary }}>
+                  Shown for reference; cycle id is not changed when editing.
+                </Typography>
+              </Box>
             </Box>
+          )}
+
+          <Divider sx={{ my: 2 }} />
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, color: colors.brandBlack, mb: 1.5 }}>
+            Previous voting cycles
+          </Typography>
+          {completedCycles.length === 0 ? (
+            <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 13 }}>
+              No completed cycles yet. When you start a new cycle, the current one moves here for history.
+            </Typography>
+          ) : (
+            <List dense disablePadding sx={{ maxHeight: 280, overflow: 'auto' }}>
+              {completedCycles.map((c) => {
+                const cKey = c.name || c.cvcId;
+                const n = pollCountByCvcId[cKey] ?? c.pollCount ?? 0;
+                const range = c.startDate
+                  ? `${format(new Date(c.startDate), 'MMM d, yyyy')}${
+                      c.endDate ? ` – ${format(new Date(c.endDate), 'MMM d, yyyy')}` : ' · no end date'
+                    }`
+                  : c.createdAt
+                    ? format(new Date(c.createdAt), 'MMM d, yyyy')
+                    : '—';
+                return (
+                  <ListItem
+                    key={c._id || cKey}
+                    sx={{
+                      borderRadius: '10px',
+                      mb: 0.75,
+                      border: `1px solid ${colors.divider}`,
+                      py: 1,
+                      px: 1.5,
+                      alignItems: 'flex-start',
+                    }}
+                  >
+                    <ListItemIcon sx={{ minWidth: 36, mt: 0.25 }}>
+                      <RadioButtonUnchecked sx={{ fontSize: 18, color: colors.textSecondary }} />
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                          <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                            {cKey}
+                          </Typography>
+                          <Chip
+                            label="COMPLETED"
+                            size="small"
+                            sx={{
+                              height: 22,
+                              fontSize: 10,
+                              fontWeight: 700,
+                              backgroundColor: `${colors.textSecondary}22`,
+                              color: colors.textSecondary,
+                            }}
+                          />
+                        </Box>
+                      }
+                      secondary={`${range} · ${n} poll${n === 1 ? '' : 's'}`}
+                      secondaryTypographyProps={{
+                        variant: 'caption',
+                        sx: { color: colors.textSecondary },
+                      }}
+                    />
+                  </ListItem>
+                );
+              })}
+            </List>
+          )}
+        </Card>
+
+        {/* Page title — below CVC */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 4 }}>
+          <Box
+            sx={{
+              width: 48,
+              height: 48,
+              borderRadius: '12px',
+              background: `linear-gradient(135deg, ${colors.brandRed} 0%, ${colors.brandDarkRed} 100%)`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <BarChart sx={{ fontSize: 28, color: colors.brandWhite }} />
+          </Box>
+          <Box>
+            <Typography
+              variant="h4"
+              sx={{
+                fontWeight: 700,
+                color: colors.brandBlack,
+                fontSize: { xs: 24, md: 28 },
+                mb: 0.5,
+              }}
+            >
+              {isEditMode ? 'Edit Poll' : 'Create New Poll'}
+            </Typography>
+            <Typography variant="body2" sx={{ color: colors.textSecondary, fontSize: 14 }}>
+              One poll per league • Max 5 active/scheduled per CVC • 24h-30d duration
+            </Typography>
           </Box>
         </Box>
 
